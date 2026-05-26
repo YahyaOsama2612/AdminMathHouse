@@ -2,18 +2,20 @@ import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import LessonSelectionRow from "./LessonSelectionRow";
 
-// تعريف المصفوفة الفارغة خارج الكومبوننت عشان نحافظ على الـ Reference بتاعها في الذاكرة
-// وده اللي هيمنع الـ Infinite Loop
 const EMPTY_LESSONS = [];
 
-const HierarchicalLessonSelector = ({ value, onChange, initialLessons = EMPTY_LESSONS }) => {
+const HierarchicalLessonSelector = ({
+  value,
+  onChange,
+  initialLessons = EMPTY_LESSONS,
+}) => {
   const [rows, setRows] = useState([]);
   const [selectedIdsPerRow, setSelectedIdsPerRow] = useState({});
 
   useEffect(() => {
     if (initialLessons && initialLessons.length > 0) {
       const grouped = {};
-      
+
       initialLessons.forEach((lesson) => {
         const chapterId = lesson.chapter?.id;
         if (!chapterId) return;
@@ -21,12 +23,17 @@ const HierarchicalLessonSelector = ({ value, onChange, initialLessons = EMPTY_LE
         if (!grouped[chapterId]) {
           grouped[chapterId] = {
             categoryId: lesson.category?.id,
+            subCategoryId: lesson.subCategory?.id || null,
             courseId: lesson.course?.id,
-            chapterId: chapterId,
+            chapterIds: [chapterId],
             selectedLessons: [],
           };
+        } else {
+          if (!grouped[chapterId].chapterIds.includes(chapterId)) {
+            grouped[chapterId].chapterIds.push(chapterId);
+          }
         }
-        
+
         grouped[chapterId].selectedLessons.push({
           value: lesson.id,
           label: lesson.name,
@@ -36,28 +43,62 @@ const HierarchicalLessonSelector = ({ value, onChange, initialLessons = EMPTY_LE
       const initialRowsData = Object.values(grouped);
       setRows(initialRowsData);
 
-      // بنخزن الـ IDs بتاعة كل الصفوف في الـ State عشان متتمسحش لما نعدل صف واحد
       const initialIdsState = {};
-      initialRowsData.forEach((row, idx) => {
-        initialIdsState[idx] = row.selectedLessons.map(l => l.value);
-      });
-      setSelectedIdsPerRow(initialIdsState);
+      const fullDetailsArray = [];
 
+      initialRowsData.forEach((row, idx) => {
+        const rowLessonIds = row.selectedLessons.map((l) => l.value);
+        initialIdsState[idx] = rowLessonIds;
+
+        fullDetailsArray.push({
+          categoryId: row.categoryId || null,
+          subCategoryId: row.subCategoryId || null,
+          courseId: row.courseId || null,
+          chapterIds: row.chapterIds || [],
+          lessonIds: rowLessonIds,
+        });
+      });
+
+      setSelectedIdsPerRow(initialIdsState);
       const allIds = initialLessons.map((l) => l.id);
-      onChange(allIds);
+      onChange(allIds, fullDetailsArray);
     } else {
-      // شرط إضافي عشان نتأكد إننا مش بنعمل setRows لو هي أصلاً فيها صف فاضي
       if (rows.length === 0) {
-        setRows([{}]); 
+        setRows([{}]);
       }
     }
-  }, [initialLessons]); // دلوقتي initialLessons مش هتعمل مشاكل لأن الريفرنس بتاعها ثابت
+  }, [initialLessons]);
 
-  const handleUpdateRow = (index, selectedIds) => {
+  const handleUpdateRow = (index, selectedIds, childSelections) => {
     setSelectedIdsPerRow((prev) => {
       const newState = { ...prev, [index]: selectedIds };
       const allIds = Array.from(new Set(Object.values(newState).flat()));
-      onChange(allIds);
+
+      setRows((prevRows) => {
+        const updatedRows = [...prevRows];
+
+        if (childSelections) {
+          updatedRows[index] = {
+            ...updatedRows[index],
+            categoryId: childSelections.categoryId || null,
+            subCategoryId: childSelections.subCategoryId || null,
+            courseId: childSelections.courseId || null,
+            chapterIds: childSelections.chapterIds || [],
+          };
+        }
+
+        const updatedRowsDetails = updatedRows.map((row, idx) => ({
+          categoryId: row.categoryId || null,
+          subCategoryId: row.subCategoryId || null,
+          courseId: row.courseId || null,
+          chapterIds: row.chapterIds || [],
+          lessonIds: newState[idx] || [],
+        }));
+
+        onChange(allIds, updatedRowsDetails);
+        return updatedRows;
+      });
+
       return newState;
     });
   };
@@ -67,12 +108,21 @@ const HierarchicalLessonSelector = ({ value, onChange, initialLessons = EMPTY_LE
   const removeRow = (index) => {
     const newRows = rows.filter((_, i) => i !== index);
     setRows(newRows);
-    
+
     setSelectedIdsPerRow((prev) => {
       const newState = { ...prev };
       delete newState[index];
       const allIds = Array.from(new Set(Object.values(newState).flat()));
-      onChange(allIds);
+
+      const updatedRowsDetails = newRows.map((row, idx) => ({
+        categoryId: row.categoryId || null,
+        subCategoryId: row.subCategoryId || null,
+        courseId: row.courseId || null,
+        chapterIds: row.chapterIds || [],
+        lessonIds: newState[idx] || [],
+      }));
+
+      onChange(allIds, updatedRowsDetails);
       return newState;
     });
   };
@@ -83,8 +133,8 @@ const HierarchicalLessonSelector = ({ value, onChange, initialLessons = EMPTY_LE
         <LessonSelectionRow
           key={index}
           index={index}
-          initialData={rowData} 
-          onUpdate={handleUpdateRow}
+          initialData={rowData}
+          onUpdate={(idx, ids, fullInfo) => handleUpdateRow(idx, ids, fullInfo)}
           onRemove={removeRow}
           isOnlyOne={rows.length === 1}
         />
