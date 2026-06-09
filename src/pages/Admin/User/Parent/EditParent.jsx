@@ -6,12 +6,14 @@ import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
+// 1. استيراد مكون البحث عن الطلاب هنا
+import SearchStudents from "../../../../components/SearchStudents";
 
 const EditParent = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const { data: parentRes, loading ,error } = useGet(`/api/admin/parent/${id}`);
+  const { data: parentRes, loading, error } = useGet(`/api/admin/parent/${id}`);
   const { putData, loading: saving } = usePut(`/api/admin/parent/${id}`);
 
   const fields = useMemo(
@@ -23,7 +25,6 @@ const EditParent = () => {
         required: true,
         placeholder: "Enter parent name",
         section: "Contact Information",
-        
       },
       {
         name: "email",
@@ -46,41 +47,68 @@ const EditParent = () => {
         label: "Password",
         type: "text",
         placeholder: "Leave empty to keep current password",
-                section: "Contact Information",
-
+        section: "Contact Information",
+      },
+      {
+        // 2. إضافة جدول اختيار الطلاب بنفس الإعدادات والـ Limit
+        name: "studentIds",
+        label: "Students",
+        fullWidth: true,
+        type: "custom",
+        render: ({ value, onChange, error }) => (
+          <SearchStudents
+            value={value}
+            onChange={onChange}
+            error={error}
+            limit={3}
+          />
+        ),
       },
     ],
-    []
+    [],
   );
 
   const onSave = async (formData) => {
-    
-
     const payload = {
       name: formData.name,
       email: formData.email,
       phoneNumber: formData.phoneNumber,
+      // 3. إضافة الـ studentIds المحددة إلى الـ payload المرسل للسيرفر
+      studentIds: formData.studentIds || [],
     };
+
     if (formData.password?.trim()) {
       payload.password = formData.password;
     }
 
     try {
-      await putData(payload, `/api/admin/parent/${id}`, "Parent updated successfully");
+      await putData(
+        payload,
+        `/api/admin/parent/${id}`,
+        "Parent updated successfully",
+      );
       navigate("/admin/users/parents");
     } catch (e) {
-        throw e
+      throw e;
     }
   };
 
-  if (loading) {
+  if (loading || saving) {
+    // عرض الـ Loader أيضاً أثناء الحفظ إذا أردت
     return <Loader />;
   }
-  if(error){
+  if (error) {
     return <Errorpage />;
   }
 
   const parent = parentRes?.data?.data;
+
+  // ملاحظة: تأكد من شكل الـ API عندك، إذا كان يرجع الطلاب كـ Object كاملة أو IDs مباشرة.
+  // السطر بالأسفل يفترض أن الـ API يرجع مصفوفة من الـ IDs أو كائنات بداخلها id.
+  const currentStudents =
+    parent?.students?.map((student) => student._id || student.id) ||
+    parent?.studentIds ||
+    [];
 
   return (
     <AddPage
@@ -88,12 +116,13 @@ const EditParent = () => {
       fields={fields}
       onSave={onSave}
       onCancel={() => navigate("/admin/users/parents")}
-       
       initialData={{
         name: parent?.name || "",
         email: parent?.email || "",
         phoneNumber: parent?.phoneNumber || "",
-        password: "", 
+        password: "",
+        // 4. تمرير الطلاب الحاليين القادمين من الـ API ليعرضهم الجدول تلقائياً عند فتح الصفحة
+        studentIds: currentStudents,
       }}
     />
   );

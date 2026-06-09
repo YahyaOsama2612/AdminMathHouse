@@ -119,6 +119,7 @@ import EditGrade from '../pages/Admin/Course/Grade/EditGrade'
 import PaymentRecharge from '../pages/Admin/Payments/PaymentRecharge/PaymentRecharge'
 import PaymentPackage from '../pages/Admin/Payments/PaymentPackage/PaymentPackage'
 import DriveLayout from "../Layout/DriveLayout";
+import PaymentContent from "../pages/Admin/Payments/PaymentContent/PaymentContent";
 
 const router = createBrowserRouter([
   {
@@ -278,6 +279,8 @@ children: [
       {path:"payment/payment-method", element: <PaymentMethod />},
       {path:"payment/payment-method/add", element: <AddPaymentMethod />},
       {path:"payment/payment-method/edit/:id", element: <EditPaymentMethod />},
+
+      {path:"payment/payment-content", element: <PaymentContent />},
     ],
   },
 ]);

@@ -143,6 +143,7 @@ const menuItems = [
       { title: "Payment Package", path: "/admin/payment/paymentpackage", icon: <FaReceipt size={18} /> },
       // { title: "Wallet History", path: "/admin/payment/wallet-history", icon: <FaWallet size={18} /> },
       { title: "Payment Method", path: "/admin/payment/payment-method", icon: <MdSettingsSuggest size={18} /> },
+      { title: "Payment Content", path: "/admin/payment/payment-content", icon: <FaUserTimes size={18} /> },
     ],
   },
   {
