@@ -19,7 +19,7 @@ const Courses = () => {
   const { categoryId } = useParams();
 
   const { data, loading, refetch, error } = useGet(
-    `/api/admin/courses/category/${categoryId}`
+    `/api/admin/courses/category/${categoryId}`,
   );
 
   const {
@@ -38,9 +38,8 @@ const Courses = () => {
     row: null,
   });
 
-  const { data: teachersData, loading: teachersLoading } = useGet(
-    "/api/admin/teacher"
-  );
+  const { data: teachersData, loading: teachersLoading } =
+    useGet("/api/admin/teacher");
 
   const teachers = teachersData?.data?.teacher || [];
 
@@ -65,15 +64,11 @@ const Courses = () => {
   };
 
   const handleRemoveTeacher = async (courseId, teacherId) => {
-    await deleteData(
-      `/api/admin/courses/${courseId}/teachers/${teacherId}`
-    );
+    await deleteData(`/api/admin/courses/${courseId}/teachers/${teacherId}`);
 
     setSelectedRow((prev) => ({
       ...prev,
-      teachers: prev.teachers.filter(
-        (t) => t.teacherId !== teacherId
-      ),
+      teachers: prev.teachers.filter((t) => t.teacherId !== teacherId),
     }));
 
     refetch();
@@ -83,7 +78,7 @@ const Courses = () => {
     await postData(
       { teacherId },
       `/api/admin/courses/${courseId}/teachers`,
-      "Teacher added successfully"
+      "Teacher added successfully",
     );
 
     const addedTeacher = teachers.find((t) => t.id === teacherId);
@@ -156,7 +151,7 @@ const Courses = () => {
     selectedRow?.teachers?.map((t) => t.teacherId) || [];
 
   const availableTeachers = teachers.filter(
-    (teacher) => !assignedTeacherIds.includes(teacher.id)
+    (teacher) => !assignedTeacherIds.includes(teacher.id),
   );
 
   if (loading || loadingOne) return <Loader />;
@@ -179,7 +174,6 @@ const Courses = () => {
         onDelete={handleDelete}
         extraActions={(row) => (
           <div className="flex gap-2">
-
             {/* Semester / Chapters */}
             {row.isHaveSemester ? (
               <NavChild route={`/admin/courses/semester/${row.id}`} />
@@ -199,22 +193,16 @@ const Courses = () => {
             </button>
 
             {/* Exams */}
-            <button
-              onClick={() =>
-                setOptionPopup({ open: true, row })
-              }
-            >
+            <button onClick={() => setOptionPopup({ open: true, row })}>
               <PiExamFill className="text-2xl" />
             </button>
 
             {/* 💰 Prices */}
             <button
-              onClick={() =>
-                setPricePopup({ open: true, row })
-              }
+              onClick={() => setPricePopup({ open: true, row })}
               className="px-2 py-1  rounded"
             >
-              <MdAttachMoney className="text-3xl text-green-600" /> 
+              <MdAttachMoney className="text-3xl text-green-600" />
             </button>
           </div>
         )}
@@ -236,12 +224,27 @@ const Courses = () => {
         description={`Are you sure you want to delete "${selectedRow?.name}" ?`}
       />
 
-  <PricePlansModal
-  open={pricePopup.open}
-  row={pricePopup.row}
-  onClose={() => setPricePopup({ open: false, row: null })}
-/>
+      <PricePlansModal
+        open={pricePopup.open}
+        row={pricePopup.row}
+        onClose={() => setPricePopup({ open: false, row: null })}
+      />
+      {optionPopup.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg">
+            <h3 className="text-lg font-bold">
+              Exams for {optionPopup.row?.name}
+            </h3>
 
+            <button
+              className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
+              onClick={() => setOptionPopup({ open: false, row: null })}
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -10,7 +10,7 @@ const Student = () => {
   const navigate = useNavigate();
 
   // 🔹 جلب الداتا من الـ API
-  const { data, loading,error, refetch } = useGet("/api/admin/student");
+  const { data, loading, error, refetch } = useGet("/api/admin/student");
   const { deleteData, loading: deleteLoading } = useDelete();
 
   // 🔹 إدارة حذف الطالب
@@ -34,10 +34,24 @@ const Student = () => {
   };
 
   const columns = [
-    { header: "Full Name", key: "name" },
-    { header: "Email", key: "email"},
-    { header: "Grade", key: "grade" ,filterable: true, filterType: 'select'},
-    { header: "Parent Phone", key: "parentphone"},
+    {
+      header: "Full Name",
+      key: "name",
+      render: (
+        value,
+        row, // ✅ "render" not "cell", args are (value, row)
+      ) => (
+        <button
+          onClick={() => navigate(`/admin/users/students/attend/${row.id}`)}
+          className="text-blue-600 hover:underline font-medium text-left cursor-pointer"
+        >
+          {row.name}
+        </button>
+      ),
+    },
+    { header: "Email", key: "email" },
+    { header: "Grade", key: "grade", filterable: true, filterType: "select" },
+    { header: "Parent Phone", key: "parentphone" },
   ];
 
   // 🔹 تحويل الداتا من شكل الـ API لشكل الجدول
@@ -49,7 +63,7 @@ const Student = () => {
         email: student.email,
         grade: student.grade?.name,
         parentphone: student.parentPhone,
-        raw: student, 
+        raw: student,
       })) || []
     );
   }, [data]);
@@ -57,12 +71,16 @@ const Student = () => {
   const handleEdit = (row) => {
     navigate(`/admin/users/students/edit/${row.id}`);
   };
-if (loading) {
+  if (loading) {
     return <Loader />;
   }
 
   if (error) {
-    return <div><Errorpage /></div>;
+    return (
+      <div>
+        <Errorpage />
+      </div>
+    );
   }
 
   return (
@@ -76,7 +94,6 @@ if (loading) {
         onAddClick={() => navigate("/admin/users/students/add")}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        
       />
 
       {/* 🔹 Confirm Delete Modal */}

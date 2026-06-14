@@ -13,6 +13,7 @@ import EditAdmin from "../pages/Admin/Admins/Admin/EditAdmin";
 import Student from "../pages/Admin/User/Student/Student";
 import AddStudent from "../pages/Admin/User/Student/AddStudent";
 import EditStudent from "../pages/Admin/User/Student/EditStudent";
+import Attend from "../pages/Admin/User/Student/Attend";
 
 import Category from '../pages/Admin/Course/Category/Category'
 import AddCategory from '../pages/Admin/Course/Category/AddCategory'
@@ -163,7 +164,7 @@ children: [
       { path: "users/students", element: <Student /> },
       { path: "users/students/add", element: <AddStudent /> },
       { path: "users/students/edit/:id", element: <EditStudent /> },
-
+      { path: "users/students/attend/:id", element: <Attend /> },
       
       { path: "courses/semester/:coursesId", element: <Semester /> },
       { path: "courses/semester/add", element: <AddSemester /> },

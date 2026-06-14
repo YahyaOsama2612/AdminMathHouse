@@ -32,7 +32,7 @@ const AddQuiz = () => {
         name: "durationHours",
         label: "Duration (Hours)",
         type: "number",
-        required: true,
+        required: false,
         placeholder: "0",
         section: "General Information",
       },
