@@ -231,7 +231,7 @@ const AllQuestions = () => {
       })) 
     },
     { key: "difficulty", label: "Difficulty", options: ["A", "B", "C", "D", "E"] },
-    { key: "questionType", label: "Question Type", options: ["Trail", "Extra"] },
+    { key: "questionType", label: "Question Type", options: ["Trail", "Extra", "Parallel"] },
     { key: "answerType", label: "Answer Type", options: ["MCQ", "Grid in"] },
     { key: "month", label: "Month", options: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] },
     {

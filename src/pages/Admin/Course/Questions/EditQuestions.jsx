@@ -134,7 +134,7 @@ const EditQuestions = () => {
       name: "questionType",
       label: "Question Type",
       type: "select",
-      options: [{ value: "Extra", label: "Extra" }, { value: "Trail", label: "Trail" }],
+      options: [{ value: "Extra", label: "Extra" }, { value: "Trail", label: "Trail" }, { value: "Parallel", label: "Parallel" }],
       required: true,
       section: "General Information",
     },

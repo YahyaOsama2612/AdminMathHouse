@@ -52,6 +52,21 @@ const Student = () => {
     { header: "Email", key: "email" },
     { header: "Grade", key: "grade", filterable: true, filterType: "select" },
     { header: "Parent Phone", key: "parentphone" },
+    {
+      header: "Package",
+      key: "package",
+      render: (
+        value,
+        row, // ✅ "render" not "cell", args are (value, row)
+      ) => (
+        <button
+          onClick={() => navigate(`/admin/users/packages/${row.id}`)}
+          className="text-blue-600 hover:underline font-medium text-left cursor-pointer"
+        >
+          View Packages
+        </button>
+      ),
+    },
   ];
 
   // 🔹 تحويل الداتا من شكل الـ API لشكل الجدول

@@ -135,6 +135,7 @@ console.log(extractedText);
       options: [
         { value: "Extra", label: "Extra" },
         { value: "Trail", label: "Trail" },
+        { value: "Parallel", label: "Parallel" },
       ],
       required: true,
       section: "General Information",

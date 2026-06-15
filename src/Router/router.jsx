@@ -14,6 +14,7 @@ import Student from "../pages/Admin/User/Student/Student";
 import AddStudent from "../pages/Admin/User/Student/AddStudent";
 import EditStudent from "../pages/Admin/User/Student/EditStudent";
 import Attend from "../pages/Admin/User/Student/Attend";
+import UserPackage from "../pages/Admin/User/Package/userpackage";
 
 import Category from '../pages/Admin/Course/Category/Category'
 import AddCategory from '../pages/Admin/Course/Category/AddCategory'
@@ -165,7 +166,7 @@ children: [
       { path: "users/students/add", element: <AddStudent /> },
       { path: "users/students/edit/:id", element: <EditStudent /> },
       { path: "users/students/attend/:id", element: <Attend /> },
-      
+      { path: "users/packages/:id", element: <UserPackage /> },
       { path: "courses/semester/:coursesId", element: <Semester /> },
       { path: "courses/semester/add", element: <AddSemester /> },
       { path: "courses/semester/edit/:id", element: <EditSemester /> },
