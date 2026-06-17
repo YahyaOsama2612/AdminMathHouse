@@ -10,22 +10,22 @@ import useDelete from "@/hooks/useDelete";
 const AllExams = () => {
   const navigate = useNavigate();
 
-  const { data, loading, error } = useGet("/api/admin/exams");
+  const { data, loading, error, refetch } = useGet("/api/admin/exams");
   const { deleteData, loading: deleteLoading } = useDelete();
- const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+
   const columns = [
     {
       header: "Exam",
       key: "title",
     },
-     {
+    {
       header: "Category",
       key: "categoryName",
       filterable: true,
       filterType: "select",
     },
-   
     {
       header: "Course",
       key: "course",
@@ -38,11 +38,10 @@ const AllExams = () => {
       filterable: true,
       filterType: "select",
     },
-
     {
       header: "Code",
       key: "codeName",
-      filterable: true,
+      filterable: true, // تم التفعيل للفلترة بناءً على طلبك
       filterType: "select",
     },
     {
@@ -64,21 +63,28 @@ const AllExams = () => {
     {
       header: "Year",
       key: "year",
+      filterable: true, // تم التفعيل للفلترة بناءً على طلبك
+      filterType: "select",
     },
     {
       header: "Month",
       key: "month",
+      filterable: true, // تم التفعيل للفلترة بناءً على طلبك
+      filterType: "select",
     },
     {
       header: "Type",
       key: "examType",
+      filterable: true,
+      filterType: "select",
     },
     {
       header: "Status",
       key: "status",
     },
   ];
-const handleDelete = (row) => {
+
+  const handleDelete = (row) => {
     setSelectedRow(row);
     setOpenDeleteModal(true);
   };
@@ -88,9 +94,9 @@ const handleDelete = (row) => {
       await deleteData(`/api/admin/exams/${selectedRow.id}`);
       setOpenDeleteModal(false);
       setSelectedRow(null);
-      refetch();
+      if (refetch) refetch();
     } catch (e) {
-        throw e
+      throw e;
     }
   };
 
@@ -101,21 +107,29 @@ const handleDelete = (row) => {
   const tableData = useMemo(() => {
     const staticExams = data?.data?.data?.static || [];
     const adaptiveExams = data?.data?.data?.adaptive || [];
+    // لدعم الأنواع الجديدة لو السيرفر يرجعها في مصفوفات منفصلة
+    const extraExams = data?.data?.data?.extra || [];
+    const trailExams = data?.data?.data?.trail || [];
 
-    const allExams = [...staticExams, ...adaptiveExams];
+    const allExams = [
+      ...staticExams,
+      ...adaptiveExams,
+      ...extraExams,
+      ...trailExams,
+    ];
 
     return allExams.map((exam) => ({
       id: exam.id,
-      title: exam.title,
+      title: exam.title || "—",
       course: exam.courseName || "—",
       codeName: exam.codeName || "—",
       rawScoreName: exam.rawScoreName || "—",
-      duration: `${exam.duration} min`,
-      totalScore: exam.totalScore,
-      passScore: exam.passScore,
-      year: exam.year,
-      month: exam.Month,
-      examType: exam.examType,
+      duration: exam.duration ? `${exam.duration} min` : "—",
+      totalScore: exam.totalScore ?? "—",
+      passScore: exam.passScore ?? "—",
+      year: exam.year ? exam.year.toString() : "—",
+      month: exam.Month || exam.month || "—",
+      examType: exam.examType ? exam.examType.toUpperCase() : "—",
       categoryName: exam.categoryName || "—",
       semesterName: exam.semesterName || "—",
       status: exam.isActive ? "Active" : "Inactive",
@@ -133,16 +147,16 @@ const handleDelete = (row) => {
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading}
-             onEdit={handleEdit}
+        onEdit={handleEdit}
         onDelete={handleDelete}
       />
       <ConfirmDeleteModal
-              open={openDeleteModal}
-              onClose={() => setOpenDeleteModal(false)}
-              onConfirm={confirmDelete}
-              title="Delete Exam"
-              description={`Are you sure you want to delete "${selectedRow?.title}"?`}
-            />
+        open={openDeleteModal}
+        onClose={() => setOpenDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Exam"
+        description={`Are you sure you want to delete "${selectedRow?.title}"?`}
+      />
     </div>
   );
 };

@@ -14,262 +14,326 @@ const AddQuestions = () => {
   const { postData: postDataimage } = usePost("/api/admin/questions/ocr");
   const location = useLocation();
   const [ocrLoading, setOcrLoading] = useState(false);
+
   // استلام معرف الدرس لو موجود في الـ state
   const { lessonId } = location.state || {};
 
   // جلب بيانات الاختيارات من الـ API
-  const { data: Lessons, loading: loadingLessons, error: errorLessons } = 
-    useGet("/api/admin/questions/selectionLesson");
-  const { data: Sections, loading: loadingSections, error: errorSections } = 
-    useGet("/api/admin/sections/selectionSections");
-  const { data: ExamCode, loading: loadingExamCode, error: errorExamCode } = 
-    useGet("/api/admin/questions/selectionExamCode");
+  const {
+    data: Lessons,
+    loading: loadingLessons,
+    error: errorLessons,
+  } = useGet("/api/admin/questions/selectionLesson");
+  const {
+    data: Sections,
+    loading: loadingSections,
+    error: errorSections,
+  } = useGet("/api/admin/sections/selectionSections");
+  const {
+    data: ExamCode,
+    loading: loadingExamCode,
+    error: errorExamCode,
+  } = useGet("/api/admin/questions/selectionExamCode");
 
-  // --- تجهيز الخيارات (Options) ---
-  const LessonsOptions = useMemo(() => 
-    Lessons?.data?.data?.map(lesson => ({ value: lesson.value, label: lesson.label })) || [], 
-    [Lessons]
-  );
+  // --- تجهيز الخيارات (Options) مع إضافة خيار فارغ لإلغاء الاختيار ---
+  const LessonsOptions = useMemo(() => {
+    const base = [{ value: "", label: "-- Select Lesson --" }];
+    const apiData =
+      Lessons?.data?.data?.map((lesson) => ({
+        value: lesson.value,
+        label: lesson.label,
+      })) || [];
+    return [...base, ...apiData];
+  }, [Lessons]);
 
-  const SectionsOptions = useMemo(() => 
-    Sections?.data?.sections?.map(s => ({ value: s.id, label: s.sectionName })) || [], 
-    [Sections]
-  );
+  const SectionsOptions = useMemo(() => {
+    const base = [{ value: "", label: "-- Select Section --" }];
+    const apiData =
+      Sections?.data?.sections?.map((s) => ({
+        value: s.id,
+        label: s.sectionName,
+      })) || [];
+    return [...base, ...apiData];
+  }, [Sections]);
 
-  const ExamCodeOptions = useMemo(() => 
-    ExamCode?.data?.data?.map(code => ({ value: code.id, label: code.code })) || [], 
-    [ExamCode]
-  );
+  const ExamCodeOptions = useMemo(() => {
+    const base = [{ value: "", label: "-- Select Exam Code --" }];
+    const apiData =
+      ExamCode?.data?.data?.map((code) => ({
+        value: code.id,
+        label: code.code,
+      })) || [];
+    return [...base, ...apiData];
+  }, [ExamCode]);
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 2000 + 1 }, (_, i) => {
-    const y = 2000 + i;
-    return { value: y.toString(), label: y.toString() };
-  });
-const handleOCR = async (imageFile, setFormData) => {
-  if (!imageFile) {
-    return toast.error("Please upload an image first");
-  }
+  const years = useMemo(() => {
+    const base = [{ value: "", label: "-- Select Year --" }];
+    const list = Array.from({ length: currentYear - 2000 + 1 }, (_, i) => {
+      const y = 2000 + i;
+      return { value: y.toString(), label: y.toString() };
+    });
+    return [...base, ...list];
+  }, [currentYear]);
 
-  try {
-    setOcrLoading(true);
+  const months = useMemo(
+    () => [
+      { value: "", label: "-- Select Month --" },
+      { value: "Jan", label: "Jan" },
+      { value: "Feb", label: "Feb" },
+      { value: "Mar", label: "Mar" },
+      { value: "Apr", label: "Apr" },
+      { value: "May", label: "May" },
+      { value: "Jun", label: "Jun" },
+      { value: "Jul", label: "Jul" },
+      { value: "Aug", label: "Aug" },
+      { value: "Sep", label: "Sep" },
+      { value: "Oct", label: "Oct" },
+      { value: "Nov", label: "Nov" },
+      { value: "Dec", label: "Dec" },
+    ],
+    [],
+  );
 
-    const formData = new FormData();
-    formData.append("image", imageFile);
-
-    const res = await postDataimage(
-      formData,
-      "/api/admin/questions/ocr",
-      "Text extracted successfully"
-    );
-
-    const extractedText = res?.data?.data;
-console.log(extractedText);
-    if (extractedText) {
-      setFormData((prev) => ({
-        ...prev,
-        question: extractedText,
-      }));
-    } else {
-      toast.error("No text detected");
+  const handleOCR = async (imageFile, setFormData) => {
+    if (!imageFile) {
+      return toast.error("Please upload an image first");
     }
 
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setOcrLoading(false);
-  }
-};
+    try {
+      setOcrLoading(true);
+      const formData = new FormData();
+      formData.append("image", imageFile);
 
-  const fields = useMemo(() => [
-{
-  name: "image",
-  label: "Question Image & OCR",
-  type: "fileWithOCR", // استخدمنا النوع الجديد هنا
-  section: "General Information",
-  fullWidth: true, // عشان ياخد العرض بالكامل والصورة والزرار يبقوا مرتاحين
-  actionButton: ({ formData, setFormData }) => (
-    <button
-      type="button"
-      onClick={() => handleOCR(formData.image, setFormData)}
-      disabled={ocrLoading || !formData.image}
-      className="w-full md:w-auto h-full px-8 py-4 bg-one text-white rounded-xl hover:bg-one/80 disabled:opacity-50 flex items-center justify-center gap-2 transition-all font-bold shadow-sm"
-    >
-      {ocrLoading ? (
-        <>
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          <span>Extracting...</span>
-        </>
-      ) : (
-        <>📄 Extract Text</>
-      )}
-    </button>
-  ),
-},
-    {
-      name: "question",
-      label: "Question Content",
-      type: "custom",
-      required: true,
-      section: "General Information",
-      fullWidth: true,
-      render: ({ value, onChange }) => (
-        <TipTapMathEditor value={value} onChange={onChange} />
-      ),
-    },
-    {
-      name: "answerType",
-      label: "Answer Type",
-      type: "select",
-      options: [
-        { value: "MCQ", label: "MCQ (Multiple Choice)" },
-        { value: "Grid in", label: "Grid in (Open Answer)" },
-      ],
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "questionType",
-      label: "Question Type",
-      type: "select",
-      options: [
-        { value: "Extra", label: "Extra" },
-        { value: "Trail", label: "Trail" },
-        { value: "Parallel", label: "Parallel" },
-      ],
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "difficulty",
-      label: "Difficulty Level",
-      type: "select",
-      options: [
-        { value: "A", label: "A (Easy)" },
-        { value: "B", label: "B" },
-        { value: "C", label: "C (Medium)" },
-        { value: "D", label: "D" },
-        { value: "E", label: "E (Hard)" },
-      ],
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "sectionId",
-      label: "Section",
-      type: "select",
-      options: SectionsOptions,
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "year",
-      label: "Year",
-      type: "select",
-      options: years,
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "month",
-      label: "Month",
-      type: "select",
-      options: [
-        { value: "Jan", label: "Jan" }, { value: "Feb", label: "Feb" },
-        { value: "Mar", label: "Mar" }, { value: "Apr", label: "Apr" },
-        { value: "May", label: "May" }, { value: "Jun", label: "Jun" },
-        { value: "Jul", label: "Jul" }, { value: "Aug", label: "Aug" },
-        { value: "Sep", label: "Sep" }, { value: "Oct", label: "Oct" },
-        { value: "Nov", label: "Nov" }, { value: "Dec", label: "Dec" },
-      ],
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "codeId",
-      label: "Exam Code",
-      type: "select",
-      options: ExamCodeOptions,
-      required: true,
-      section: "General Information",
-    },
+      const res = await postDataimage(
+        formData,
+        "/api/admin/questions/ocr",
+        "Text extracted successfully",
+      );
 
-    // --- MCQ Section ---
-    {
-      name: "options",
-      label: "Multiple Choice Options",
-      type: "dynamic-list",
-      required: true,
-      section: "Answers Configuration",
-      hidden: (formData) => formData.answerType === "Grid in",
-      helperText: "Enter the text for options A, B, C, D...",
-    },
-    {
-      name: "correctOption",
-      label: "Mark Correct Letter",
-      type: "custom",
-      required: true,
-      section: "Answers Configuration",
-      hidden: (formData) => formData.answerType === "Grid in",
-      render: ({ value, onChange, formData, error }) => {
-        const count = formData.options?.length || 4;
-        const letters = Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i));
-        return (
-          <div className="flex flex-col gap-3">
-            {letters.map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => onChange(l)}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold transition-all border-2 
-                  ${value === l ? "bg-one text-white border-one shadow-md scale-110" : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"}`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        );
+      const extractedText = res?.data?.data;
+      if (extractedText) {
+        setFormData((prev) => ({
+          ...prev,
+          question: extractedText,
+        }));
+      } else {
+        toast.error("No text detected");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const fields = useMemo(
+    () => [
+      {
+        name: "image",
+        label: "Question Image & OCR",
+        type: "fileWithOCR",
+        section: "General Information",
+        fullWidth: true,
+        actionButton: ({ formData, setFormData }) => (
+          <button
+            type="button"
+            onClick={() => handleOCR(formData.image, setFormData)}
+            disabled={ocrLoading || !formData.image}
+            className="w-full md:w-auto h-full px-8 py-4 bg-one text-white rounded-xl hover:bg-one/80 disabled:opacity-50 flex items-center justify-center gap-2 transition-all font-bold shadow-sm"
+          >
+            {ocrLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Extracting...</span>
+              </>
+            ) : (
+              <>📄 Extract Text</>
+            )}
+          </button>
+        ),
       },
-    },
+      {
+        name: "questionNumber", // حقل رقم السؤال الجديد
+        label: "Question Number",
+        type: "number",
+        required: false,
+        section: "General Information",
+      },
+      {
+        name: "question",
+        label: "Question Content",
+        type: "custom",
+        required: true,
+        section: "General Information",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <TipTapMathEditor value={value} onChange={onChange} />
+        ),
+      },
+      {
+        name: "answerType",
+        label: "Answer Type",
+        type: "select",
+        options: [
+          { value: "MCQ", label: "MCQ (Multiple Choice)" },
+          { value: "Grid in", label: "Grid in (Open Answer)" },
+        ],
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "questionType",
+        label: "Question Type",
+        type: "select",
+        options: [
+          { value: "Extra", label: "Extra" },
+          { value: "Trail", label: "Trail" },
+          { value: "Parallel", label: "Parallel" },
+        ],
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "difficulty",
+        label: "Difficulty Level",
+        type: "select",
+        options: [
+          { value: "A", label: "A (Easy)" },
+          { value: "B", label: "B" },
+          { value: "C", label: "C (Medium)" },
+          { value: "D", label: "D" },
+          { value: "E", label: "E (Hard)" },
+        ],
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "sectionId",
+        label: "Section",
+        type: "select",
+        options: SectionsOptions, // الآن يحتوي على خيار الإلغاء الفارغ
+        required: false,
+        section: "General Information",
+      },
+      {
+        name: "year",
+        label: "Year",
+        type: "select",
+        options: years, // الآن يحتوي على خيار الإلغاء الفارغ
+        required: false,
+        section: "General Information",
+      },
+      {
+        name: "month",
+        label: "Month",
+        type: "select",
+        options: months, // الآن يحتوي على خيار الإلغاء الفارغ
+        required: false,
+        section: "General Information",
+      },
+      {
+        name: "codeId",
+        label: "Exam Code",
+        type: "select",
+        options: ExamCodeOptions,
+        required: true,
+        section: "General Information",
+      },
 
-    // --- Grid In Section ---
-    {
-      name: "gridInAnswers",
-      label: "Accepted Grid-in Answers",
-      type: "dynamic-list",
-      required: true,
-      section: "Answers Configuration",
-      hidden: (formData) => formData.answerType === "MCQ" || !formData.answerType,
-      helperText: "Add all possible correct formats (e.g., 0.5, .5, 1/2)",
-    },
+      // --- MCQ Section ---
+      {
+        name: "options",
+        label: "Multiple Choice Options",
+        type: "dynamic-list",
+        required: true,
+        section: "Answers Configuration",
+        hidden: (formData) => formData.answerType === "Grid in",
+        helperText: "Enter the text for options A, B, C, D...",
+      },
+      {
+        name: "correctOption",
+        label: "Mark Correct Letter",
+        type: "custom",
+        required: true,
+        section: "Answers Configuration",
+        hidden: (formData) => formData.answerType === "Grid in",
+        render: ({ value, onChange, formData }) => {
+          const count = formData.options?.length || 4;
+          const letters = Array.from({ length: count }, (_, i) =>
+            String.fromCharCode(65 + i),
+          );
+          return (
+            <div className="flex flex-col gap-3">
+              {letters.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => onChange(l)}
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold transition-all border-2 
+                  ${value === l ? "bg-one text-white border-one shadow-md scale-110" : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          );
+        },
+      },
 
-    // --- Media Section ---
-    {
-      name: "answerPdf",
-      label: "Answer PDF URL",
-      type: "text",
-      section: "Solution Media",
-    },
-    {
-      name: "answerVideo",
-      label: "Answer Video URL",
-      type: "text",
-      section: "Solution Media",
-    },
-    
-], [SectionsOptions, ExamCodeOptions, years, ocrLoading]);
+      // --- Grid In Section ---
+      {
+        name: "gridInAnswers",
+        label: "Accepted Grid-in Answers",
+        type: "dynamic-list",
+        required: true,
+        section: "Answers Configuration",
+        hidden: (formData) =>
+          formData.answerType === "MCQ" || !formData.answerType,
+        helperText: "Add all possible correct formats (e.g., 0.5, .5, 1/2)",
+      },
+
+      // --- Media Section ---
+      {
+        name: "answerImage", // حقل صورة الحل الجديد
+        label: "Answer Image",
+        type: "file", // يفترض أن مكون AddPage يدعم نوع file لرفع الصور المباشرة
+        section: "Solution Media",
+      },
+      {
+        name: "answerPdf",
+        label: "Answer PDF URL",
+        type: "text",
+        section: "Solution Media",
+      },
+      {
+        name: "answerVideo",
+        label: "Answer Video URL",
+        type: "text",
+        section: "Solution Media",
+      },
+    ],
+    [SectionsOptions, ExamCodeOptions, years, months, ocrLoading],
+  );
+
   const initialFormValues = {
+    questionNumber: "", // القيمة الابتدائية لرقم السؤال
     question: "",
     answerType: "",
     difficulty: "",
     options: ["", "", "", ""],
     gridInAnswers: [""],
     correctOption: "",
-    year:"",
+    year: "",
+    month: "",
+    sectionId: "",
+    answerImage: null, // القيمة الابتدائية لصورة الحل
+    answerPdf: "",
+    answerVideo: "",
   };
 
   const onSave = async (formData) => {
-    // 1. معالجة الصورة
+    // 1. معالجة صورة السؤال
     let imageBase64 = null;
     if (formData.image instanceof File) {
       imageBase64 = await new Promise((resolve) => {
@@ -279,44 +343,82 @@ console.log(extractedText);
       });
     }
 
-    // 2. معالجة الإجابات بناءً على النوع
+    // 2. معالجة صورة الحل (الجديدة)
+    let answerImageBase64 = null;
+    if (formData.answerImage instanceof File) {
+      answerImageBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(formData.answerImage);
+      });
+    }
+
+    // 3. معالجة الإجابات بناءً على النوع
     let finalOptions = [];
     if (formData.answerType === "MCQ") {
-      finalOptions = (formData.options || []).map((ans, index) => ({
-        answer: ans?.trim(),
-        isCorrect: formData.correctOption === String.fromCharCode(65 + index),
-        order: String.fromCharCode(65 + index),
-      })).filter(opt => opt.answer);
+      finalOptions = (formData.options || [])
+        .map((ans, index) => ({
+          answer: ans?.trim(),
+          isCorrect: formData.correctOption === String.fromCharCode(65 + index),
+          order: String.fromCharCode(65 + index),
+        }))
+        .filter((opt) => opt.answer);
 
       if (finalOptions.length < 2 || !formData.correctOption) {
-        return toast.error("Please provide MCQ options and mark the correct one");
+        return toast.error(
+          "Please provide MCQ options and mark the correct one",
+        );
       }
     } else {
       finalOptions = (formData.gridInAnswers || [])
-        .filter(ans => ans.trim() !== "")
-        .map(ans => ({
+        .filter((ans) => ans.trim() !== "")
+        .map((ans) => ({
           answer: ans.trim(),
           isCorrect: true,
-          order: null
+          order: null,
         }));
 
       if (finalOptions.length === 0) {
-        return toast.error("Please add at least one correct answer for Grid-in");
+        return toast.error(
+          "Please add at least one correct answer for Grid-in",
+        );
       }
     }
 
-    // 3. تجهيز الـ Payload النهائي
-    const { year, gridInAnswers, correctOption, options, ...rest } = formData;
+    // 4. تجهيز الـ Payload النهائي وتنظيف الحقول غير الإلزامية الفارغة
+    const {
+      year,
+      month,
+      sectionId,
+      questionNumber,
+      gridInAnswers,
+      correctOption,
+      options,
+      answerImage,
+      ...rest
+    } = formData;
+
     const payload = {
       ...rest,
-      year: Number(year),
-      lessonId: lessonId,
+      lessonId: lessonId || null,
       options: finalOptions,
-      image: imageBase64 || formData.image, 
+      image: imageBase64 || formData.image || null,
+      answerImage: answerImageBase64 || null, // إرسال صورة الحل كـ Base64
     };
 
+    // التحقق من الحقول الاختيارية حتى لا تُرسل كـ نصوص فارغة تسبب مشاكل بالـ Back-end
+    if (year && year.trim() !== "") payload.year = Number(year);
+    if (month && month.trim() !== "") payload.month = month;
+    if (sectionId && sectionId.trim() !== "") payload.sectionId = sectionId;
+    if (questionNumber && questionNumber.toString().trim() !== "")
+      payload.questionNumber = Number(questionNumber);
+
     try {
-      await postData(payload, "/api/admin/questions", "Question added successfully");
+      await postData(
+        payload,
+        "/api/admin/questions",
+        "Question added successfully",
+      );
       navigate(-1);
     } catch (err) {
       console.error(err);

@@ -12,15 +12,18 @@ const QuestionsTableSelect = ({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState(""); // فلتر الصعوبة
+  const [year, setYear] = useState(""); // فلتر السنة
   const [loading, setLoading] = useState(false);
 
   const limit = 10;
 
+  // استدعاء البيانات عند تغير الصفحة، البحث، أو الفلاتر
   useEffect(() => {
     if (lessonId) {
       fetchQuestions();
     }
-  }, [page, search, lessonId]);
+  }, [page, search, difficulty, year, lessonId]);
 
   const fetchQuestions = async () => {
     try {
@@ -31,6 +34,8 @@ const QuestionsTableSelect = ({
           page,
           limit,
           search,
+          difficulty, // إرسال الفلتر للسيرفر
+          year, // إرسال الفلتر للسيرفر
         },
       });
 
@@ -55,21 +60,19 @@ const QuestionsTableSelect = ({
 
   const isChecked = (id) => value.includes(id);
 
-  // --- لوجيك الـ Select All الجديد للملف ---
-
-  // 1. تشيك لو كل الأسئلة بتاعة الصفحة الحالية موجودة جوه الـ value المختار
+  // تشيك لو كل أسئلة الصفحة الحالية مختارة بالفعل
   const isAllCurrentPageSelected =
     questions.length > 0 && questions.every((q) => value.includes(q.id));
 
-  // 2. فانكشن التحكم عند الضغط على الـ Checkbox الرئيسي
+  // فانكشن الـ Add All / Remove All للصفحة الحالية
   const handleSelectAllToggle = () => {
     const currentPageIds = questions.map((q) => q.id);
 
     if (isAllCurrentPageSelected) {
-      // لو كلهم مختارين في الصفحة الحالية -> نشيلهم هما بس ونحافظ على أسئلة الصفحات التانية
+      // إزالة أسئلة الصفحة الحالية فقط
       onChange(value.filter((id) => !currentPageIds.includes(id)));
     } else {
-      // لو مش كلهم مختارين -> ندمج الأسئلة الحالية مع المختارين مسبقاً بدون تكرار
+      // إضافة أسئلة الصفحة الحالية بدون تكرار
       const newSelection = Array.from(new Set([...value, ...currentPageIds]));
       onChange(newSelection);
     }
@@ -82,33 +85,82 @@ const QuestionsTableSelect = ({
         <span className="px-3 py-1 text-xs font-medium bg-indigo-50 text-indigo-600 rounded-full">
           {value.length} Selected
         </span>
+
+        {/* زرار Add All / Remove All الصريح */}
+        {questions.length > 0 && (
+          <button
+            type="button"
+            onClick={handleSelectAllToggle}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg border transition ${
+              isAllCurrentPageSelected
+                ? "bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100"
+                : "bg-indigo-600 text-white border-transparent hover:bg-indigo-700"
+            }`}
+          >
+            {isAllCurrentPageSelected ? "Deselect Page" : "Add All From Page"}
+          </button>
+        )}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search question..."
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
-          }}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-        />
-        <svg
-          className="absolute left-3 top-3.5 w-5 h-5 text-slate-400"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"
+      {/* Filters Section (البحث مع الفلاتر الجديدة) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Input Search */}
+        <div className="relative md:col-span-2">
+          <input
+            type="text"
+            placeholder="Search question..."
+            value={search}
+            onChange={(e) => {
+              setPage(1);
+              setSearch(e.target.value);
+            }}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
           />
-        </svg>
+          <svg
+            className="absolute left-3 top-3 w-4 h-4 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"
+            />
+          </svg>
+        </div>
+
+        {/* Difficulty Filter */}
+        <div>
+          <select
+            value={difficulty}
+            onChange={(e) => {
+              setPage(1);
+              setDifficulty(e.target.value);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600"
+          >
+            <option value="">All Difficulties</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+
+        {/* Year Filter */}
+        <div>
+          <input
+            type="number"
+            placeholder="Filter by Year (e.g. 2024)"
+            value={year}
+            onChange={(e) => {
+              setPage(1);
+              setYear(e.target.value);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -116,14 +168,13 @@ const QuestionsTableSelect = ({
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
             <tr>
-              {/* تعديل: إضافة الـ Checkbox الرئيسي هنا */}
               <th className="p-4 w-16 text-center">
                 <input
                   type="checkbox"
                   disabled={loading || questions.length === 0}
                   checked={isAllCurrentPageSelected}
                   onChange={handleSelectAllToggle}
-                  className="w-4 h-4 accent-one cursor-pointer disabled:opacity-40"
+                  className="w-4 h-4 accent-indigo-600 cursor-pointer disabled:opacity-40"
                 />
               </th>
               <th className="p-4 text-left">Question</th>
@@ -158,7 +209,7 @@ const QuestionsTableSelect = ({
                       type="checkbox"
                       checked={isChecked(q.id)}
                       onChange={() => toggleSelect(q.id)}
-                      className="w-4 h-4 accent-one cursor-pointer"
+                      className="w-4 h-4 accent-indigo-600 cursor-pointer"
                     />
                   </td>
 
@@ -167,7 +218,7 @@ const QuestionsTableSelect = ({
                   </td>
 
                   <td className="p-4">
-                    <span className="px-2 py-1 text-xs bg-slate-100 rounded-md">
+                    <span className="px-2 py-1 text-xs bg-slate-100 rounded-md capitalize">
                       {q.difficulty}
                     </span>
                   </td>

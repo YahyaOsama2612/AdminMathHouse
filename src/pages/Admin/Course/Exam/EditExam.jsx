@@ -46,55 +46,57 @@ const EditExam = () => {
         options: [
           { label: "Static", value: "static" },
           { label: "Adaptive", value: "adaptive" },
+          { label: "Extra", value: "extra" },
+          { label: "Trail", value: "trail" },
         ],
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "title",
         label: "Title",
         type: "text",
         required: true,
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "description",
         label: "Description",
         type: "text",
         required: true,
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "duration",
-        label: "Duration (Minutes)",
+        label: "Duration (Minutes / Hours)",
         type: "number",
         required: true,
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "totalScore",
         label: "Total Score",
         type: "number",
         required: true,
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "passScore",
         label: "Pass Score",
         type: "number",
         required: true,
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "year",
-        label: "Year",
+        label: "Year (Optional)",
         type: "select",
         options: years,
-        required: true,
-      section: "General Information",
+        required: false, // إلغاء الإجبارية هنا
+        section: "General Information",
       },
       {
         name: "month",
-        label: "Month",
+        label: "Month (Optional)",
         type: "select",
         options: [
           "Jan",
@@ -110,8 +112,8 @@ const EditExam = () => {
           "Nov",
           "Dec",
         ].map((m) => ({ value: m, label: m })),
-        required: true,
-      section: "General Information",
+        required: false, // إلغاء الإجبارية هنا
+        section: "General Information",
       },
       {
         name: "codeId",
@@ -121,7 +123,7 @@ const EditExam = () => {
         options:
           options?.examCodes?.map((c) => ({ label: c.code, value: c.id })) ||
           [],
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "rawScoreId",
@@ -131,7 +133,7 @@ const EditExam = () => {
         options:
           options?.rawScores?.map((r) => ({ label: r.score, value: r.id })) ||
           [],
-      section: "General Information",
+        section: "General Information",
       },
       {
         name: "sections",
@@ -220,18 +222,18 @@ const EditExam = () => {
       examType: exam.examType || "",
       title: exam.title || "",
       description: exam.description || "",
-      duration: exam.duration || 0,
-      totalScore: exam.totalScore || 0,
-      passScore: exam.passScore || 0,
-      year: exam.year?.toString() || "",
-      month: exam.Month || "",
+      duration: exam.duration || "",
+      totalScore: exam.totalScore || "",
+      passScore: exam.passScore || "",
+      year: exam.year ? exam.year.toString() : "",
+      month: exam.Month || exam.month || "",
       codeId: exam.codeId || "",
       rawScoreId: exam.rawScoreId || "",
       sections:
         exam.sections?.map((s) => ({
           sectionId: s.sectionId,
           sectionOrder: s.sectionOrder,
-          questionIds: s.questions?.map((q) => q.questionId) || [],
+          questionIds: s.questions?.map((q) => q.questionId || q.id) || [],
         })) || [],
     };
   }, [examRes]);
@@ -245,14 +247,16 @@ const EditExam = () => {
       toast.error(
         "Please complete all sections and add at least one question in each.",
       );
-      return; // مايبعتش البيانات للـ API
+      return;
     }
+
     const payload = {
       ...formData,
       duration: Number(formData.duration),
       totalScore: Number(formData.totalScore),
       passScore: Number(formData.passScore),
-      year: Number(formData.year),
+      year: formData.year ? Number(formData.year) : null,
+      month: formData.month || null,
       sections: formData.sections || [],
     };
 

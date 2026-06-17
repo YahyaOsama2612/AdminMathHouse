@@ -10,9 +10,11 @@ const AddRawScore = () => {
   const navigate = useNavigate();
   const { postData, loading: saving, error } = usePost("/api/admin/rawScore");
 
-
-  const { data: coursesRes, loading: loadingCourses, error: errorC } =
-    useGet("/api/admin/teacher/selectionCourses");
+  const {
+    data: coursesRes,
+    loading: loadingCourses,
+    error: errorC,
+  } = useGet("/api/admin/teacher/selectionCourses");
 
   const courseOptions = useMemo(() => {
     return (
@@ -50,7 +52,15 @@ const AddRawScore = () => {
         section: "General Information",
         min: 0,
       },
-     
+      {
+        name: "questionsCount", // الحقل الجديد لعدد الأسئلة
+        label: "Questions Count",
+        type: "number",
+        required: true,
+        placeholder: "Enter number of questions",
+        section: "General Information",
+        min: 1,
+      },
       {
         name: "giftingScore",
         label: "Gifting Score",
@@ -59,15 +69,15 @@ const AddRawScore = () => {
         placeholder: "Enter gifting score",
         section: "General Information",
         min: 0,
-       
-      }, {
+      },
+      {
         name: "is_giftingScore",
         label: "Include Gifting Score?",
-        type: "switch", 
+        type: "switch",
         section: "General Information",
-      }
+      },
     ],
-    [courseOptions]
+    [courseOptions],
   );
 
   const initialFormValues = useMemo(
@@ -75,10 +85,11 @@ const AddRawScore = () => {
       name: "",
       courseId: "",
       score: "",
+      questionsCount: "", // القيمة الابتدائية لعدد الأسئلة
       is_giftingScore: false,
       giftingScore: 0,
     }),
-    []
+    [],
   );
 
   const onSave = async (formData) => {
@@ -86,11 +97,16 @@ const AddRawScore = () => {
       name: formData.name,
       courseId: formData.courseId,
       score: Number(formData.score),
+      questionsCount: Number(formData.questionsCount), // إرسال عدد الأسئلة للـ API
       is_giftingScore: Boolean(formData.is_giftingScore),
       giftingScore: Number(formData.giftingScore),
     };
 
-    await postData(payload, "/api/admin/rawScore", "Raw score added successfully");
+    await postData(
+      payload,
+      "/api/admin/rawScore",
+      "Raw score added successfully",
+    );
     navigate("/admin/settings/rawscore");
   };
 
@@ -103,7 +119,6 @@ const AddRawScore = () => {
       fields={fields}
       onSave={onSave}
       onCancel={() => navigate("/admin/settings/rawscore")}
-       
       initialData={initialFormValues}
     />
   );
