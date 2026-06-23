@@ -1,4 +1,47 @@
-import React, { useMemo, useState } from "react";
+// Reusable field UI for drive picker
+const DrivePickerField = ({
+  label,
+  value,
+  allowedTypes,
+  pickerTitle,
+  onOpen,
+  onClear,
+}) => (
+  <div className="flex flex-col gap-2 w-full">
+    {value ? (
+      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+        <span className="text-lg">
+          {allowedTypes[0] === "video"
+            ? "🎬"
+            : allowedTypes[0] === "pdf"
+              ? "📕"
+              : "🖼️"}
+        </span>
+        <span className="flex-1 text-sm text-slate-700 truncate">
+          {value.split("/").pop()}
+        </span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-red-500 hover:text-red-700 font-semibold shrink-0"
+        >
+          Remove
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-slate-500 hover:text-indigo-600 transition-all text-sm font-medium"
+      >
+        <span>📂</span>
+        <span>Select from Drive</span>
+      </button>
+    )}
+  </div>
+);
+
+import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
@@ -7,6 +50,7 @@ import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import TipTapMathEditor from "../../../../components/TipTapMathEditor";
+import DrivePicker from "@/components/DrivePicker";
 
 const AddQuestions = () => {
   const navigate = useNavigate();
@@ -14,6 +58,31 @@ const AddQuestions = () => {
   const { postData: postDataimage } = usePost("/api/admin/questions/ocr");
   const location = useLocation();
   const [ocrLoading, setOcrLoading] = useState(false);
+
+  // Drive Picker state
+  const [picker, setPicker] = useState({
+    open: false,
+    field: null,
+    allowedTypes: [],
+    title: "",
+  });
+
+  const pickerSetterRef = useRef(null);
+  const openPicker = (field, allowedTypes, title, setFormData) => {
+    pickerSetterRef.current = setFormData; // ✅ no React trap
+    setPicker({ open: true, field, allowedTypes, title });
+  };
+
+  const handlePickerSelect = (file) => {
+    if (!pickerSetterRef.current || !picker.field) return;
+
+    const value = file.sourceUrl || file.bunnyGuid || null; // ✅ fallback to bunnyGuid
+
+    pickerSetterRef.current((prev) => ({
+      ...prev,
+      [picker.field]: value,
+    }));
+  };
 
   // استلام معرف الدرس لو موجود في الـ state
   const { lessonId } = location.state || {};
@@ -295,20 +364,83 @@ const AddQuestions = () => {
 
       // --- Media Section ---
       {
-        name: "answerImage", // حقل صورة الحل الجديد
+        name: "answerImage",
         label: "Answer Image",
-        type: "file", // يفترض أن مكون AddPage يدعم نوع file لرفع الصور المباشرة
+        type: "custom",
         section: "Solution Media",
+        fullWidth: false,
+        render: ({ value, onChange, formData, setFormData }) => (
+          <DrivePickerField
+            label="Answer Image"
+            value={value}
+            fieldName="answer_image"
+            allowedTypes={["image"]}
+            pickerTitle="Select Answer Image from Drive"
+            onOpen={() =>
+              openPicker(
+                "answerImage",
+                ["image"],
+                "Select Answer Image from Drive",
+                setFormData,
+              )
+            }
+            onClear={() => onChange("")}
+          />
+        ),
       },
       {
-        name: "answerPdf",
-        label: "Answer PDF URL",
-        type: "text",
+        name: "pdf",
+        label: "Answer PDF",
+        type: "custom",
         section: "Solution Media",
+        fullWidth: false,
+        render: ({ value, onChange, formData, setFormData }) => (
+          <DrivePickerField
+            label="Answer PDF"
+            value={value}
+            fieldName="pdf"
+            allowedTypes={["pdf"]}
+            pickerTitle="Select Answer PDF from Drive"
+            onOpen={() =>
+              openPicker(
+                "pdf",
+                ["pdf"],
+                "Select Answer PDF from Drive",
+                setFormData,
+              )
+            }
+            onClear={() => onChange("")}
+          />
+        ),
       },
       {
-        name: "answerVideo",
-        label: "Answer Video URL",
+        name: "video",
+        label: "Answer Video",
+        type: "custom",
+        section: "Solution Media",
+        fullWidth: false,
+        render: ({ value, onChange, formData, setFormData }) => (
+          <DrivePickerField
+            label="Answer Video"
+            value={value}
+            fieldName="answerVideo"
+            allowedTypes={["video"]}
+            pickerTitle="Select Answer Video from Drive"
+            onOpen={() =>
+              openPicker(
+                "video",
+                ["video"],
+                "Select Answer Video from Drive",
+                setFormData,
+              )
+            }
+            onClear={() => onChange("")}
+          />
+        ),
+      },
+      {
+        name: "answerText",
+        label: "Answer Text",
         type: "text",
         section: "Solution Media",
       },
@@ -327,13 +459,13 @@ const AddQuestions = () => {
     year: "",
     month: "",
     sectionId: "",
-    answerImage: null, // القيمة الابتدائية لصورة الحل
-    answerPdf: "",
-    answerVideo: "",
+    answerImage: "",
+    pdf: "",
+    video: "",
+    answerText: "",
   };
 
   const onSave = async (formData) => {
-    // 1. معالجة صورة السؤال
     let imageBase64 = null;
     if (formData.image instanceof File) {
       imageBase64 = await new Promise((resolve) => {
@@ -343,17 +475,6 @@ const AddQuestions = () => {
       });
     }
 
-    // 2. معالجة صورة الحل (الجديدة)
-    let answerImageBase64 = null;
-    if (formData.answerImage instanceof File) {
-      answerImageBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(formData.answerImage);
-      });
-    }
-
-    // 3. معالجة الإجابات بناءً على النوع
     let finalOptions = [];
     if (formData.answerType === "MCQ") {
       finalOptions = (formData.options || [])
@@ -363,12 +484,6 @@ const AddQuestions = () => {
           order: String.fromCharCode(65 + index),
         }))
         .filter((opt) => opt.answer);
-
-      if (finalOptions.length < 2 || !formData.correctOption) {
-        return toast.error(
-          "Please provide MCQ options and mark the correct one",
-        );
-      }
     } else {
       finalOptions = (formData.gridInAnswers || [])
         .filter((ans) => ans.trim() !== "")
@@ -377,15 +492,8 @@ const AddQuestions = () => {
           isCorrect: true,
           order: null,
         }));
-
-      if (finalOptions.length === 0) {
-        return toast.error(
-          "Please add at least one correct answer for Grid-in",
-        );
-      }
     }
 
-    // 4. تجهيز الـ Payload النهائي وتنظيف الحقول غير الإلزامية الفارغة
     const {
       year,
       month,
@@ -394,7 +502,7 @@ const AddQuestions = () => {
       gridInAnswers,
       correctOption,
       options,
-      answerImage,
+      
       ...rest
     } = formData;
 
@@ -403,15 +511,14 @@ const AddQuestions = () => {
       lessonId: lessonId || null,
       options: finalOptions,
       image: imageBase64 || formData.image || null,
-      answerImage: answerImageBase64 || null, // إرسال صورة الحل كـ Base64
+      answerPdf: rest.pdf, // 👈 if backend expects "answerPdf"
+      answerVideo: rest.video, // 👈 if backend expects "answerVideo"
     };
 
-    // التحقق من الحقول الاختيارية حتى لا تُرسل كـ نصوص فارغة تسبب مشاكل بالـ Back-end
-    if (year && year.trim() !== "") payload.year = Number(year);
-    if (month && month.trim() !== "") payload.month = month;
-    if (sectionId && sectionId.trim() !== "") payload.sectionId = sectionId;
-    if (questionNumber && questionNumber.toString().trim() !== "")
-      payload.questionNumber = Number(questionNumber);
+    if (year) payload.year = Number(year);
+    if (month) payload.month = month;
+    if (sectionId) payload.sectionId = sectionId;
+    if (questionNumber) payload.questionNumber = Number(questionNumber);
 
     try {
       await postData(
@@ -429,13 +536,22 @@ const AddQuestions = () => {
   if (errorLessons || errorExamCode || errorSections) return <Errorpage />;
 
   return (
-    <AddPage
-      title="Add New Question"
-      fields={fields}
-      onSave={onSave}
-      onCancel={() => navigate(-1)}
-      initialData={initialFormValues}
-    />
+    <>
+      <DrivePicker
+        isOpen={picker.open}
+        onClose={() => setPicker((p) => ({ ...p, open: false }))}
+        onSelect={handlePickerSelect}
+        allowedTypes={picker.allowedTypes}
+        title={picker.title}
+      />
+      <AddPage
+        title="Add New Question"
+        fields={fields}
+        onSave={onSave}
+        onCancel={() => navigate(-1)}
+        initialData={initialFormValues}
+      />
+    </>
   );
 };
 
