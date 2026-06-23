@@ -50,7 +50,7 @@ import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import TipTapMathEditor from "../../../../components/TipTapMathEditor";
-import DrivePicker from "@/components/DrivePicker";
+import DrivePicker from "../../../../components/Drivepicker";
 
 const AddQuestions = () => {
   const navigate = useNavigate();
