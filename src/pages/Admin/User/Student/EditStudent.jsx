@@ -12,13 +12,25 @@ const EditStudent = () => {
   const { id } = useParams();
 
   // 🔹 جلب بيانات الطالب الحالي
-  const { data: studentRes, loading: loadingStudent, error: selectError } = useGet(`/api/admin/student/${id}`);
+  const {
+    data: studentRes,
+    loading: loadingStudent,
+    error: selectError,
+  } = useGet(`/api/admin/student/${id}`);
 
   // 🔹 جلب البيانات الأولية (categories + grades الافتراضية)
-  const { data: selectData, loading: loadingSelect, error: selectError2 } = useGet("/api/admin/student/select");
+  const {
+    data: selectData,
+    loading: loadingSelect,
+    error: selectError2,
+  } = useGet("/api/admin/student/select");
 
   // 🔹 جلب grades عند تغيير category
-  const { data: gradesData, loading: loadingGrades, fetchData: fetchGrades } = useLazyGet();
+  const {
+    data: gradesData,
+    loading: loadingGrades,
+    fetchData: fetchGrades,
+  } = useLazyGet();
 
   const { putData, loading: saving } = usePut(`/api/admin/student/${id}`);
 
@@ -54,24 +66,26 @@ const EditStudent = () => {
     const grades = filteredGrades ?? selectData?.data?.data?.grades;
     return (
       grades?.map((g) => ({
-        value: g,
-        label: `Grade ${g}`,
+        value: g.id || g,
+
+        label: `Grade ${g.name || g}`,
       })) || []
     );
   }, [filteredGrades, selectData]);
-
   // 🔹 handler لتغيير category → إعادة تعيين grade وجلب grades الجديدة
   const handleCategoryChange = useCallback(
     async (selectedValue, setFormData) => {
       setFormData((prev) => ({ ...prev, grade: "" }));
       if (selectedValue) {
         setFilteredGrades(null);
-        await fetchGrades(`/api/admin/student/select?categoryId=${selectedValue}`);
+        await fetchGrades(
+          `/api/admin/student/select?categoryId=${selectedValue}`,
+        );
       } else {
         setFilteredGrades(null);
       }
     },
-    [fetchGrades]
+    [fetchGrades],
   );
 
   const fields = useMemo(
@@ -145,10 +159,12 @@ const EditStudent = () => {
         isLoading: loadingGrades,
         isDisabled: loadingGrades,
         section: "Account Information",
-        helperText: loadingGrades ? "Loading grades..." : "Choose the student's grade",
+        helperText: loadingGrades
+          ? "Loading grades..."
+          : "Choose the student's grade",
       },
     ],
-    [categoriesOptions, gradesOptions, loadingGrades, handleCategoryChange]
+    [categoriesOptions, gradesOptions, loadingGrades, handleCategoryChange],
   );
 
   const onSave = async (formData) => {
@@ -161,10 +177,14 @@ const EditStudent = () => {
       phone: formData.phone || "",
       parentphone: formData.parentphone || "",
       category: formData.category || null,
-      grade: formData.grade || null,
+      grade: formData.grade?.id || formData.grade,
     };
 
-    await putData(payload, `/api/admin/student/${id}`, "Student updated successfully");
+    await putData(
+      payload,
+      `/api/admin/student/${id}`,
+      "Student updated successfully",
+    );
     navigate("/admin/users/students");
   };
 
@@ -186,7 +206,7 @@ const EditStudent = () => {
         phone: student?.phone || "",
         parentphone: student?.parentphone || "",
         category: student?.category || "",
-        grade: student?.grade || "",
+        grade: student?.grade?.id || student?.grade || "",
       }}
     />
   );

@@ -233,12 +233,11 @@ const AddAdminRoles = () => {
   );
 
   const onSave = async (formData) => {
+    // التعديل هنا: نقوم بإرسال قائمة الأكشنز كما هي بدون تحويلها لكائنات
     const formattedPermissions = Object.keys(selectedPermissions)
       .map((moduleName) => ({
         module: moduleName,
-        actions: selectedPermissions[moduleName].map((act) => ({
-          action: act,
-        })),
+        actions: selectedPermissions[moduleName], // تم إزالة الـ .map التي تحولها لكائنات
       }))
       .filter((p) => p.actions.length > 0);
 
@@ -259,7 +258,6 @@ const AddAdminRoles = () => {
       throw err;
     }
   };
-
   if (getLoading) return <Loader />;
   if (error) return <Errorpage />;
 
