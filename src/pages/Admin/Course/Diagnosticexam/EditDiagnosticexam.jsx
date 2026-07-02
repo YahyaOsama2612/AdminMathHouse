@@ -37,6 +37,15 @@ const EditDiagnosticexam = () => {
     const selectedQuestions =
       examData?.questions?.map((q) => q.questionId || q.id || q.question?.id) ||
       [];
+    let parsedCalculators = [];
+    try {
+      parsedCalculators =
+        typeof examData.calculators === "string"
+          ? JSON.parse(examData.calculators)
+          : examData.calculators || [];
+    } catch (e) {
+      parsedCalculators = [];
+    }
 
     return {
       title: examData?.title || "",
@@ -48,6 +57,7 @@ const EditDiagnosticexam = () => {
       isActive: examData?.isActive || false,
       questionIds: selectedQuestions,
       courseId: examData?.course?.id || examData?.courseId || "",
+      calculators: parsedCalculators,
     };
   }, [examRes]);
 
@@ -108,6 +118,22 @@ const EditDiagnosticexam = () => {
         section: "General Information",
       },
       {
+        name: "calculators",
+        label: "Calculator Types",
+        type: "multipleSelect",
+        required: true,
+       
+        options: [
+          { label: "3D", value: "3D" },
+          { label: "four function", value: "four function" },
+          { label: "geometry", value: "geometry" },
+          { label: "graph", value: "graph" },
+          { label: "matrix", value: "matrix" },
+          { label: "scientific", value: "scientific" },
+        ],
+        section: "General Information",
+      },
+      {
         name: "questionIds",
         label: "Select Questions",
         type: "custom",
@@ -140,6 +166,7 @@ const EditDiagnosticexam = () => {
         isActive: formData.isActive,
         questionIds: formData.questionIds,
         courseId: initialData.courseId,
+        calculators: formData.calculators,
       };
 
       await putData(

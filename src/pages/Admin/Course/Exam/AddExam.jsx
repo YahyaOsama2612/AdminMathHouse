@@ -129,6 +129,18 @@ const AddExam = () => {
         section: "General Information",
       },
       {
+        name: "calculators", // اسم الحقل
+        label: "Calculator Types",
+        type: "multipleSelect", // النوع المعتمد في AddPage
+        required: true,
+        options:
+          options?.calculatorTypes?.map((c) => ({
+            label: c,
+            value: c,
+          })) || [],
+        section: "General Information",
+      },
+      {
         name: "sections",
         label: "Sections",
         fullWidth: true,
@@ -232,6 +244,7 @@ const AddExam = () => {
       year: formData.year ? Number(formData.year) : null,
       month: formData.month || null,
       courseId: courseId,
+    calculators: formData.calculators,
       sections: formData.sections || [],
     };
 
@@ -263,6 +276,7 @@ const AddExam = () => {
           month: "",
           codeId: "",
           rawScoreId: "",
+          calculatorTypes: [],
           sections: [],
         }}
       />

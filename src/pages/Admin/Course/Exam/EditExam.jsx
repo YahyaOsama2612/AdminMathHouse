@@ -136,6 +136,18 @@ const EditExam = () => {
         section: "General Information",
       },
       {
+        name: "calculators",
+        label: "Calculator Types",
+        type: "multipleSelect",
+        required: true,
+        options:
+          options?.calculatorTypes?.map((c) => ({
+            label: c,
+            value: c,
+          })) || [],
+        section: "General Information",
+      },
+      {
         name: "sections",
         label: "Sections",
         fullWidth: true,
@@ -218,6 +230,17 @@ const EditExam = () => {
   const initialData = useMemo(() => {
     if (!examRes?.data?.data) return {};
     const exam = examRes.data.data;
+    let parsedCalculators = [];
+    try {
+      if (typeof exam.calculators === "string") {
+        parsedCalculators = JSON.parse(exam.calculators);
+      } else if (Array.isArray(exam.calculators)) {
+        parsedCalculators = exam.calculators;
+      }
+    } catch (e) {
+      console.error("Error parsing calculators:", e);
+      parsedCalculators = [];
+    }
     return {
       examType: exam.examType || "",
       title: exam.title || "",
@@ -229,6 +252,7 @@ const EditExam = () => {
       month: exam.Month || exam.month || "",
       codeId: exam.codeId || "",
       rawScoreId: exam.rawScoreId || "",
+      calculators: parsedCalculators,
       sections:
         exam.sections?.map((s) => ({
           sectionId: s.sectionId,
@@ -257,6 +281,7 @@ const EditExam = () => {
       passScore: Number(formData.passScore),
       year: formData.year ? Number(formData.year) : null,
       month: formData.month || null,
+      calculators: formData.calculators,
       sections: formData.sections || [],
     };
 

@@ -13,7 +13,11 @@ const AddExam = () => {
   const { postData, loading: saving } = usePost();
   const location = useLocation();
   const courseId = location.state?.courseId;
-  const { data: rawScoresRes, loading: loadingRawScores, error: errorRawScores } = useGet("/api/admin/diagnosticExam/selection");
+  const {
+    data: rawScoresRes,
+    loading: loadingRawScores,
+    error: errorRawScores,
+  } = useGet("/api/admin/diagnosticExam/selection");
 
   const rawScoreOptions = useMemo(() => {
     return (
@@ -32,92 +36,113 @@ const AddExam = () => {
     );
   }, [rawScoresRes]);
 
-  const fields = useMemo(() => [
-    {
-      name: "title",
-      label: "Exam Title",
-      type: "text",
-      required: true,
-      placeholder: "Enter exam title",
-      section: "General Information",
-    },
-    {
-      name: "description",
-      label: "Description (Optional)",
-      type: "text",
-      placeholder: "Enter description",
-      section: "General Information",
-    },
-    {
-      name: "duration",
-      label: "Duration (minutes)*",
-      type: "number",
-      required: true,
-      placeholder: "60",
-      section: "General Information",
-    },
-    {
-      name: "rawScoreId",
-      label: "Raw Score Rule*",
-      type: "select",
-      required: true,
-      options: rawScoreOptions,
-      section: "General Information",
-    },
-    {
-      name: "numberOfQuestions",
-      label: "Number of Questions*",
-      type: "number",
-      required: true,
-      placeholder: "20",
-      section: "General Information",
-    },
-    {
-      name: "passScore",
-      label: "Passing Score*",
-      type: "number",
-      required: true,
-      placeholder: "70",
-      section: "General Information",
-    },
-    {
-      name: "isActive",
-      label: "Active",
-      type: "switch",
-      section: "General Information",
-    },
-     {
-  name: "questionIds",
-  label: "Select Questions",
-  type: "custom",
-  fullWidth: true,
-  required: true,
-  section: "Questions",
-  render: ({ value, onChange, error }) => (
-    <QuestionsTableSelect
-      name="course"
-      lessonId={courseId}
-      value={value}
-      onChange={onChange}
-      error={error}
-    />
-  )
-}
-  ], [rawScoreOptions]);
+  const fields = useMemo(
+    () => [
+      {
+        name: "title",
+        label: "Exam Title",
+        type: "text",
+        required: true,
+        placeholder: "Enter exam title",
+        section: "General Information",
+      },
+      {
+        name: "description",
+        label: "Description (Optional)",
+        type: "text",
+        placeholder: "Enter description",
+        section: "General Information",
+      },
+      {
+        name: "duration",
+        label: "Duration (minutes)*",
+        type: "number",
+        required: true,
+        placeholder: "60",
+        section: "General Information",
+      },
+      {
+        name: "rawScoreId",
+        label: "Raw Score Rule*",
+        type: "select",
+        required: true,
+        options: rawScoreOptions,
+        section: "General Information",
+      },
+      {
+        name: "numberOfQuestions",
+        label: "Number of Questions*",
+        type: "number",
+        required: true,
+        placeholder: "20",
+        section: "General Information",
+      },
+      {
+        name: "passScore",
+        label: "Passing Score*",
+        type: "number",
+        required: true,
+        placeholder: "70",
+        section: "General Information",
+      },
+      {
+        name: "isActive",
+        label: "Active",
+        type: "switch",
+        section: "General Information",
+      },
+      {
+        name: "calculators",
+        label: "Calculator Types",
+        type: "multipleSelect",
+        required: true,
+        options: [
+          { label: "3D", value: "3D" },
+          { label: "four function", value: "four function" },
+          { label: "geometry", value: "geometry" },
+          { label: "graph", value: "graph" },
+          { label: "matrix", value: "matrix" },
+          { label: "scientific", value: "scientific" },
+        ],
+        section: "General Information",
+      },
+      {
+        name: "questionIds",
+        label: "Select Questions",
+        type: "custom",
+        fullWidth: true,
+        required: true,
+        section: "Questions",
+        render: ({ value, onChange, error }) => (
+          <QuestionsTableSelect
+            name="course"
+            lessonId={courseId}
+            value={value}
+            onChange={onChange}
+            error={error}
+          />
+        ),
+      },
+    ],
+    [rawScoreOptions],
+  );
 
-  const initialFormValues = useMemo(() => ({
-    title: "",
-    description: "",
-    duration: "",
-    rawScoreId: "",
-    numberOfQuestions: "",
-    passScore: "",
-    isActive: false,
-    questionIds: [],
-  }), []);
+  const initialFormValues = useMemo(
+    () => ({
+      title: "",
+      description: "",
+      duration: "",
+      rawScoreId: "",
+      numberOfQuestions: "",
+      passScore: "",
+      isActive: false,
+      questionIds: [],
+      calculators: [],
+    }),
+    [],
+  );
 
   const onSave = async (formData) => {
-    
     try {
       const payload = {
         title: formData.title,
@@ -127,16 +152,19 @@ const AddExam = () => {
         numberOfQuestions: Number(formData.numberOfQuestions),
         passScore: Number(formData.passScore),
         isActive: formData.isActive,
-        questionIds: formData.questionIds ,
+        questionIds: formData.questionIds,
+        calculators: formData.calculators,
         courseId: courseId,
-          
       };
 
-      await postData(payload, "/api/admin/diagnosticExam", "Exam added successfully");
+      await postData(
+        payload,
+        "/api/admin/diagnosticExam",
+        "Exam added successfully",
+      );
       navigate(`/admin/courses/diagnosticexam/${courseId}`);
     } catch (error) {
-           throw error;
-
+      throw error;
     }
   };
 
