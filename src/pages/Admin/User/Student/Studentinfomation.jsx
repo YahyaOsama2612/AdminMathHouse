@@ -16,6 +16,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  X,
 } from "lucide-react";
 import api from "@/api/api";
 import useGet from "@/hooks/useGet";
@@ -24,6 +26,8 @@ import Errorpage from "@/components/Errorpage";
 
 const StudentInformation = () => {
   const [processing, setProcessing] = useState(false);
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [walletOverride, setWalletOverride] = useState(null);
   const { id } = useParams();
 
   const { data: response, loading, error } = useGet(`/api/admin/student/${id}`);
@@ -33,6 +37,13 @@ const StudentInformation = () => {
   const student = response?.data?.data;
   const quizzes = quizResponse?.data?.data || [];
   const exams = examResponse?.data?.data || [];
+
+  const walletBalance =
+    walletOverride !== null ? walletOverride : student?.wallet?.balance || 0;
+
+  const handleTopUpSuccess = (newBalance) => {
+    setWalletOverride(newBalance);
+  };
 
   const handleOpenAccount = async () => {
     const dashboardTab = window.open("", "studentDashboardTab");
@@ -126,10 +137,20 @@ const StudentInformation = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl text-white shadow-xl">
-            <p className="opacity-80">Wallet Balance</p>
-            <h3 className="text-4xl font-bold mt-2">
-              {student?.wallet?.balance || 0} EGP
-            </h3>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="opacity-80">Wallet Balance</p>
+                <h3 className="text-4xl font-bold mt-2">
+                  {walletBalance} EGP
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsTopUpOpen(true)}
+                className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl text-xs font-bold transition-colors shrink-0"
+              >
+                <Plus size={14} /> Top Up
+              </button>
+            </div>
           </div>
 
           {/* Courses */}
@@ -179,6 +200,133 @@ const StudentInformation = () => {
       <div className="mt-6 space-y-6">
         <QuizReportsSection quizzes={quizzes} />
         <ExamReportsSection exams={exams} />
+      </div>
+
+      {isTopUpOpen && (
+        <TopUpWalletModal
+          studentId={id}
+          currentBalance={walletBalance}
+          onClose={() => setIsTopUpOpen(false)}
+          onSuccess={handleTopUpSuccess}
+        />
+      )}
+    </div>
+  );
+};
+
+const TopUpWalletModal = ({ studentId, currentBalance, onClose, onSuccess }) => {
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    const numericAmount = Number(amount);
+    if (!amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setErrorMsg("Please enter a valid amount greater than 0.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await api.post(`/api/admin/student/${studentId}/top-up-wallet`, {
+        amount: numericAmount,
+        description: description.trim() || undefined,
+      });
+
+      // Prefer the balance returned by the API; otherwise compute it locally.
+      const returnedBalance = res?.data?.data?.balance;
+      const nextBalance =
+        typeof returnedBalance === "number"
+          ? returnedBalance
+          : currentBalance + numericAmount;
+
+      toast.success("Wallet topped up successfully");
+      onSuccess(nextBalance);
+      onClose();
+    } catch (err) {
+      const message =
+        err?.response?.data?.message || "Failed to top up wallet. Please try again.";
+      setErrorMsg(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Top Up Wallet</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Amount (EGP)
+            </label>
+            <input
+              type="number"
+              min="1"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="e.g. 100"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Description
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Monthly subscription"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+
+          {errorMsg && (
+            <p className="text-sm text-red-500 font-medium">{errorMsg}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Processing..." : "Confirm Top-Up"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
