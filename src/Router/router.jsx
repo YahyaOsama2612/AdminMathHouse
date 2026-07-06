@@ -10,18 +10,16 @@ import Admin from "../pages/Admin/Admins/Admin/Admin";
 import AddAdmin from "../pages/Admin/Admins/Admin/AddAdmin";
 import EditAdmin from "../pages/Admin/Admins/Admin/EditAdmin";
 
-
 import AdminRoles from "../pages/Admin/Admins/AdminRoles/AdminRoles";
 import AddAdminRoles from "../pages/Admin/Admins/AdminRoles/AddAdminRoles";
 import EditAdminRoles from "../pages/Admin/Admins/AdminRoles/EditAdminRoles";
-
 
 import Student from "../pages/Admin/User/Student/Student";
 import AddStudent from "../pages/Admin/User/Student/AddStudent";
 import EditStudent from "../pages/Admin/User/Student/EditStudent";
 import Attend from "../pages/Admin/User/Student/Attend";
 import UserPackage from "../pages/Admin/User/Package/userpackage";
-
+import StudentInformation from "../pages/Admin/User/Student/Studentinfomation";
 import Category from "../pages/Admin/Course/Category/Category";
 import AddCategory from "../pages/Admin/Course/Category/AddCategory";
 import EditCategory from "../pages/Admin/Course/Category/EditCategory";
@@ -164,10 +162,9 @@ const router = createBrowserRouter([
       { path: "Admin/add", element: <AddAdmin /> },
       { path: "Admin/edit/:id", element: <EditAdmin /> },
 
-      { path: "admin-roles", element: <AdminRoles /> }, 
-      {path:"admin-roles/add",element:<AddAdminRoles/>},
-      {path:"admin-roles/edit/:id",element:<EditAdminRoles/>},
-
+      { path: "admin-roles", element: <AdminRoles /> },
+      { path: "admin-roles/add", element: <AddAdminRoles /> },
+      { path: "admin-roles/edit/:id", element: <EditAdminRoles /> },
 
       { path: "users/students", element: <Student /> },
       { path: "users/students/add", element: <AddStudent /> },
@@ -177,7 +174,10 @@ const router = createBrowserRouter([
       { path: "courses/semester/:coursesId", element: <Semester /> },
       { path: "courses/semester/add", element: <AddSemester /> },
       { path: "courses/semester/edit/:id", element: <EditSemester /> },
-
+      {
+        path: "users/student-information/:id",
+        element: <StudentInformation />,
+      },
       { path: "users/teachers", element: <Teacher /> },
       { path: "users/teachers/add", element: <AddTeacher /> },
       { path: "users/teachers/edit/:id", element: <EditTeacher /> },

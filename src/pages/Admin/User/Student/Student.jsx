@@ -81,10 +81,10 @@ const Student = () => {
       key: "package",
       render: (value, row) => (
         <button
-          onClick={() => navigate(`/admin/users/packages/${row.id}`)}
+          onClick={() => navigate(`/admin/users/student-information/${row.id}`)}
           className="text-blue-600 hover:underline font-medium text-left cursor-pointer"
         >
-          View Packages
+          View 
         </button>
       ),
     },
@@ -119,7 +119,7 @@ const Student = () => {
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading}
-        // البحث والفلترة
+       
         searchTerm={tempFilters.search}
         onSearchChange={(val) =>
           setTempFilters((prev) => ({ ...prev, search: val }))
@@ -128,7 +128,7 @@ const Student = () => {
         onFilterChange={(key, val) =>
           setTempFilters((prev) => ({ ...prev, [key]: val }))
         }
-        // إعدادات الفلاتر (الكورس والكاتيجوري)
+ 
         filters={[
           { key: "grade", label: "Grade", options: [] }, // يمكنك ملء الخيارات هنا
           { key: "category", label: "Category", options: [] },
