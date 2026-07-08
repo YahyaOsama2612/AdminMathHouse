@@ -27,7 +27,7 @@ import Errorpage from "@/components/Errorpage";
 import {
   exportLessonProgressReport,
   exportExamReport,
-} from "@/utils/reportExport";
+} from "../../../../utils/Reportexport";
 const StudentInformation = () => {
   const [processing, setProcessing] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
