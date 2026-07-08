@@ -7,6 +7,7 @@ const QuestionsTableSelect = ({
   error,
   lessonId,
   name,
+  maxQuestions,
 }) => {
   const [questions, setQuestions] = useState([]);
   const [page, setPage] = useState(1);
@@ -25,6 +26,13 @@ const QuestionsTableSelect = ({
     }
   }, [page, search, difficulty, year, lessonId]);
 
+  useEffect(() => {
+    if (maxQuestions > 0 && value.length > maxQuestions) {
+      onChange(value.slice(0, maxQuestions));
+    }
+  }, [maxQuestions, value]);
+
+  
   const fetchQuestions = async () => {
     try {
       setLoading(true);
@@ -53,9 +61,14 @@ const QuestionsTableSelect = ({
   const toggleSelect = (id) => {
     if (value.includes(id)) {
       onChange(value.filter((item) => item !== id));
-    } else {
-      onChange([...value, id]);
+      return;
     }
+
+    if (maxQuestions > 0 && value.length >= maxQuestions) {
+      return;
+    }
+
+    onChange([...value, id]);
   };
 
   const isChecked = (id) => value.includes(id);
@@ -69,12 +82,22 @@ const QuestionsTableSelect = ({
     const currentPageIds = questions.map((q) => q.id);
 
     if (isAllCurrentPageSelected) {
-      // إزالة أسئلة الصفحة الحالية فقط
       onChange(value.filter((id) => !currentPageIds.includes(id)));
+      return;
+    }
+
+    const availableQuestions = currentPageIds.filter(
+      (id) => !value.includes(id),
+    );
+
+    if (maxQuestions > 0) {
+      const remaining = maxQuestions - value.length;
+
+      const idsToAdd = availableQuestions.slice(0, remaining);
+
+      onChange([...value, ...idsToAdd]);
     } else {
-      // إضافة أسئلة الصفحة الحالية بدون تكرار
-      const newSelection = Array.from(new Set([...value, ...currentPageIds]));
-      onChange(newSelection);
+      onChange([...new Set([...value, ...availableQuestions])]);
     }
   };
 
@@ -208,6 +231,11 @@ const QuestionsTableSelect = ({
                     <input
                       type="checkbox"
                       checked={isChecked(q.id)}
+                      disabled={
+                        !isChecked(q.id) &&
+                        maxQuestions > 0 &&
+                        value.length >= maxQuestions
+                      }
                       onChange={() => toggleSelect(q.id)}
                       className="w-4 h-4 accent-indigo-600 cursor-pointer"
                     />

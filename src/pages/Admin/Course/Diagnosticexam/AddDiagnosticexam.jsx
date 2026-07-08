@@ -113,13 +113,14 @@ const AddExam = () => {
         fullWidth: true,
         required: true,
         section: "Questions",
-        render: ({ value, onChange, error }) => (
+        render: ({ value, onChange, error, formData }) => (
           <QuestionsTableSelect
             name="course"
             lessonId={courseId}
             value={value}
             onChange={onChange}
             error={error}
+            maxQuestions={Number(formData.numberOfQuestions) || 0}
           />
         ),
       },

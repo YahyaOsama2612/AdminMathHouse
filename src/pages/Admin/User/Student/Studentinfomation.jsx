@@ -24,7 +24,10 @@ import api from "@/api/api";
 import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-
+import {
+  exportLessonProgressReport,
+  exportExamReport,
+} from "@/utils/reportExport";
 const StudentInformation = () => {
   const [processing, setProcessing] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
@@ -183,8 +186,18 @@ const StudentInformation = () => {
       <div className="mt-6 space-y-6">
         <CoursesSection courses={student?.courses || []} />
         <PackagesSection packages={student?.packages || []} />
-        <QuizReportsSection quizzes={quizzes} studentId={id} />
-        <ExamReportsSection exams={exams} />
+        <QuizReportsSection
+          quizzes={quizzes}
+          studentId={id}
+          studentName={`${student?.firstname} ${student?.lastname}`}
+          grade={student?.grade?.nameAr}
+          courses={student?.courses || []}
+        />
+        <ExamReportsSection
+          exams={exams}
+          studentName={`${student?.firstname} ${student?.lastname}`}
+          grade={student?.grade?.nameAr}
+        />
       </div>
 
       {isTopUpOpen && (
@@ -207,6 +220,7 @@ const TopUpWalletModal = ({
 }) => {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [operation, setOperation] = useState("deposit");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -226,6 +240,7 @@ const TopUpWalletModal = ({
         `/api/admin/student/${studentId}/top-up-wallet`,
         {
           amount: numericAmount,
+          operation,
           description: description.trim() || undefined,
         },
       );
@@ -235,7 +250,9 @@ const TopUpWalletModal = ({
       const nextBalance =
         typeof returnedBalance === "number"
           ? returnedBalance
-          : currentBalance + numericAmount;
+          : operation === "deposit"
+            ? currentBalance + numericAmount
+            : currentBalance - numericAmount;
 
       toast.success("Wallet topped up successfully");
       onSuccess(nextBalance);
@@ -271,6 +288,20 @@ const TopUpWalletModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Operation
+            </label>
+
+            <select
+              value={operation}
+              onChange={(e) => setOperation(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8B4B4]"
+            >
+              <option value="deposit">Deposit</option>
+              <option value="withdrawal">Withdrawal</option>
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
               Amount (EGP)
@@ -568,12 +599,34 @@ const PackagesSection = ({ packages }) => {
 
 const QUIZ_PAGE_SIZE = 8;
 
-const QuizReportsSection = ({ quizzes, studentId }) => {
+const QuizReportsSection = ({
+  quizzes,
+  studentId,
+  studentName,
+  grade,
+  courses,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedQuizId, setExpandedQuizId] = useState(null);
   const [extendLessonTarget, setExtendLessonTarget] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await exportLessonProgressReport({
+        studentName,
+        grade,
+        courseId: courses?.[0]?.id,
+        quizzes,
+      });
+    } catch (err) {
+      toast.error(err.message || "Failed to export report");
+    } finally {
+      setExporting(false);
+    }
+  };
   const filteredQuizzes = useMemo(() => {
     if (!searchTerm.trim()) return quizzes;
     const term = searchTerm.toLowerCase();
@@ -611,6 +664,13 @@ const QuizReportsSection = ({ quizzes, studentId }) => {
             {filteredQuizzes.length}
           </span>
         </h3>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50"
+        >
+          {exporting ? "Exporting..." : "Export Report"}
+        </button>
         <div className="relative w-full sm:w-64">
           <Search
             size={16}
@@ -914,10 +974,28 @@ const QuizDetails = ({ quiz }) => {
 
 const PAGE_SIZE = 8;
 
-const ExamReportsSection = ({ exams }) => {
+const ExamReportsSection = ({ exams, studentName, grade }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedExamId, setExpandedExamId] = useState(null);
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await exportExamReport({
+        studentName,
+        grade,
+
+        exams,
+      });
+    } catch (err) {
+      toast.error(err.message || "Failed to export report");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const filteredExams = useMemo(() => {
     if (!searchTerm.trim()) return exams;
@@ -949,6 +1027,14 @@ const ExamReportsSection = ({ exams }) => {
             {filteredExams.length}
           </span>
         </h3>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50"
+        >
+          {exporting ? "Exporting..." : "Export Report"}
+        </button>
+
         <div className="relative w-full sm:w-64">
           <Search
             size={16}

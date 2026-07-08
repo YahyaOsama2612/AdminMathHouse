@@ -29,6 +29,15 @@ const DriveLayout = () => {
   const [regularFile, setRegularFile] = useState(null);
   const [isFileUploading, setIsFileUploading] = useState(false);
 
+  // 📂 رفع مجلد كامل (بدون الحاجة لتعديل الباك اند)
+  const [folderFiles, setFolderFiles] = useState(null);
+  const [isFolderUploading, setIsFolderUploading] = useState(false);
+  const [folderUploadStatus, setFolderUploadStatus] = useState("");
+  const [folderUploadCounts, setFolderUploadCounts] = useState({
+    done: 0,
+    total: 0,
+  });
+
   // 💡 States خاصة بتشغيل الفيديو الآمن
   const [streamUrl, setStreamUrl] = useState(null);
   const [isLoadingStream, setIsLoadingStream] = useState(false);
@@ -73,8 +82,8 @@ const DriveLayout = () => {
   const handleUploadFile = async (e) => {
     e.preventDefault();
 
-    if (!videoFile || !newVideoTitle.trim()) {
-      toast.error("Video title and file are required");
+    if (!videoFile ) {
+      toast.error("Video file is required");
       return;
     }
 
@@ -141,8 +150,8 @@ const DriveLayout = () => {
   const handleUploadRegularFile = async (e) => {
     e.preventDefault();
 
-    if (!regularFile || !newFileTitle.trim()) {
-      toast.error("File title and file are required");
+    if (!regularFile ) {
+      toast.error("File title is  required");
       return;
     }
 
@@ -195,6 +204,241 @@ const DriveLayout = () => {
     } finally {
       setIsFileUploading(false);
     }
+  };
+
+  // 📂 [الفانكشن الثالثة] - Upload Folder (recreates tree client-side, no backend changes needed)
+  const API_BASE_URL = "https://bcknd.mathshouse.net";
+
+  // Lists the folders already inside a given parent (used to resolve name collisions)
+  const listChildFolders = async (parentFolderId) => {
+    const token = localStorage.getItem("token");
+    const url = parentFolderId
+      ? `${API_BASE_URL}/api/drive/folders/${parentFolderId}`
+      : `${API_BASE_URL}/api/drive/folders`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: token ? `Bearer ${token}` : "" },
+    });
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData?.message || "Failed to read folder contents");
+    }
+    return resData?.data?.folders || [];
+  };
+
+  // Creates a folder, or if it already exists, looks up and reuses its id
+  const getOrCreateFolderId = async (name, parentFolderId) => {
+    try {
+      const res = await createFolder(
+        { name, parentFolderId },
+        null,
+        null, // no toast per subfolder — we show one summary toast at the end
+      );
+      const newId = res?.data?.folder?.id || res?.data?.id;
+      if (!newId) {
+        throw new Error(`Folder "${name}" created but no id was returned`);
+      }
+      return newId;
+    } catch (err) {
+      const message = (
+        err?.message ||
+        err?.response?.data?.message ||
+        ""
+      ).toLowerCase();
+
+      if (message.includes("already exists")) {
+        const siblings = await listChildFolders(parentFolderId);
+        const existing = siblings.find(
+          (f) => f.name?.trim().toLowerCase() === name.trim().toLowerCase(),
+        );
+        if (existing) return existing.id;
+      }
+      throw err;
+    }
+  };
+
+  // Walks a folder path (e.g. ["Photos", "2024", "Trip"]), creating/reusing each
+  // level under currentFolderId, and returns the id of the deepest folder.
+  const resolveFolderPath = async (segments, pathCache) => {
+    let parentId = currentFolderId;
+    let pathKey = "";
+
+    for (const segment of segments) {
+      pathKey = pathKey ? `${pathKey}/${segment}` : segment;
+
+      if (pathCache.has(pathKey)) {
+        parentId = pathCache.get(pathKey);
+        continue;
+      }
+
+      const folderId = await getOrCreateFolderId(segment, parentId);
+      pathCache.set(pathKey, folderId);
+      parentId = folderId;
+    }
+
+    return parentId;
+  };
+
+  // Uploads one non-video file (pdf/image) into a specific folder
+  const uploadRegularFileTo = async (file, title, folderId) => {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error("Unsupported file type (only PDF and images allowed)");
+    }
+
+    const token = localStorage.getItem("token");
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("title", title);
+    if (folderId) formData.append("folderId", folderId);
+
+    const response = await fetch(`${API_BASE_URL}/api/drive/upload/file`, {
+      method: "POST",
+      headers: { Authorization: token ? `Bearer ${token}` : "" },
+      body: formData,
+    });
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData?.message || "Failed to upload file");
+    }
+  };
+
+  // Uploads one video file into a specific folder via TUS
+  const uploadVideoFileTo = (file, title, folderId) =>
+    new Promise(async (resolve, reject) => {
+      try {
+        const res = await uploadInit({
+          videoTitle: title,
+          folderId: folderId ?? null, // never send `undefined` — send null explicitly, like the single-upload flow does
+        });
+        const creds = res.data?.uploadCredentials || res.data;
+        if (!creds || !creds.libraryId) {
+          reject(new Error("Failed to get upload credentials"));
+          return;
+        }
+
+        const upload = new tus.Upload(file, {
+          endpoint: "https://video.bunnycdn.com/tusupload",
+          retryDelays: [0, 1000, 3000, 5000],
+          chunkSize: 5 * 1024 * 1024,
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            filename: file.name,
+            filetype: file.type,
+            title,
+          },
+          headers: {
+            AuthorizationSignature: creds.signature,
+            AuthorizationExpire: String(creds.expirationTime),
+            VideoId: creds.videoId,
+            LibraryId: String(creds.libraryId),
+          },
+          onError: (error) => reject(error),
+          onSuccess: () => resolve(),
+        });
+
+        const previousUploads = await upload.findPreviousUploads();
+        if (previousUploads.length) {
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        upload.start();
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+  // OS-generated metadata files that should never be uploaded
+  const isJunkFile = (fileName) =>
+    /^(desktop\.ini|thumbs\.db|\.ds_store)$/i.test(fileName);
+
+  // Browsers guess MIME type from the OS, which is unreliable for some video
+  // containers (.mkv, .avi, .wmv, sometimes even .mp4). Fall back to extension.
+  const VIDEO_EXTENSIONS = [
+    "mp4",
+    "mov",
+    "mkv",
+    "avi",
+    "wmv",
+    "flv",
+    "webm",
+    "m4v",
+    "mpg",
+    "mpeg",
+  ];
+  const isVideoFile = (file) => {
+    if (file.type?.startsWith("video/")) return true;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    return VIDEO_EXTENSIONS.includes(ext);
+  };
+
+  const handleUploadFolder = async () => {
+    if (!folderFiles || folderFiles.length === 0) {
+      toast.error("Please choose a folder first");
+      return;
+    }
+
+    const fileList = Array.from(folderFiles).filter(
+      (file) => !isJunkFile(file.name),
+    );
+    setIsFolderUploading(true);
+    setFolderUploadCounts({ done: 0, total: fileList.length });
+
+    const pathCache = new Map();
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      // webkitRelativePath looks like "MyFolder/Sub/file.png"
+      const relativePath = file.webkitRelativePath || file.name;
+      const segments = relativePath.split("/").filter(Boolean);
+      const fileName = segments.pop(); // last segment is the file itself
+      const title = fileName.replace(/\.[^/.]+$/, "") || fileName;
+
+      setFolderUploadStatus(
+        `Uploading ${i + 1}/${fileList.length}: ${relativePath}`,
+      );
+
+      try {
+        const targetFolderId = await resolveFolderPath(segments, pathCache);
+
+        if (isVideoFile(file)) {
+          await uploadVideoFileTo(file, title, targetFolderId);
+        } else {
+          await uploadRegularFileTo(file, title, targetFolderId);
+        }
+        successCount++;
+      } catch (err) {
+        console.error(
+          `Failed to upload ${relativePath}:`,
+          err?.response?.data || err?.message || err,
+        );
+        failCount++;
+      } finally {
+        setFolderUploadCounts((prev) => ({ ...prev, done: prev.done + 1 }));
+      }
+    }
+
+    setIsFolderUploading(false);
+    setFolderUploadStatus("");
+    setFolderFiles(null);
+
+    if (failCount === 0) {
+      toast.success(`Folder uploaded successfully 🎉 (${successCount} files)`);
+    } else {
+      toast.error(
+        `Uploaded ${successCount} file(s), ${failCount} failed. Check console for details.`,
+      );
+    }
+    refetch();
   };
 
   // 🗑️ Delete Item
@@ -317,7 +561,7 @@ const DriveLayout = () => {
       </div>
 
       {/* Actions Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
         {/* Create Folder Card */}
         <div
           className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md"
@@ -416,6 +660,62 @@ const DriveLayout = () => {
             </button>
           </form>
         </div>
+      </div>
+
+      {/* Upload Folder Card — its own full-width row, separate from the 3-card grid above */}
+      <div
+        className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md mb-10"
+        data-aos="fade-up"
+        data-aos-delay="250"
+      >
+        <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
+          Upload Folder
+        </h2>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="file"
+            webkitdirectory=""
+            directory=""
+            multiple
+            onChange={(e) => setFolderFiles(e.target.files)}
+            className="w-full sm:flex-1 text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer"
+          />
+          <button
+            onClick={handleUploadFolder}
+            disabled={isFolderUploading || !folderFiles}
+            className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-medium px-6 py-2.5 rounded-xl transition-colors shadow-sm shadow-amber-200 shrink-0 flex items-center justify-center"
+          >
+            {isFolderUploading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+
+        {folderFiles && !isFolderUploading && (
+          <p className="mt-3 text-xs text-slate-400">
+            {folderFiles.length} file(s) selected
+          </p>
+        )}
+
+        {isFolderUploading && (
+          <div className="mt-4">
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="bg-amber-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                style={{
+                  width: `${
+                    folderUploadCounts.total
+                      ? (folderUploadCounts.done / folderUploadCounts.total) *
+                        100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500 truncate">
+              {folderUploadStatus} ({folderUploadCounts.done}/
+              {folderUploadCounts.total})
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Grid: Folders & Files */}

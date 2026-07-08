@@ -23,7 +23,7 @@ const HierarchicalLessonSelector = ({
         if (!grouped[chapterId]) {
           grouped[chapterId] = {
             categoryId: lesson.category?.id,
-            subCategoryId: lesson.subCategory?.id || null,
+          subCategoryId: lesson.subCategory?.id || lesson.subcategory?.id || null, 
             courseId: lesson.course?.id,
             chapterIds: [chapterId],
             selectedLessons: [],

@@ -14,6 +14,7 @@ import { MdGridView } from "react-icons/md";
 import IconButton from "@/components/IconButton";
 import { MdAttachMoney } from "react-icons/md";
 import PricePlansModal from "@/components/PricePlansModal";
+import { Users, ClipboardList, DollarSign } from "lucide-react";
 const Courses = () => {
   const navigate = useNavigate();
   const { categoryId } = useParams();
@@ -153,7 +154,13 @@ const Courses = () => {
   const availableTeachers = teachers.filter(
     (teacher) => !assignedTeacherIds.includes(teacher.id),
   );
+  const courseTeachers = useMemo(() => {
+    if (!selectedRow) return [];
 
+    return teachers.filter((teacher) =>
+      teacher.courses?.some((course) => course.id === selectedRow.id),
+    );
+  }, [teachers, selectedRow]);
   if (loading || loadingOne) return <Loader />;
   if (error || errorOne) return <Errorpage />;
 
@@ -188,21 +195,28 @@ const Courses = () => {
                 setSelectedTeacherId("");
                 setOpenTeacherModal(true);
               }}
+              className="p-2 rounded-lg hover:bg-slate-100 transition"
+              title="Teachers"
             >
-              <GiTeacher className="text-3xl bg-one text-white rounded" />
+              <Users className="w-5 h-5 text-red-900" />
             </button>
 
             {/* Exams */}
-            <button onClick={() => setOptionPopup({ open: true, row })}>
-              <PiExamFill className="text-2xl" />
+            <button
+              onClick={() => setOptionPopup({ open: true, row })}
+              className="p-2 rounded-lg hover:bg-slate-100 transition"
+              title="Exams"
+            >
+              <ClipboardList className="w-5 h-5 text-red-900" />
             </button>
 
             {/* 💰 Prices */}
             <button
               onClick={() => setPricePopup({ open: true, row })}
-              className="px-2 py-1  rounded"
+              className="p-2 rounded-lg hover:bg-slate-100 transition"
+              title="Price Plans"
             >
-              <MdAttachMoney className="text-3xl text-green-600" />
+              <DollarSign className="w-5 h-5 text-red-900" />
             </button>
           </div>
         )}
@@ -300,6 +314,78 @@ const Courses = () => {
             >
               close
             </button>
+          </div>
+        </div>
+      )}
+      {openTeacherModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <div>
+                <h2 className="text-xl font-bold">Course Teachers</h2>
+                <p className="text-sm text-slate-500">{selectedRow?.name}</p>
+              </div>
+
+              <button
+                onClick={() => setOpenTeacherModal(false)}
+                className="text-slate-500 hover:text-red-600 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="max-h-[500px] overflow-y-auto p-6">
+              {courseTeachers.length === 0 ? (
+                <div className="text-center py-10 text-slate-500">
+                  No teachers assigned to this course.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {courseTeachers.map((teacher) => (
+                    <div
+                      key={teacher.id}
+                      className="flex items-center gap-4 border rounded-xl p-4 hover:bg-slate-50"
+                    >
+                      <img
+                        src={
+                          teacher.avatar ||
+                          "https://ui-avatars.com/api/?name=" +
+                            encodeURIComponent(teacher.name)
+                        }
+                        alt={teacher.name}
+                        className="w-14 h-14 rounded-full object-cover"
+                      />
+
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-slate-800">
+                          {teacher.name}
+                        </h3>
+
+                        <p className="text-sm text-slate-500">
+                          {teacher.email}
+                        </p>
+
+                        <p className="text-sm text-slate-500">
+                          {teacher.phoneNumber}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setOpenTeacherModal(false)}
+                className="px-5 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
