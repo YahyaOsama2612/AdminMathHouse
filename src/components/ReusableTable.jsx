@@ -1,9 +1,22 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Pencil, Trash2, Search, Plus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import {
+  Pencil,
+  Trash2,
+  Search,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 import TruncatedText from "./TruncatedText";
 
 // --- Custom Searchable Select Component ---
-const SearchableSelect = ({ value, onChange, options, placeholder = "All" }) => {
+const SearchableSelect = ({
+  value,
+  onChange,
+  options,
+  placeholder = "All",
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef(null);
@@ -21,19 +34,24 @@ const SearchableSelect = ({ value, onChange, options, placeholder = "All" }) => 
 
   // فلترة الخيارات
   const filteredOptions = options.filter((opt) =>
-    String(opt).toLowerCase().includes(searchQuery.toLowerCase())
+    String(opt).toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     // التعديل هنا: خلينا الـ z-index يتغير بناءً على حالة الـ isOpen عشان يظهر فوق الكل
-    <div className={`relative w-full ${isOpen ? "z-50" : "z-10"}`} ref={dropdownRef}>
+    <div
+      className={`relative w-full ${isOpen ? "z-50" : "z-10"}`}
+      ref={dropdownRef}
+    >
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex justify-between items-center p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:ring-1 focus:ring-one cursor-pointer transition-colors"
       >
         <span className="truncate">{value || placeholder}</span>
-        <ChevronDown className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       {isOpen && (
@@ -48,7 +66,7 @@ const SearchableSelect = ({ value, onChange, options, placeholder = "All" }) => 
                 className="w-full p-1.5 pl-7 text-xs border border-border rounded bg-background text-foreground outline-none focus:border-one focus:ring-1 focus:ring-one"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onClick={(e) => e.stopPropagation()} 
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
           </div>
@@ -65,7 +83,7 @@ const SearchableSelect = ({ value, onChange, options, placeholder = "All" }) => 
             >
               All (الكل)
             </li>
-            
+
             {filteredOptions.length > 0 ? (
               filteredOptions.map((val, idx) => (
                 <li
@@ -93,55 +111,58 @@ const SearchableSelect = ({ value, onChange, options, placeholder = "All" }) => 
 };
 
 // --- Main Table Component ---
-const ReusableTable = ({ 
-  title, 
-  columns, 
-  data = [], 
-  onAddClick, 
-  titleAdd, 
-  onEdit,     
-  onDelete,   
-  extraActions, 
+const ReusableTable = ({
+  title,
+  columns,
+  data = [],
+  onAddClick,
+  titleAdd,
+  onEdit,
+  onDelete,
+  extraActions,
   showStatusInActions = false,
   onToggleStatus,
   statusKey = "status",
   children,
   rowsPerPage = 10,
-
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [columnFilters, setColumnFilters] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
 
   const handleColumnFilterChange = (key, value) => {
-    setColumnFilters(prev => ({
+    setColumnFilters((prev) => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }));
     setCurrentPage(1);
   };
 
   const getUniqueValues = (key) => {
-    const values = data.map((item) => String(item[key] || "").trim()).filter(Boolean);
+    const values = data
+      .map((item) => String(item[key] || "").trim())
+      .filter(Boolean);
     return [...new Set(values)];
   };
 
   const filteredData = useMemo(() => {
     return data.filter((row) => {
       const matchesGlobalSearch = columns.some((col) =>
-        String(row[col.key] || "").toLowerCase().includes(searchTerm.toLowerCase())
+        String(row[col.key] || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()),
       );
 
       const matchesColumnFilters = columns.every((col) => {
         if (!col.filterable || !columnFilters[col.key]) return true;
-        
+
         const cellValue = String(row[col.key] || "").toLowerCase();
         const filterValue = columnFilters[col.key].toLowerCase();
-        
-        if (col.filterType === 'select') {
+
+        if (col.filterType === "select") {
           return cellValue === filterValue;
         }
-        
+
         return cellValue.includes(filterValue);
       });
 
@@ -152,23 +173,22 @@ const ReusableTable = ({
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
   const currentRows = filteredData.slice(
     (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
+    currentPage * rowsPerPage,
   );
 
   const hasFilters = columns.some((col) => col.filterable);
 
   return (
     <div className="w-full space-y-4 p-4 bg-background text-left">
-      
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className=' flex gap-2'>
-          {title && <h2 className="text-xl text-one md:text-2xl font-semibold">{title}</h2>}
-          {children && (
-    <div className="w-full md:w-auto">
-      {children}
-    </div>
-  )}
+        <div className=" flex gap-2">
+          {title && (
+            <h2 className="text-xl text-one md:text-2xl font-semibold">
+              {title}
+            </h2>
+          )}
+          {children && <div className="w-full md:w-auto">{children}</div>}
         </div>
 
         <div className="flex flex-col md:flex-row gap-3 items-center">
@@ -209,10 +229,10 @@ const ReusableTable = ({
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     {col.header}
                   </label>
-                  
-                  {col.filterType === 'select' ? (
+
+                  {col.filterType === "select" ? (
                     <SearchableSelect
-                      value={columnFilters[col.key] || ''}
+                      value={columnFilters[col.key] || ""}
                       onChange={(val) => handleColumnFilterChange(col.key, val)}
                       options={getUniqueValues(col.key)}
                       placeholder="All"
@@ -222,8 +242,10 @@ const ReusableTable = ({
                       type="text"
                       placeholder={`Search ${col.header}...`}
                       className="w-full p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors"
-                      value={columnFilters[col.key] || ''}
-                      onChange={(e) => handleColumnFilterChange(col.key, e.target.value)}
+                      value={columnFilters[col.key] || ""}
+                      onChange={(e) =>
+                        handleColumnFilterChange(col.key, e.target.value)
+                      }
                     />
                   )}
                 </div>
@@ -242,11 +264,17 @@ const ReusableTable = ({
                   #
                 </th>
                 {columns.map((col, index) => (
-                  <th key={index} className="p-4 font-bold text-one uppercase text-[11px] tracking-widest align-middle">
+                  <th
+                    key={index}
+                    className="p-4 font-bold text-one uppercase text-[11px] tracking-widest align-middle"
+                  >
                     {col.header}
                   </th>
                 ))}
-                {(onEdit || onDelete || extraActions || showStatusInActions) && (
+                {(onEdit ||
+                  onDelete ||
+                  extraActions ||
+                  showStatusInActions) && (
                   <th className="p-4 font-bold text-one uppercase text-[11px] tracking-widest text-center align-middle">
                     Actions
                   </th>
@@ -256,10 +284,18 @@ const ReusableTable = ({
             <tbody>
               {currentRows.length > 0 ? (
                 currentRows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="hover:bg-one/5 transition-colors border-b border-border last:border-0">
-                    <td className="p-4 text-foreground text-sm">{(currentPage - 1) * rowsPerPage + rowIndex + 1}</td>
+                  <tr
+                    key={rowIndex}
+                    className="hover:bg-one/5 transition-colors border-b border-border last:border-0"
+                  >
+                    <td className="p-4 text-foreground text-sm">
+                      {(currentPage - 1) * rowsPerPage + rowIndex + 1}
+                    </td>
                     {columns.map((col, colIndex) => (
-                      <td key={colIndex} className="p-4 text-foreground text-sm">
+                      <td
+                        key={colIndex}
+                        className="p-4 text-foreground text-sm"
+                      >
                         {col.render ? (
                           col.render(row[col.key], row)
                         ) : (
@@ -269,21 +305,32 @@ const ReusableTable = ({
                     ))}
 
                     {/* Actions Column */}
-                    {(onEdit || onDelete || extraActions || showStatusInActions) && (
+                    {(onEdit ||
+                      onDelete ||
+                      extraActions ||
+                      showStatusInActions) && (
                       <td className="p-4">
-                        <div className="flex justify-center items-center gap-2 flex-wrap">
-                          {showStatusInActions && (
-                            onToggleStatus ? (
+                        <div className="flex items-center justify-center gap-2">
+                          {showStatusInActions &&
+                            (onToggleStatus ? (
                               <button
                                 onClick={() => onToggleStatus(row)}
                                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-300 ${
-                                  row[statusKey] === "active" ? "bg-green-500" : "bg-gray-300"
+                                  row[statusKey] === "active"
+                                    ? "bg-green-500"
+                                    : "bg-gray-300"
                                 }`}
-                                title={row[statusKey] === "active" ? "Deactivate" : "Activate"}
+                                title={
+                                  row[statusKey] === "active"
+                                    ? "Deactivate"
+                                    : "Activate"
+                                }
                               >
                                 <span
                                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
-                                    row[statusKey] === "active" ? "translate-x-4" : "translate-x-1"
+                                    row[statusKey] === "active"
+                                      ? "translate-x-4"
+                                      : "translate-x-1"
                                   }`}
                                 />
                               </button>
@@ -297,16 +344,27 @@ const ReusableTable = ({
                               >
                                 {row[statusKey]}
                               </span>
-                            )
+                            ))}
+                          {extraActions && (
+                            <div className="flex items-center gap-2">
+                              {extraActions(row)}
+                            </div>
                           )}
-                          {extraActions && extraActions(row)}
                           {onEdit && (
-                            <button onClick={() => onEdit(row)} className="group p-2 rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105" title="Edit">
+                            <button
+                              onClick={() => onEdit(row)}
+                              className="group p-2 rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-105"
+                              title="Edit"
+                            >
                               <Pencil className="w-4 h-4 text-blue-600 transition-all duration-200 group-hover:text-white group-hover:-rotate-6" />
                             </button>
                           )}
                           {onDelete && (
-                            <button onClick={() => onDelete(row)} className="group p-2 rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105" title="Delete">
+                            <button
+                              onClick={() => onDelete(row)}
+                              className="group p-2 rounded-lg transition-all duration-200 hover:bg-red-600 hover:scale-105"
+                              title="Delete"
+                            >
                               <Trash2 className="w-4 h-4 text-red-600 transition-colors duration-200 group-hover:text-white group-hover:rotate-6" />
                             </button>
                           )}
@@ -317,7 +375,10 @@ const ReusableTable = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={columns.length + 2} className="p-10 text-center text-muted-foreground italic">
+                  <td
+                    colSpan={columns.length + 2}
+                    className="p-10 text-center text-muted-foreground italic"
+                  >
                     No results found.
                   </td>
                 </tr>
@@ -330,7 +391,15 @@ const ReusableTable = ({
       {/* Pagination */}
       <div className="flex flex-col md:flex-row justify-between items-center p-4 bg-muted/10 rounded-lg border border-border gap-4">
         <div className="text-sm text-muted-foreground">
-          Showing <span className="text-foreground font-bold">{currentRows.length}</span> of <span className="text-foreground font-bold">{filteredData.length}</span> results
+          Showing{" "}
+          <span className="text-foreground font-bold">
+            {currentRows.length}
+          </span>{" "}
+          of{" "}
+          <span className="text-foreground font-bold">
+            {filteredData.length}
+          </span>{" "}
+          results
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm">
@@ -340,16 +409,28 @@ const ReusableTable = ({
               min={1}
               max={totalPages || 1}
               value={currentPage}
-              onChange={(e) => setCurrentPage(Math.max(1, Math.min(totalPages, Number(e.target.value))))}
+              onChange={(e) =>
+                setCurrentPage(
+                  Math.max(1, Math.min(totalPages, Number(e.target.value))),
+                )
+              }
               className="w-12 text-center border border-border rounded bg-card py-1 font-bold outline-none focus:ring-1 focus:ring-one"
             />
             <span>of {totalPages || 1}</span>
           </div>
           <div className="flex gap-1">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 transition-all">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 transition-all"
+            >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage((p) => p + 1)} className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 transition-all">
+            <button
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 transition-all"
+            >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

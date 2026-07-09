@@ -171,7 +171,7 @@ shadow-lg shadow-one/50
 hover:shadow-one/80 
 hover:scale-[1.02] 
 transition duration-300"      >
-        + Add Plan
+        + Add New Plan
       </button>
     </div>
   );
