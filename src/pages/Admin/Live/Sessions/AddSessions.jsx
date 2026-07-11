@@ -53,11 +53,6 @@ const AddSessions = () => {
     { value: "repeat", label: "Repeat" },
   ];
 
-  const assignmentTypeOptions = [
-    { value: "group", label: "Assign to Group" },
-    { value: "students", label: "Assign to Specific Students" },
-  ];
-
   const sessionRelationalTypeOptions = [
     { value: "Explanation", label: "Explanation" },
     { value: "Re-Explanation", label: "Re-Explanation" },
@@ -79,7 +74,8 @@ const AddSessions = () => {
     name: "",
     scheduleType: "once",
     sessionRelationalType: "Explanation",
-    assignmentType: "group",
+    assignToGroup: true,
+    assignToStudents: false,
     groupId: "",
     teacherId: "",
     sessionDate: "",
@@ -141,11 +137,14 @@ const AddSessions = () => {
     if (!formData.name.trim()) tempErrors.name = "Session name is required";
     if (!formData.teacherId) tempErrors.teacherId = "Teacher is required";
 
-    if (formData.assignmentType === "group" && !formData.groupId) {
+    if (!formData.assignToGroup && !formData.assignToStudents) {
+      tempErrors.assignmentTarget = "Select at least one of Group or Students";
+    }
+    if (formData.assignToGroup && !formData.groupId) {
       tempErrors.groupId = "Group selection is required";
     }
     if (
-      formData.assignmentType === "students" &&
+      formData.assignToStudents &&
       (!formData.userIds || formData.userIds.length === 0)
     ) {
       tempErrors.userIds = "At least one student must be selected";
@@ -167,6 +166,73 @@ const AddSessions = () => {
 
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
+  };
+
+  // 🔹 Step-by-step navigation
+  const TABS = ["info", "schedule", "content", "links"];
+
+  const validateStep = (tab) => {
+    const tempErrors = {};
+
+    if (tab === "info") {
+      if (!formData.name.trim()) tempErrors.name = "Session name is required";
+      if (!formData.teacherId) tempErrors.teacherId = "Teacher is required";
+    }
+
+    if (tab === "schedule") {
+      if (formData.scheduleType === "once") {
+        if (!formData.sessionDate)
+          tempErrors.sessionDate = "Session date is required";
+        if (!formData.timeFrom) tempErrors.timeFrom = "From time is required";
+        if (!formData.timeTo) tempErrors.timeTo = "To time is required";
+      } else {
+        if (!formData.startDate)
+          tempErrors.startDate = "Start date is required";
+        if (!formData.endDate) tempErrors.endDate = "End date is required";
+      }
+    }
+
+    if (tab === "content") {
+      if (!formData.assignToGroup && !formData.assignToStudents) {
+        tempErrors.assignmentTarget =
+          "Select at least one of Group or Students";
+      }
+      if (formData.assignToGroup && !formData.groupId) {
+        tempErrors.groupId = "Group selection is required";
+      }
+      if (
+        formData.assignToStudents &&
+        (!formData.userIds || formData.userIds.length === 0)
+      ) {
+        tempErrors.userIds = "At least one student must be selected";
+      }
+      if (!formData.lessonIds || formData.lessonIds.length === 0) {
+        tempErrors.lessonIds = "At least one lesson must be selected";
+      }
+    }
+
+    setErrors((prev) => ({ ...prev, ...tempErrors }));
+    return Object.keys(tempErrors).length === 0;
+  };
+
+  const handleNext = (e) => {
+    e.preventDefault();
+    if (!validateStep(activeTab)) {
+      toast.error("Please fill all required fields before continuing");
+      return;
+    }
+    const currentIndex = TABS.indexOf(activeTab);
+    if (currentIndex < TABS.length - 1) {
+      setActiveTab(TABS[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevious = (e) => {
+    e.preventDefault();
+    const currentIndex = TABS.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(TABS[currentIndex - 1]);
+    }
   };
 
   const onSave = async (e) => {
@@ -192,11 +258,8 @@ const AddSessions = () => {
       scheduleType: formData.scheduleType,
       teacherId: formData.teacherId,
       groupIds:
-        formData.assignmentType === "group" && formData.groupId
-          ? [formData.groupId]
-          : [],
-      studentIds:
-        formData.assignmentType === "students" ? formData.userIds : [],
+        formData.assignToGroup && formData.groupId ? [formData.groupId] : [],
+      studentIds: formData.assignToStudents ? formData.userIds : [],
 
       categoryId: primaryRow.categoryId || null,
       subCategoryId: primaryRow.subCategoryId || primaryRow.categoryId || null,
@@ -649,19 +712,40 @@ const AddSessions = () => {
             <label className="text-sm font-bold text-slate-700">
               Assign Session To <span className="text-red-500">*</span>
             </label>
-            <Select
-              options={assignmentTypeOptions}
-              value={assignmentTypeOptions.find(
-                (opt) => opt.value === formData.assignmentType,
-              )}
-              onChange={(selected) =>
-                handleSelectChange("assignmentType", selected.value)
-              }
-            />
+            <div className="flex flex-wrap gap-6 pt-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.assignToGroup}
+                  onChange={(e) =>
+                    handleSelectChange("assignToGroup", e.target.checked)
+                  }
+                  className="w-4 h-4 rounded border-slate-300 text-one focus:ring-one"
+                />
+                Group
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.assignToStudents}
+                  onChange={(e) =>
+                    handleSelectChange("assignToStudents", e.target.checked)
+                  }
+                  className="w-4 h-4 rounded border-slate-300 text-one focus:ring-one"
+                />
+                Specific Students
+              </label>
+            </div>
+            {errors.assignmentTarget && (
+              <p className="text-xs text-red-500 flex items-center gap-1">
+                <AlertCircle size={14} />
+                {errors.assignmentTarget}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-6 pt-2">
-            {formData.assignmentType === "group" && (
+            {formData.assignToGroup && (
               <div className="flex flex-col gap-1.5 max-w-md">
                 <label className="text-sm font-bold text-slate-700">
                   Select Group <span className="text-red-500">*</span>
@@ -690,7 +774,7 @@ const AddSessions = () => {
               </div>
             )}
 
-            {formData.assignmentType === "students" && (
+            {formData.assignToStudents && (
               <div className="flex flex-col gap-1.5 w-full">
                 <label className="text-sm font-bold text-slate-700">
                   Search & Select Students{" "}
@@ -785,20 +869,42 @@ const AddSessions = () => {
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 flex items-center gap-3"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Saving Configuration...</span>
-              </>
-            ) : (
-              <span>Save Changes</span>
-            )}
-          </button>
+          {activeTab !== TABS[0] && (
+            <button
+              type="button"
+              onClick={handlePrevious}
+              disabled={isSubmitting}
+              className="px-8 py-3 text-slate-600 font-bold border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
+            >
+              Previous
+            </button>
+          )}
+
+          {activeTab !== TABS[TABS.length - 1] ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={isSubmitting}
+              className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 flex items-center gap-3"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 flex items-center gap-3"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Saving Configuration...</span>
+                </>
+              ) : (
+                <span>Save Changes</span>
+              )}
+            </button>
+          )}
         </div>
       </form>
     </div>
