@@ -276,6 +276,7 @@ const Lessons = () => {
         )}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        extraButton={true}
       >
         <PricePlansModal
           open={pricePopup.open}

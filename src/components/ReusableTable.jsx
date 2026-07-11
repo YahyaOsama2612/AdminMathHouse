@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import TruncatedText from "./TruncatedText";
 
+// استيراد أيقونة مناسبة للـ Drive
+import { HardDrive } from "lucide-react"; 
+
 // --- Custom Searchable Select Component ---
 const SearchableSelect = ({
   value,
@@ -125,6 +128,7 @@ const ReusableTable = ({
   statusKey = "status",
   children,
   rowsPerPage = 10,
+  extraButton = false
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [columnFilters, setColumnFilters] = useState({});
@@ -143,6 +147,16 @@ const ReusableTable = ({
       .map((item) => String(item[key] || "").trim())
       .filter(Boolean);
     return [...new Set(values)];
+  };
+
+    // دالة للتعامل مع الانتقال للـ Drive الديناميكي في تبويب جديد
+  const handleGoToDrive = () => {
+    // جلب الـ Base URL الحالي ديناميكياً (مثال: http://localhost:5173 أو الدومين الفعلي للـ Production)
+    const baseUrl = window.location.origin; 
+    const driveUrl = `${baseUrl}/logindrive`;
+    
+    // فتح الرابط في تبويب جديد تماماً
+    window.open(driveUrl, "_blank", "noopener,noreferrer");
   };
 
   const filteredData = useMemo(() => {
@@ -214,6 +228,19 @@ const ReusableTable = ({
               <Plus className="w-4 h-4" /> Add {titleAdd}
             </button>
           )}
+
+          {extraButton && (
+            <button
+              type="button"
+              onClick={handleGoToDrive}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm"
+            >
+              <HardDrive size={18} />
+              <span>Go to Drive</span>
+            </button>
+          )}
+
+
         </div>
       </div>
 
