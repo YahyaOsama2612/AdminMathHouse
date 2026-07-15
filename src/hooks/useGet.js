@@ -8,6 +8,12 @@ export default function useGet(url) {
   const [error, setError] = useState(null);
 
   const fetchData = useCallback(async () => {
+    if (!url) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const res = await api.get(url);

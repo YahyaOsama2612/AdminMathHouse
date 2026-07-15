@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "@/api/api";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
@@ -12,21 +13,54 @@ import "react-datepicker/dist/react-datepicker.css";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
+// Rendered once per student in the attendance table. Memoized so typing in
+// unrelated form fields (name, links, etc.) doesn't re-render every row.
+const AttendanceRow = React.memo(function AttendanceRow({
+  student,
+  index,
+  columns,
+  completedLessonIds,
+}) {
+  return (
+    <tr className="border-t border-slate-100">
+      <td className="p-2 text-slate-500 sticky left-0 bg-white">{index + 1}</td>
+      <td className="p-2 font-medium text-slate-700 whitespace-nowrap sticky left-8 bg-white">
+        {student.studentName}
+      </td>
+      {columns.map((col) => (
+        <td key={col.id} className="p-2 text-center border-l border-slate-50">
+          {completedLessonIds?.has(col.id) ? (
+            <span className="text-emerald-500 font-bold">✓</span>
+          ) : (
+            <span className="text-slate-300 font-bold">✗</span>
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+});
+
 const AddSessions = () => {
   const navigate = useNavigate();
   const { postData } = usePost("/api/admin/session");
+  const { postData: generateAttendance } = usePost(
+    "/api/admin/session/students/attendance",
+  );
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [courseColumns, setCourseColumns] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
 
   const {
     data: groupData,
-    loading: grouploading,
+    loading: groupLoading,
     error: groupError,
   } = useGet("/api/admin/session/select/groups");
 
   const {
     data: teachersData,
-    loading: teachersloading,
+    loading: teachersLoading,
     error: teachersError,
   } = useGet("/api/admin/session/select/teachers");
 
@@ -94,6 +128,37 @@ const AddSessions = () => {
 
   const [errors, setErrors] = useState({});
 
+  // Fetch the members of the currently selected group so they can be displayed
+  const {
+    data: groupMembersData,
+    loading: groupMembersLoading,
+    error: groupMembersError,
+  } = useGet(
+    formData.assignToGroup && formData.groupId
+      ? `/api/admin/groups/${formData.groupId}`
+      : "",
+  );
+
+  const groupMembers = useMemo(() => {
+    return (
+      groupMembersData?.data?.group?.students ||
+      groupMembersData?.data?.students ||
+      []
+    );
+  }, [groupMembersData]);
+
+  // The attendance API sometimes returns studentName: null. Fall back to the
+  // name we already have from the group members list, if available.
+  const attendanceNameMap = useMemo(() => {
+    const map = new Map();
+    groupMembers.forEach((s) => {
+      const sid = s.id || s.studentId;
+      const sname = s.name || s.studentName || s.fullName;
+      if (sid && sname) map.set(sid, sname);
+    });
+    return map;
+  }, [groupMembers]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -111,9 +176,99 @@ const AddSessions = () => {
       lessonIds: ids || [],
       lessonsFullDetails: fullDetails || [],
     }));
-    // تم تصحيح الخطأ هنا بتحويل lessonIds إلى دلالة نصية سليمة داخل الـ Check
     if (errors.lessonIds) setErrors((prev) => ({ ...prev, lessonIds: "" }));
   };
+
+  const handleGenerateAttendance = async () => {
+    if (!formData.userIds || formData.userIds.length === 0) {
+      toast.error("Please select at least one student first");
+      return;
+    }
+
+    const primaryRow =
+      formData.lessonsFullDetails.find((r) => r.courseId) || {};
+    const courseId = primaryRow.courseId || null;
+
+    if (!courseId) {
+      toast.error(
+        "Please select a course from the lesson hierarchy before generating",
+      );
+      return;
+    }
+
+    try {
+      setAttendanceLoading(true);
+
+      // Pull the full curriculum for this course (every chapter and every
+      // lesson under it), independent of who attended what, so the table
+      // always shows the complete set of lesson columns.
+      const chaptersRes = await api.get(
+        `/api/admin/session/select/chapter/${courseId}`,
+      );
+      const chapterList = chaptersRes.data?.data?.chapters || [];
+
+      const lessonResults = await Promise.all(
+        chapterList.map((chapter) =>
+          api.get(`/api/admin/session/select/lesson/${chapter.id}`),
+        ),
+      );
+
+      const orderedColumns = chapterList.flatMap((chapter, idx) => {
+        const lessons = lessonResults[idx]?.data?.data?.lessons || [];
+        return lessons.map((lesson) => ({
+          id: lesson.id,
+          name: lesson.name,
+          chapterId: chapter.id,
+          chapterName: chapter.name,
+        }));
+      });
+      setCourseColumns(orderedColumns);
+
+      const res = await generateAttendance(
+        {
+          studentIds: formData.userIds,
+          courseId,
+        },
+        "/api/admin/session/students/attendance",
+        "",
+      );
+
+      const students = res?.data?.students || [];
+      const normalized = students.map((student) => ({
+        ...student,
+        studentName:
+          student.studentName ||
+          attendanceNameMap.get(student.studentId) ||
+          "Unnamed Student",
+        chapters: student.chapters || [],
+      }));
+
+      setAttendanceData(normalized);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err?.response?.data?.message || "Failed to load attendance data",
+      );
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  // Which lessons each student has completed, built from the attendance
+  // response. Columns come from courseColumns (the full curriculum fetched
+  // for this course), not from this response, so every lesson always shows
+  // up even with zero attendance.
+  const attendanceByStudent = useMemo(() => {
+    const byStudent = {};
+    attendanceData?.forEach((student) => {
+      const completed = new Set();
+      student.chapters?.forEach((chapter) => {
+        chapter.lessons?.forEach((lesson) => completed.add(lesson.id));
+      });
+      byStudent[student.studentId] = completed;
+    });
+    return byStudent;
+  }, [attendanceData]);
 
   const formatTimeToHMS = (dateObj) => {
     if (!dateObj) return "";
@@ -302,7 +457,7 @@ const AddSessions = () => {
     }
   };
 
-  if (grouploading || teachersloading) return <Loader />;
+  if (groupLoading || teachersLoading) return <Loader />;
   if (groupError || teachersError) return <Errorpage />;
 
   return (
@@ -771,22 +926,183 @@ const AddSessions = () => {
                     {errors.groupId}
                   </p>
                 )}
+
+                {formData.groupId && (
+                  <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-bold text-slate-500 mb-2">
+                      Students in this group
+                    </p>
+                    {groupMembersLoading ? (
+                      <p className="text-xs text-slate-400">
+                        Loading group students...
+                      </p>
+                    ) : groupMembersError ? (
+                      <p className="text-xs text-red-500">
+                        Could not load group students
+                      </p>
+                    ) : groupMembers.length === 0 ? (
+                      <p className="text-xs text-slate-400">
+                        No students found in this group
+                      </p>
+                    ) : (
+                      <>
+                        <label className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={
+                              groupMembers.length > 0 &&
+                              groupMembers.every((s) =>
+                                formData.userIds.includes(s.id || s.studentId),
+                              )
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                handleSelectChange("userIds", [
+                                  ...new Set([
+                                    ...formData.userIds,
+                                    ...groupMembers.map(
+                                      (s) => s.id || s.studentId,
+                                    ),
+                                  ]),
+                                ]);
+                              } else {
+                                handleSelectChange(
+                                  "userIds",
+                                  formData.userIds.filter(
+                                    (id) =>
+                                      !groupMembers.some(
+                                        (s) => (s.id || s.studentId) === id,
+                                      ),
+                                  ),
+                                );
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          Select All
+                        </label>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+                          {groupMembers.map((s) => {
+                            const sid = s.id || s.studentId;
+                            const sname =
+                              s.name || s.studentName || s.fullName || "";
+                            const checked = formData.userIds.includes(sid);
+                            return (
+                              <label
+                                key={sid}
+                                className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...new Set([...formData.userIds, sid])]
+                                      : formData.userIds.filter(
+                                          (uid) => uid !== sid,
+                                        );
+                                    handleSelectChange("userIds", next);
+                                  }}
+                                  className="w-4 h-4 rounded border-slate-300 text-one focus:ring-one"
+                                />
+                                {sname}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {formData.assignToStudents && (
-              <div className="flex flex-col gap-1.5 w-full">
+            {/* Student search table is always visible so it can be combined with a group */}
+            <div className="flex flex-col gap-1.5 w-full">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <label className="text-sm font-bold text-slate-700">
                   Search & Select Students{" "}
-                  <span className="text-red-500">*</span>
+                  {formData.assignToStudents && (
+                    <span className="text-red-500">*</span>
+                  )}
                 </label>
-                <SearchStudents
-                  value={formData.userIds}
-                  onChange={(value) => handleSelectChange("userIds", value)}
-                  error={errors.userIds}
-                />
+                <button
+                  type="button"
+                  onClick={handleGenerateAttendance}
+                  disabled={attendanceLoading || !formData.userIds?.length}
+                  className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all"
+                >
+                  {attendanceLoading ? "Generating..." : "Generate Attendance"}
+                </button>
               </div>
-            )}
+              <SearchStudents
+                value={formData.userIds}
+                onChange={(value) => handleSelectChange("userIds", value)}
+                error={errors.userIds}
+              />
+
+              {attendanceData?.length > 0 && (
+                <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
+                  <p className="text-xs font-bold text-slate-500 px-3 pt-3">
+                    Student Attendance / Progress
+                  </p>
+                  <div className="overflow-x-auto mt-2">
+                    <table className="min-w-full text-xs border-collapse">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">
+                            #
+                          </th>
+                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-8 bg-slate-50 z-10">
+                            Student Name
+                          </th>
+                          {courseColumns.map((col) => (
+                            <th
+                              key={col.id}
+                              className="p-2 text-center font-bold text-slate-600 whitespace-nowrap min-w-[115px] border-l border-slate-100"
+                            >
+                              {/* Render the chapter name styled elegantly directly above the lesson name */}
+                              <div className="text-[10px] text-slate-400 font-normal leading-tight mb-0.5 uppercase tracking-wider">
+                               Ch: {col.chapterName || "General"}
+                              </div>
+                              <div className="text-xs text-slate-700 font-bold">
+                                {col.name}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {courseColumns.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={2}
+                              className="p-4 text-center text-sm text-slate-400 italic"
+                            >
+                              No attendance data available yet for the selected
+                              students.
+                            </td>
+                          </tr>
+                        ) : (
+                          attendanceData.map((student, idx) => (
+                            <AttendanceRow
+                              key={student.studentId}
+                              student={student}
+                              index={idx}
+                              columns={courseColumns}
+                              completedLessonIds={
+                                attendanceByStudent[student.studentId]
+                              }
+                            />
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-col gap-1.5 w-full border-t border-slate-100 pt-4">
               <label className="text-sm font-bold text-slate-700 mb-2">

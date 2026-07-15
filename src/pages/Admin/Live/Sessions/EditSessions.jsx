@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import usePut from "@/hooks/usePut";
+import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
+import api from "@/api/api";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import SearchStudents from "@/components/SearchStudents";
@@ -12,10 +14,43 @@ import "react-datepicker/dist/react-datepicker.css";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
+// Rendered once per student in the attendance table. Memoized so typing in
+// unrelated form fields (name, links, etc.) doesn't re-render every row.
+const AttendanceRow = React.memo(function AttendanceRow({
+  student,
+  index,
+  columns,
+  completedLessonIds,
+}) {
+  return (
+    <tr className="border-t border-slate-100">
+      <td className="p-2 text-slate-500 sticky left-0 bg-white">{index + 1}</td>
+      <td className="p-2 font-medium text-slate-700 whitespace-nowrap sticky left-8 bg-white">
+        {student.studentName}
+      </td>
+      {columns.map((col) => (
+        <td key={col.id} className="p-2 text-center border-l border-slate-50">
+          {completedLessonIds?.has(col.id) ? (
+            <span className="text-emerald-500 font-bold">✓</span>
+          ) : (
+            <span className="text-slate-300 font-bold">✗</span>
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+});
+
 const EditSessions = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { putData } = usePut(`/api/admin/session/${id}`);
+  const { postData: postAttendance } = usePost(
+    "/api/admin/session/students/attendance",
+  );
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [courseColumns, setCourseColumns] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
 
@@ -64,6 +99,37 @@ const EditSessions = () => {
 
   const [errors, setErrors] = useState({});
 
+  // Fetch the members of the currently selected group so they can be displayed
+  const {
+    data: groupMembersData,
+    loading: groupMembersLoading,
+    error: groupMembersError,
+  } = useGet(
+    formData.assignToGroup && formData.groupId
+      ? `/api/admin/groups/${formData.groupId}`
+      : "",
+  );
+
+  const groupMembers = useMemo(() => {
+    return (
+      groupMembersData?.data?.group?.students ||
+      groupMembersData?.data?.students ||
+      []
+    );
+  }, [groupMembersData]);
+
+  // The attendance API sometimes returns studentName: null. Fall back to the
+  // name we already have from the group members list, if available.
+  const attendanceNameMap = useMemo(() => {
+    const map = new Map();
+    groupMembers.forEach((s) => {
+      const sid = s.id || s.studentId;
+      const sname = s.name || s.studentName || s.fullName;
+      if (sid && sname) map.set(sid, sname);
+    });
+    return map;
+  }, [groupMembers]);
+
   // 🔹 Sync database session data carefully to localized state hooks
   useEffect(() => {
     if (sessionRes?.data?.session) {
@@ -73,13 +139,39 @@ const EditSessions = () => {
       const hasStudents = Boolean(session.students?.length);
       const mappedGroupId = session.groupIds?.[0] || session.groupId || "";
 
-      // Fallback extraction safely parsing details from either root properties or embedded nested items
+      // The lessons the session API returns nest course/category/chapter as
+      // objects (e.g. lesson.course.id), not flat lesson.courseId fields.
       const backupLesson = session.lessons?.[0] || {};
       const targetCategoryId =
-        session.categoryId || backupLesson.categoryId || null;
+        session.categoryId || backupLesson.category?.id || null;
       const targetSubCategoryId =
-        session.subCategoryId || backupLesson.subCategoryId || targetCategoryId;
-      const targetCourseId = session.courseId || backupLesson.courseId || null;
+        session.subCategoryId ||
+        backupLesson.subcategory?.id ||
+        targetCategoryId;
+      const targetCourseId =
+        session.courseId || backupLesson.course?.id || null;
+
+      // Build an initial hierarchy "row" from the loaded lessons so the
+      // course/category context is available right away, without requiring
+      // the user to re-touch the Lesson Hierarchy selector before generating
+      // attendance or saving.
+      const initialChapterIds = Array.from(
+        new Set(
+          (session.lessons || []).map((l) => l.chapter?.id).filter(Boolean),
+        ),
+      );
+      const initialLessonsFullDetails =
+        targetCourseId || targetCategoryId
+          ? [
+              {
+                categoryId: targetCategoryId,
+                subCategoryId: targetSubCategoryId,
+                courseId: targetCourseId,
+                chapterIds: initialChapterIds,
+                lessonIds: session.lessons?.map((l) => l.id) || [],
+              },
+            ]
+          : [];
 
       setFormData({
         name: session.name || "",
@@ -101,7 +193,7 @@ const EditSessions = () => {
           ? session.recurringDays
           : [{ dayOfWeek: "", timeFrom: "", timeTo: "" }],
         lessonIds: session.lessons?.map((l) => l.id) || [],
-        lessonsFullDetails: [], // Starts blank, populates cleanly if client alters row selections
+        lessonsFullDetails: initialLessonsFullDetails, // pre-filled from loaded session data
         userIds: session.students?.map((s) => s.id) || [],
         session_link: session.session_link || "",
         material_link: session.material_link || "",
@@ -172,6 +264,93 @@ const EditSessions = () => {
     }));
     if (errors.lessonIds) setErrors((prev) => ({ ...prev, lessonIds: "" }));
   };
+
+  const handleGenerateAttendance = async () => {
+    if (!formData.userIds || formData.userIds.length === 0) {
+      toast.error("Please select at least one student first");
+      return;
+    }
+
+    const dynamicRow =
+      formData.lessonsFullDetails?.find((r) => r.courseId) || {};
+    const courseId = dynamicRow.courseId || formData.initialCourseId || null;
+
+    if (!courseId) {
+      toast.error(
+        "Please select a course from the lesson hierarchy before generating",
+      );
+      return;
+    }
+
+    try {
+      setAttendanceLoading(true);
+
+      // Pull the full curriculum for this course (every chapter and every
+      // lesson under it), independent of who attended what, so the table
+      // always shows the complete set of lesson columns.
+      const chaptersRes = await api.get(
+        `/api/admin/session/select/chapter/${courseId}`,
+      );
+      const chapterList = chaptersRes.data?.data?.chapters || [];
+
+      const lessonResults = await Promise.all(
+        chapterList.map((chapter) =>
+          api.get(`/api/admin/session/select/lesson/${chapter.id}`),
+        ),
+      );
+
+      const orderedColumns = chapterList.flatMap((chapter, idx) => {
+        const lessons = lessonResults[idx]?.data?.data?.lessons || [];
+        return lessons.map((lesson) => ({
+          id: lesson.id,
+          name: lesson.name,
+          chapterId: chapter.id,
+          chapterName: chapter.name,
+        }));
+      });
+      setCourseColumns(orderedColumns);
+
+      const res = await postAttendance(
+        { studentIds: formData.userIds, courseId },
+        "/api/admin/session/students/attendance",
+      );
+
+      const students = res?.data?.students || [];
+      const normalized = students.map((student) => ({
+        ...student,
+        studentName:
+          student.studentName ||
+          attendanceNameMap.get(student.studentId) ||
+          "Unnamed Student",
+        chapters: student.chapters || [],
+      }));
+
+      setAttendanceData(normalized);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err?.response?.data?.message || "Failed to load attendance data",
+      );
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  // Which lessons each student has completed, built from the attendance
+  // response. Columns come from courseColumns (the full curriculum fetched
+  // for this course), not from this response, so every lesson always shows
+  // up even with zero attendance.
+  const attendanceByStudent = useMemo(() => {
+    const byStudent = {};
+    attendanceData?.forEach((student) => {
+      const completed = new Set();
+      student.chapters?.forEach((chapter) => {
+        chapter.lessons?.forEach((lesson) => completed.add(lesson.id));
+      });
+      byStudent[student.studentId] = completed;
+    });
+    return byStudent;
+  }, [attendanceData]);
 
   const formatTimeToHMS = (dateObj) => {
     if (!dateObj) return "";
@@ -789,22 +968,126 @@ const EditSessions = () => {
                     {errors.groupId}
                   </p>
                 )}
+
+                {formData.groupId && (
+                  <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-bold text-slate-500 mb-2">
+                      Students in this group
+                    </p>
+                    {groupMembersLoading ? (
+                      <p className="text-xs text-slate-400">
+                        Loading group students...
+                      </p>
+                    ) : groupMembersError ? (
+                      <p className="text-xs text-red-500">
+                        Could not load group students
+                      </p>
+                    ) : groupMembers.length === 0 ? (
+                      <p className="text-xs text-slate-400">
+                        No students found in this group
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {groupMembers.map((s) => (
+                          <span
+                            key={s.id || s.studentId}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600"
+                          >
+                            {s.name || s.studentName || s.fullName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {formData.assignToStudents && (
-              <div className="flex flex-col gap-1.5 w-full">
+            {/* Student search table is always visible so it can be combined with a group */}
+            <div className="flex flex-col gap-1.5 w-full">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <label className="text-sm font-bold text-slate-700">
                   Search & Select Students{" "}
-                  <span className="text-red-500">*</span>
+                  {formData.assignToStudents && (
+                    <span className="text-red-500">*</span>
+                  )}
                 </label>
-                <SearchStudents
-                  value={formData.userIds}
-                  onChange={(val) => handleSelectChange("userIds", val)}
-                  error={errors.userIds}
-                />
+                <button
+                  type="button"
+                  onClick={handleGenerateAttendance}
+                  disabled={attendanceLoading || !formData.userIds?.length}
+                  className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all"
+                >
+                  {attendanceLoading ? "Generating..." : "Generate Attendance"}
+                </button>
               </div>
-            )}
+              <SearchStudents
+                value={formData.userIds}
+                onChange={(val) => handleSelectChange("userIds", val)}
+                error={errors.userIds}
+              />
+
+              {attendanceData?.length > 0 && (
+                <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
+                  <p className="text-xs font-bold text-slate-500 px-3 pt-3">
+                    Student Attendance / Progress
+                  </p>
+                  <div className="overflow-x-auto mt-2">
+                    <table className="min-w-full text-xs border-collapse">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">
+                            #
+                          </th>
+                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-8 bg-slate-50 z-10">
+                            Student Name
+                          </th>
+                          {courseColumns.map((col) => (
+                            <th
+                              key={col.id}
+                              className="p-2 text-center font-bold text-slate-600 whitespace-nowrap min-w-[115px] border-l border-slate-100"
+                            >
+                              {/* 🎯 FIX: Render the chapter name styled elegantly directly above the lesson name */}
+                              <div className="text-[10px] text-slate-400 font-normal leading-tight mb-0.5 uppercase tracking-wider">
+                                Ch: {col.chapterName || "General"}
+                              </div>
+                              <div className="text-xs text-slate-700 font-bold">
+                                {col.name}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {courseColumns.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={2}
+                              className="p-4 text-center text-sm text-slate-400 italic"
+                            >
+                              No attendance data available yet for the selected
+                              students.
+                            </td>
+                          </tr>
+                        ) : (
+                          attendanceData.map((student, idx) => (
+                            <AttendanceRow
+                              key={student.studentId}
+                              student={student}
+                              index={idx}
+                              columns={courseColumns}
+                              completedLessonIds={
+                                attendanceByStudent[student.studentId]
+                              }
+                            />
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-col gap-1.5 w-full border-t border-slate-100 pt-4">
               <label className="text-sm font-bold text-slate-700 mb-2">

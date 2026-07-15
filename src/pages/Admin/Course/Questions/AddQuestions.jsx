@@ -232,8 +232,8 @@ const AddQuestions = () => {
       {
         name: "question",
         label: "Question Content",
-        type: "custom",
         required: true,
+        type: "custom",
         section: "General Information",
         fullWidth: true,
         render: ({ value, onChange }) => (
@@ -441,7 +441,11 @@ const AddQuestions = () => {
       {
         name: "answerText",
         label: "Answer Text",
-        type: "text",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <TipTapMathEditor value={value} onChange={onChange} />
+        ),
         section: "Solution Media",
       },
     ],
@@ -502,7 +506,7 @@ const AddQuestions = () => {
       gridInAnswers,
       correctOption,
       options,
-      
+
       ...rest
     } = formData;
 
