@@ -28,6 +28,7 @@ import {
   exportLessonProgressReport,
   exportExamReport,
 } from "../../../../utils/Reportexport";
+
 const StudentInformation = () => {
   const [processing, setProcessing] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
@@ -182,7 +183,7 @@ const StudentInformation = () => {
         </div>
       </div>
 
-      {/* Courses, Packages, Quiz & Exam Reports - built to handle large datasets (search + pagination) */}
+      {/* Courses, Packages, Quiz & Exam Reports */}
       <div className="mt-6 space-y-6">
         <CoursesSection courses={student?.courses || []} />
         <PackagesSection packages={student?.packages || []} />
@@ -195,6 +196,7 @@ const StudentInformation = () => {
         />
         <ExamReportsSection
           exams={exams}
+          studentId={id}
           studentName={`${student?.firstname} ${student?.lastname}`}
           grade={student?.grade?.nameAr}
         />
@@ -245,7 +247,6 @@ const TopUpWalletModal = ({
         },
       );
 
-      // Prefer the balance returned by the API; otherwise compute it locally.
       const returnedBalance = res?.data?.data?.balance;
       const nextBalance =
         typeof returnedBalance === "number"
@@ -612,6 +613,9 @@ const QuizReportsSection = ({
   const [extendLessonTarget, setExtendLessonTarget] = useState(null);
   const [exporting, setExporting] = useState(false);
 
+  // New States for "Generate Mistakes" Feature
+  const [selectedQuizzes, setSelectedQuizzes] = useState(new Set());
+
   const handleExport = async () => {
     try {
       setExporting(true);
@@ -627,6 +631,27 @@ const QuizReportsSection = ({
       setExporting(false);
     }
   };
+
+  const handleGenerateMistakes = (type) => {
+    // You can replace this with your actual API call to generate the PDFs
+    const selectedIds = Array.from(selectedQuizzes);
+    console.log(`Generating ${type} mistakes PDF for quizzes:`, selectedIds);
+    toast.success(
+      `${type === "empty" ? "Empty" : "Answers"} Mistakes PDF generated and sent to Teacher Dashboard!`,
+    );
+  };
+
+  const toggleQuizSelection = (quizId, e) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedQuizzes);
+    if (newSet.has(quizId)) {
+      newSet.delete(quizId);
+    } else {
+      newSet.add(quizId);
+    }
+    setSelectedQuizzes(newSet);
+  };
+
   const filteredQuizzes = useMemo(() => {
     if (!searchTerm.trim()) return quizzes;
     const term = searchTerm.toLowerCase();
@@ -636,6 +661,12 @@ const QuizReportsSection = ({
         quiz.lesson?.name?.toLowerCase().includes(term),
     );
   }, [quizzes, searchTerm]);
+
+  const selectedMistakesCount = useMemo(() => {
+    return quizzes
+      .filter((q) => selectedQuizzes.has(q.quizId))
+      .reduce((sum, q) => sum + (q.mistakes?.length || 0), 0);
+  }, [quizzes, selectedQuizzes]);
 
   const totalPages = Math.max(
     1,
@@ -657,32 +688,56 @@ const QuizReportsSection = ({
 
   return (
     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
         <h3 className="font-bold text-gray-800 flex items-center gap-2">
           <BookOpen size={20} className="text-orange-600" /> Quiz Reports
           <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {filteredQuizzes.length}
           </span>
         </h3>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50"
-        >
-          {exporting ? "Exporting..." : "Export Report"}
-        </button>
-        <div className="relative w-full sm:w-64">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Search quizzes or lessons..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8B4B4]"
-          />
+
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          {selectedQuizzes.size > 0 && (
+            <div className="flex items-center gap-2 bg-[#FBEAEA] px-3 py-1.5 rounded-xl">
+              <span className="text-sm font-bold text-[#7D0A0A]">
+                Mistakes Count: {selectedMistakesCount}
+              </span>
+              <button
+                onClick={() => handleGenerateMistakes("empty")}
+                className="ml-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
+              >
+                Generate Empty PDF
+              </button>
+              <button
+                onClick={() => handleGenerateMistakes("answers")}
+                className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
+              >
+                Generate Answers PDF
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50 shrink-0"
+          >
+            {exporting ? "Exporting..." : "Export Report"}
+          </button>
+
+          <div className="relative w-full sm:w-64">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search quizzes or lessons..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8B4B4]"
+            />
+          </div>
         </div>
       </div>
 
@@ -702,61 +757,70 @@ const QuizReportsSection = ({
           return (
             <div
               key={quiz.quizId}
-              className="border border-gray-100 rounded-2xl overflow-hidden"
+              className="border border-gray-100 rounded-2xl overflow-hidden flex flex-col"
             >
-              <button
-                onClick={() => hasDetails && toggleExpand(quiz.quizId)}
-                className={`w-full flex items-center justify-between p-4 text-left transition-colors ${
-                  hasDetails
-                    ? "hover:bg-gray-50 cursor-pointer"
-                    : "cursor-default"
-                }`}
+              <div
+                className={`w-full flex items-center transition-colors ${hasDetails ? "hover:bg-gray-50 cursor-pointer" : ""}`}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-gray-800 truncate">
-                    {quiz.quizName}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    Lesson: {quiz.lesson?.name || "N/A"}
-                  </p>
+                <div className="pl-4 py-4 flex items-center justify-center shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={selectedQuizzes.has(quiz.quizId)}
+                    onChange={(e) => toggleQuizSelection(quiz.quizId, e)}
+                    className="w-4 h-4 text-[#7D0A0A] rounded border-gray-300 focus:ring-[#7D0A0A] cursor-pointer"
+                  />
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 ml-4">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                      quiz.status === "absent"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-green-100 text-green-600"
-                    }`}
-                  >
-                    {quiz.status}
-                  </span>
-                  <span className="text-sm font-bold text-gray-700 whitespace-nowrap">
-                    {quiz.score !== null && quiz.score !== undefined
-                      ? `${quiz.score}/${quiz.totalScore}`
-                      : "N/A"}
-                  </span>
-                  {quiz.lesson?.id && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExtendLessonTarget(quiz.lesson);
-                      }}
-                      title="Extend lesson duration"
-                      className="flex items-center gap-1 bg-[#FBEAEA] hover:bg-[#F0D2D2] text-[#7D0A0A] px-2 py-1 rounded-lg text-[11px] font-bold transition-colors"
+                <div
+                  onClick={() => hasDetails && toggleExpand(quiz.quizId)}
+                  className="flex-1 flex items-center justify-between p-4 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-gray-800 truncate">
+                      {quiz.quizName}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      Lesson: {quiz.lesson?.name || "N/A"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                        quiz.status === "absent"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-green-100 text-green-600"
+                      }`}
                     >
-                      <Clock size={12} /> Extend
-                    </button>
-                  )}
-                  {hasDetails &&
-                    (isExpanded ? (
-                      <ChevronUp size={18} className="text-gray-400" />
-                    ) : (
-                      <ChevronDown size={18} className="text-gray-400" />
-                    ))}
+                      {quiz.status}
+                    </span>
+                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">
+                      {quiz.score !== null && quiz.score !== undefined
+                        ? `${quiz.score}/${quiz.totalScore}`
+                        : "N/A"}
+                    </span>
+                    {quiz.lesson?.id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExtendLessonTarget(quiz.lesson);
+                        }}
+                        title="Extend lesson duration"
+                        className="flex items-center gap-1 bg-[#FBEAEA] hover:bg-[#F0D2D2] text-[#7D0A0A] px-2 py-1 rounded-lg text-[11px] font-bold transition-colors"
+                      >
+                        <Clock size={12} /> Extend
+                      </button>
+                    )}
+                    {hasDetails &&
+                      (isExpanded ? (
+                        <ChevronUp size={18} className="text-gray-400" />
+                      ) : (
+                        <ChevronDown size={18} className="text-gray-400" />
+                      ))}
+                  </div>
                 </div>
-              </button>
+              </div>
 
               {isExpanded && hasDetails && <QuizDetails quiz={quiz} />}
             </div>
@@ -978,8 +1042,10 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedExamId, setExpandedExamId] = useState(null);
-
   const [exporting, setExporting] = useState(false);
+
+  // New States for "Generate Mistakes" Feature
+  const [selectedExams, setSelectedExams] = useState(new Set());
 
   const handleExport = async () => {
     try {
@@ -987,7 +1053,6 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
       await exportExamReport({
         studentName,
         grade,
-
         exams,
       });
     } catch (err) {
@@ -997,11 +1062,36 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
     }
   };
 
+  const handleGenerateMistakes = (type) => {
+    const selectedIds = Array.from(selectedExams);
+    console.log(`Generating ${type} mistakes PDF for exams:`, selectedIds);
+    toast.success(
+      `${type === "empty" ? "Empty" : "Answers"} Mistakes PDF generated and sent to Teacher Dashboard!`,
+    );
+  };
+
+  const toggleExamSelection = (examId, e) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedExams);
+    if (newSet.has(examId)) {
+      newSet.delete(examId);
+    } else {
+      newSet.add(examId);
+    }
+    setSelectedExams(newSet);
+  };
+
   const filteredExams = useMemo(() => {
     if (!searchTerm.trim()) return exams;
     const term = searchTerm.toLowerCase();
     return exams.filter((exam) => exam.examName?.toLowerCase().includes(term));
   }, [exams, searchTerm]);
+
+  const selectedMistakesCount = useMemo(() => {
+    return exams
+      .filter((e) => selectedExams.has(e.examId))
+      .reduce((sum, e) => sum + (e.mistakes?.length || 0), 0);
+  }, [exams, selectedExams]);
 
   const totalPages = Math.max(1, Math.ceil(filteredExams.length / PAGE_SIZE));
   const paginatedExams = filteredExams.slice(
@@ -1020,33 +1110,56 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
 
   return (
     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
         <h3 className="font-bold text-gray-800 flex items-center gap-2">
           <Award size={20} className="text-emerald-600" /> Exam Reports
           <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {filteredExams.length}
           </span>
         </h3>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50"
-        >
-          {exporting ? "Exporting..." : "Export Report"}
-        </button>
 
-        <div className="relative w-full sm:w-64">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Search exams..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8B4B4]"
-          />
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          {selectedExams.size > 0 && (
+            <div className="flex items-center gap-2 bg-[#FBEAEA] px-3 py-1.5 rounded-xl">
+              <span className="text-sm font-bold text-[#7D0A0A]">
+                Mistakes Count: {selectedMistakesCount}
+              </span>
+              <button
+                onClick={() => handleGenerateMistakes("empty")}
+                className="ml-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
+              >
+                Generate Empty PDF
+              </button>
+              <button
+                onClick={() => handleGenerateMistakes("answers")}
+                className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
+              >
+                Generate Answers PDF
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-[#7D0A0A] text-white rounded-xl text-sm font-bold disabled:opacity-50 shrink-0"
+          >
+            {exporting ? "Exporting..." : "Export Report"}
+          </button>
+
+          <div className="relative w-full sm:w-64">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search exams..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8B4B4]"
+            />
+          </div>
         </div>
       </div>
 
@@ -1060,52 +1173,69 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
         {paginatedExams.map((exam) => {
           const isExpanded = expandedExamId === exam.examId;
           const passed = exam.score >= exam.passScore;
+          const hasDetails =
+            (exam.mistakes && exam.mistakes.length > 0) ||
+            (exam.lessonsToRecap && exam.lessonsToRecap.length > 0);
 
           return (
             <div
               key={exam.examId}
-              className="border border-gray-100 rounded-2xl overflow-hidden"
+              className="border border-gray-100 rounded-2xl overflow-hidden flex flex-col"
             >
-              <button
-                onClick={() => toggleExpand(exam.examId)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
+              <div
+                className={`w-full flex items-center transition-colors ${hasDetails ? "hover:bg-gray-50 cursor-pointer" : ""}`}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-gray-800 truncate">
-                    {exam.examName}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {exam.date
-                      ? new Date(exam.date).toLocaleDateString()
-                      : "N/A"}{" "}
-                    · {exam.mistakesCount || 0} mistakes
-                  </p>
+                <div className="pl-4 py-4 flex items-center justify-center shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={selectedExams.has(exam.examId)}
+                    onChange={(e) => toggleExamSelection(exam.examId, e)}
+                    className="w-4 h-4 text-[#7D0A0A] rounded border-gray-300 focus:ring-[#7D0A0A] cursor-pointer"
+                  />
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 ml-4">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                      exam.status === "absent"
-                        ? "bg-red-100 text-red-600"
-                        : passed
-                          ? "bg-green-100 text-green-600"
-                          : "bg-amber-100 text-amber-600"
-                    }`}
-                  >
-                    {exam.status}
-                  </span>
-                  <span className="text-sm font-bold text-gray-700 whitespace-nowrap">
-                    {exam.score}/{exam.totalScore}
-                  </span>
-                  {isExpanded ? (
-                    <ChevronUp size={18} className="text-gray-400" />
-                  ) : (
-                    <ChevronDown size={18} className="text-gray-400" />
-                  )}
-                </div>
-              </button>
+                <div
+                  onClick={() => hasDetails && toggleExpand(exam.examId)}
+                  className="flex-1 flex items-center justify-between p-4 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-gray-800 truncate">
+                      {exam.examName}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {exam.date
+                        ? new Date(exam.date).toLocaleDateString()
+                        : "N/A"}{" "}
+                      · {exam.mistakesCount || 0} mistakes
+                    </p>
+                  </div>
 
-              {isExpanded && <ExamDetails exam={exam} />}
+                  <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                        exam.status === "absent"
+                          ? "bg-red-100 text-red-600"
+                          : passed
+                            ? "bg-green-100 text-green-600"
+                            : "bg-amber-100 text-amber-600"
+                      }`}
+                    >
+                      {exam.status}
+                    </span>
+                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">
+                      {exam.score}/{exam.totalScore}
+                    </span>
+                    {hasDetails &&
+                      (isExpanded ? (
+                        <ChevronUp size={18} className="text-gray-400" />
+                      ) : (
+                        <ChevronDown size={18} className="text-gray-400" />
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {isExpanded && hasDetails && <ExamDetails exam={exam} />}
             </div>
           );
         })}

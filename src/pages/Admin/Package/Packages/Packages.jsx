@@ -44,6 +44,8 @@ const Packages = () => {
     { header: "Lessons", key: "number" ,filterable: true, filterType: 'select'},
     { header: "Price", key: "price",filterable: true, filterType: 'select'},
     { header: "Duration (days)", key: "duration",filterable: true, filterType: 'select'}, 
+    { header: "Has Answers", key: "hasAnswers", filterable: true, filterType: 'select' },
+    {header:"Answer price", key:"answerPrice", filterable: false, filterType: 'select'},
   ];
 
   const tableData = useMemo(() => {
@@ -57,6 +59,8 @@ const Packages = () => {
         number: pkg.number,
         price: pkg.price,
         duration: pkg.duration,
+        hasAnswers: pkg.hasAnswers ? "Yes" : "No",
+        answerPrice: pkg.answersPrice || 0,
         raw: pkg,
       })) || []
     );

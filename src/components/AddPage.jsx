@@ -14,7 +14,6 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
   const [previews, setPreviews] = useState({});
 
   // Initialize default data
-  
 
   const [formData, setFormData] = useState(() =>
     fields.reduce(
@@ -33,13 +32,16 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
           {},
         ),
     );
-useEffect(() => {
+  useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
       setFormData((prev) => ({ ...prev, ...initialData }));
 
       const newPreviews = {};
       Object.keys(initialData).forEach((key) => {
-        if (typeof initialData[key] === "string" && initialData[key].includes("http")) {
+        if (
+          typeof initialData[key] === "string" &&
+          initialData[key].includes("http")
+        ) {
           newPreviews[key] = initialData[key];
         }
       });
@@ -47,7 +49,6 @@ useEffect(() => {
     }
     // 👇🔥 استخدمنا JSON.stringify عشان الكومبوننت ميعملش إعادة تعيين (Reset) للفورم فجأة
   }, [JSON.stringify(initialData)]);
-  
 
   // --- Validation Logic (Translated) ---
   const validateField = useCallback(
@@ -438,7 +439,10 @@ useEffect(() => {
                           }));
 
                           if (errors[field.name])
-                            setErrors((prev) => ({ ...prev, [field.name]: "" }));
+                            setErrors((prev) => ({
+                              ...prev,
+                              [field.name]: "",
+                            }));
 
                           // تمرير setFormData للأب عند الحاجة
                           if (field.onChange) {
@@ -483,43 +487,57 @@ useEffect(() => {
                     )}
 
                     {field.type === "pdf" && (
-  <div
-    className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-red-500 bg-red-50" : "border-slate-200 hover:border-red-300"}`}
-  >
-    <input
-      accept="application/pdf"
-      type="file"
-      onChange={(e) => handleFileChange(e, field.name)}
-      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-    />
-    <div className="flex items-center gap-4 text-left">
-      {previews[field.name] ? (
-        /* شكل الـ Preview لما يتم اختيار ملف PDF */
-        <div className="w-16 h-16 bg-red-100 rounded-lg flex flex-col items-center justify-center text-red-600 ring-2 ring-white shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <span className="text-[10px] font-bold mt-1">PDF</span>
-        </div>
-      ) : (
-        /* الشكل الافتراضي قبل الرفع */
-        <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-red-500 transition-colors">
-          <Upload size={24} />
-        </div>
-      )}
-      
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-slate-600">
-          {previews[field.name] ? "PDF Selected Successfully" : "Click to upload or drag and drop"}
-        </span>
-        <span className="text-xs text-slate-400">
-          PDF file up to 5MB
-        </span>
-      </div>
-    </div>
-  </div>
-)}
+                      <div
+                        className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-red-500 bg-red-50" : "border-slate-200 hover:border-red-300"}`}
+                      >
+                        <input
+                          accept="application/pdf"
+                          type="file"
+                          onChange={(e) => handleFileChange(e, field.name)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex items-center gap-4 text-left">
+                          {previews[field.name] ? (
+                            /* شكل الـ Preview لما يتم اختيار ملف PDF */
+                            <div className="w-16 h-16 bg-red-100 rounded-lg flex flex-col items-center justify-center text-red-600 ring-2 ring-white shadow-md">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              <span className="text-[10px] font-bold mt-1">
+                                PDF
+                              </span>
+                            </div>
+                          ) : (
+                            /* الشكل الافتراضي قبل الرفع */
+                            <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-red-500 transition-colors">
+                              <Upload size={24} />
+                            </div>
+                          )}
+
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-600">
+                              {previews[field.name]
+                                ? "PDF Selected Successfully"
+                                : "Click to upload or drag and drop"}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              PDF file up to 5MB
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {field.type === "dynamic-list" && (
                       <div className="flex flex-col gap-3">
@@ -586,17 +604,25 @@ useEffect(() => {
                         </button>
                       </div>
                     )}
-
                     {field.type === "switch" && (
                       <div className="flex items-center gap-3 py-2 justify-start">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            // 1. Calculate the new boolean value
+                            const newValue = !formData[field.name];
+
+                            // 2. Update the internal state of AddPage
                             setFormData((prev) => ({
                               ...prev,
-                              [field.name]: !prev[field.name],
-                            }))
-                          }
+                              [field.name]: newValue,
+                            }));
+
+                            // 3. 🔥 Notify the parent component so it can render the new field!
+                            if (field.onChange) {
+                              field.onChange(newValue, setFormData);
+                            }
+                          }}
                           className={`w-12 h-6 flex items-center rounded-full p-1 transition-all duration-300 ${formData[field.name] ? "bg-one" : "bg-slate-300"}`}
                         >
                           <div
@@ -608,83 +634,85 @@ useEffect(() => {
                         </span>
                       </div>
                     )}
-{field.type === "fileWithOCR" && (
-  <div className="flex flex-col md:flex-row gap-4 w-full items-stretch">
-    {/* صندوق رفع الصورة */}
-    <div
-      className={`relative flex-1 group border-2 border-dashed rounded-xl p-4 transition-all ${
-        previews[field.name] ? "border-one bg-one/5" : "border-slate-200 hover:border-one/50"
-      }`}
-    >
-      <input
-        accept="image/png, image/jpeg, image/jpg, image/webp"
-        type="file"
-        onChange={(e) => handleFileChange(e, field.name)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-      />
-      <div className="flex items-center gap-4 text-left">
-        {previews[field.name] ? (
-          <img
-            src={previews[field.name]}
-            alt="preview"
-            className="w-16 h-16 rounded-lg object-cover ring-2 ring-white shadow-md"
-          />
-        ) : (
-          <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-one transition-colors">
-            <Upload size={24} />
-          </div>
-        )}
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-slate-600">
-            Click to upload or drag and drop
-          </span>
-          <span className="text-xs text-slate-400">
-            PNG, JPG up to 5MB
-          </span>
-        </div>
-      </div>
-    </div>
+                    {field.type === "fileWithOCR" && (
+                      <div className="flex flex-col md:flex-row gap-4 w-full items-stretch">
+                        {/* صندوق رفع الصورة */}
+                        <div
+                          className={`relative flex-1 group border-2 border-dashed rounded-xl p-4 transition-all ${
+                            previews[field.name]
+                              ? "border-one bg-one/5"
+                              : "border-slate-200 hover:border-one/50"
+                          }`}
+                        >
+                          <input
+                            accept="image/png, image/jpeg, image/jpg, image/webp"
+                            type="file"
+                            onChange={(e) => handleFileChange(e, field.name)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className="flex items-center gap-4 text-left">
+                            {previews[field.name] ? (
+                              <img
+                                src={previews[field.name]}
+                                alt="preview"
+                                className="w-16 h-16 rounded-lg object-cover ring-2 ring-white shadow-md"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-one transition-colors">
+                                <Upload size={24} />
+                              </div>
+                            )}
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-slate-600">
+                                Click to upload or drag and drop
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                PNG, JPG up to 5MB
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-    {/* الزرار الإضافي */}
-    {field.actionButton && (
-      <div className="flex md:w-auto w-full">
-        {field.actionButton({ formData, setFormData })}
-      </div>
-    )}
-  </div>
-)}
-                  {field.type === "custom" && field.render && (
-  <div className="w-full">
-    {field.render({
-      value: formData[field.name], // القيمة الحالية
-      
-      onChange: (newValue) => {
-        setFormData((prev) => ({
-          ...prev,
-          [field.name]: newValue,
-        }));
-        if (errors[field.name])
-          setErrors((prev) => ({
-            ...prev,
-            [field.name]: "",
-          }));
-      },
+                        {/* الزرار الإضافي */}
+                        {field.actionButton && (
+                          <div className="flex md:w-auto w-full">
+                            {field.actionButton({ formData, setFormData })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {field.type === "custom" && field.render && (
+                      <div className="w-full">
+                        {field.render({
+                          value: formData[field.name], // القيمة الحالية
 
-      error: errors[field.name], 
-      formData: formData, 
-      field: field, 
-      
-      // 👇 التعديل هنا: لازم نمرر setFormData عشان تقدر تستخدمها في الـ OCR
-      setFormData: setFormData, 
-    })}
+                          onChange: (newValue) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              [field.name]: newValue,
+                            }));
+                            if (errors[field.name])
+                              setErrors((prev) => ({
+                                ...prev,
+                                [field.name]: "",
+                              }));
+                          },
 
-    {errors[field.name] && (
-      <p className="text-xs text-red-500 font-medium flex items-center gap-1 mt-1">
-        <AlertCircle size={14} /> {errors[field.name]}
-      </p>
-    )}
-  </div>
-)}
+                          error: errors[field.name],
+                          formData: formData,
+                          field: field,
+
+                          // 👇 التعديل هنا: لازم نمرر setFormData عشان تقدر تستخدمها في الـ OCR
+                          setFormData: setFormData,
+                        })}
+
+                        {errors[field.name] && (
+                          <p className="text-xs text-red-500 font-medium flex items-center gap-1 mt-1">
+                            <AlertCircle size={14} /> {errors[field.name]}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {/* Helper Text & Errors */}
                     {field.helperText && !errors[field.name] && (
                       <p className="text-[11px] text-slate-400 flex items-center gap-1 justify-start">

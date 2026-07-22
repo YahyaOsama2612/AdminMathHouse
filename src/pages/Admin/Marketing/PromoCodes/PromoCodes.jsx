@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye } from "lucide-react";
 import ReusableTable from "@/components/ReusableTable";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
+import PromoCodeDetailsModal from "@/components/PromoCodeDetailsModal";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
 import usePut from "@/hooks/usePut";
@@ -18,6 +20,25 @@ const PromoCodes = () => {
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewingId, setViewingId] = useState(null);
+
+  const {
+    data: detailRes,
+    loading: loadingDetail,
+    error: detailError,
+  } = useGet(viewModalOpen && viewingId ? `/api/admin/promoCodes/${viewingId}` : null);
+
+  const handleView = (row) => {
+    setViewingId(row.id);
+    setViewModalOpen(true);
+  };
+
+  const closeViewModal = () => {
+    setViewModalOpen(false);
+    setViewingId(null);
+  };
+
   const handleDelete = (row) => {
     setSelectedRow(row);
     setOpenDeleteModal(true);
@@ -30,7 +51,7 @@ const PromoCodes = () => {
       setSelectedRow(null);
       refetch();
     } catch (e) {
-        throw e
+      throw e;
     }
   };
 
@@ -42,18 +63,41 @@ const PromoCodes = () => {
     navigate("/admin/marketing/promocodes/add");
   };
 
- 
-
   const columns = [
     { header: "Promo Name", key: "promoName" },
     { header: "Code", key: "code" },
-    { header: "Discount (%)", key: "discountAmount" ,filterable: true, filterType: 'select'},
-    { header: "Start Date", key: "startDate" ,filterable: true, filterType: 'select'},
-    { header: "End Date", key: "endDate" ,filterable: true, filterType: 'select'},
-    { header: "Usages Allowed", key: "numberOfUsagesAllowed" ,filterable: true, filterType: 'select'},
-    { header: "Users Used", key: "numberOfUsers" ,filterable: true, filterType: 'select'},
-    { header: "Courses", key: "courses" ,filterable: true, filterType: 'select'},
-    { header: "Packages", key: "packages" ,filterable: true, filterType: 'select'},
+    { header: "Type", key: "type", filterable: true, filterType: "select" },
+    {
+      header: "Discount (%)",
+      key: "discountAmount",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "Start Date",
+      key: "startDate",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "End Date",
+      key: "endDate",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "Usages Allowed",
+      key: "numberOfUsagesAllowed",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "Users Used",
+      key: "numberOfUsers",
+      filterable: true,
+      filterType: "select",
+    },
+   
   ];
 
   const tableData = useMemo(() => {
@@ -67,8 +111,9 @@ const PromoCodes = () => {
         endDate: new Date(promo.endDate).toLocaleDateString(),
         numberOfUsagesAllowed: promo.numberOfUsagesAllowed,
         numberOfUsers: promo.numberOfUsers,
-        courses: promo.courses.map((c) => c.courseName).join(", "),
-        packages: promo.packages.map((p) => p.packageName).join(", "),
+        courses: (promo.courses || []).map((c) => c.courseName).join(", "),
+        packages: (promo.packages || []).map((p) => p.packageName).join(", "),
+        type: promo.type,
         isActive: promo.isActive ?? true,
         raw: promo,
       })) || []
@@ -89,7 +134,23 @@ const PromoCodes = () => {
         onAddClick={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        
+        extraActions={(row) => (
+          <button
+            onClick={() => handleView(row)}
+            className="group p-2 rounded-lg transition-all duration-200 hover:bg-one hover:scale-105"
+            title="View"
+          >
+            <Eye className="w-4 h-4 text-one transition-colors duration-200 group-hover:text-white" />
+          </button>
+        )}
+      />
+
+      <PromoCodeDetailsModal
+        open={viewModalOpen}
+        onClose={closeViewModal}
+        promo={detailRes?.data?.data}
+        loading={loadingDetail}
+        error={detailError}
       />
 
       <ConfirmDeleteModal

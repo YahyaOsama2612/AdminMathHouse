@@ -14,33 +14,45 @@ const AddPackages = () => {
   const token = getToken();
   const { postData } = usePost("/api/admin/package");
 
-  // جلب البيانات الأساسية
-  const { data: selectData, loading: loadingSelect, error: errorSelect } = 
-    useGet("/api/admin/package/select");
+  const {
+    data: selectData,
+    loading: loadingSelect,
+    error: errorSelect,
+  } = useGet("/api/admin/package/select");
 
   const [courseOptions, setCourseOptions] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
-  // تحويل الداتا لشكل label و value
-  const typeOptions = useMemo(() => 
-    selectData?.data?.types || [], [selectData]);
+  // Track selected Type and Switch state
+  const [selectedType, setSelectedType] = useState("");
+  const [hasAnswers, setHasAnswers] = useState(false);
 
-  const categoryOptions = useMemo(() => 
-    selectData?.data?.categories || [], [selectData]);
+  const typeOptions = useMemo(
+    () => selectData?.data?.types || [],
+    [selectData],
+  );
 
-  // جلب الكورسات عند تغير الـ Category
+  const categoryOptions = useMemo(
+    () => selectData?.data?.categories || [],
+    [selectData],
+  );
+
   useEffect(() => {
     if (!selectedCategoryId) return;
 
     const fetchCourses = async () => {
       setLoadingCourses(true);
       try {
-        const res = await axios.get(`https://bcknd.mathshouse.net/api/admin/package/courses/${selectedCategoryId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const options = res.data?.data  .map(c => ({ value: c.value, label: c.label })) || [];
-        
+        const res = await axios.get(
+          `https://bcknd.mathshouse.net/api/admin/package/courses/${selectedCategoryId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const options =
+          res.data?.data.map((c) => ({ value: c.value, label: c.label })) || [];
+
         setCourseOptions(options);
       } catch (err) {
         toast.error("Failed to load courses");
@@ -51,70 +63,116 @@ const AddPackages = () => {
     fetchCourses();
   }, [selectedCategoryId, token]);
 
-  const fields = useMemo(() => [
-    {
-      name: "name",
-      label: "Package Name",
-      type: "text",
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "type",
-      label: "Module",
-      type: "select",
-      required: true,
-      options: typeOptions,
-      section: "General Information",
-    },
-    {
-      name: "categoryId",
-      label: "Category",
-      type: "select",
-      required: true,
-      options: categoryOptions,
-      section: "General Information",
-      onChange: (val) => setSelectedCategoryId(val) 
-    },
-    {
-      name: "courseId",
-      label: "Course",
-      type: "select",
-      required: true,
-      options: courseOptions,
-      section: "General Information",
-      placeholder: loadingCourses ? "Loading..." : "Select Course",
-    },
-   
-    {
-      name: "number",
-      label: "Number of Items",
-      type: "number",
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "price",
-      label: "Price",
-      type: "numberdecimal",
-      required: true,
-      section: "General Information",
-    },
-    {
-      name: "duration",
-      label: "Duration (Days)",
-      type: "number",
-      required: true,
-      section: "General Information",
-    },
-  ], [typeOptions, categoryOptions, courseOptions, loadingCourses]);
+  const fields = useMemo(
+    () => [
+      {
+        name: "name",
+        label: "Package Name",
+        type: "text",
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "type",
+        label: "Module",
+        type: "select",
+        required: true,
+        options: typeOptions,
+        section: "General Information",
+        // Capture the selected module type
+        onChange: (val) => setSelectedType(val),
+      },
+      {
+        name: "categoryId",
+        label: "Category",
+        type: "select",
+        required: true,
+        options: categoryOptions,
+        section: "General Information",
+        onChange: (val) => setSelectedCategoryId(val),
+      },
+      {
+        name: "courseId",
+        label: "Course",
+        type: "select",
+        required: true,
+        options: courseOptions,
+        section: "General Information",
+        placeholder: loadingCourses ? "Loading..." : "Select Course",
+      },
+      {
+        name: "number",
+        label: "Number of Items",
+        type: "number",
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "price",
+        label: "Price",
+        type: "numberdecimal",
+        required: true,
+        section: "General Information",
+      },
+      {
+        name: "duration",
+        label: "Duration (Days)",
+        type: "number",
+        required: true,
+        section: "General Information",
+      },
+      // --- ONLY SHOW SWITCH IF TYPE IS 'exam' (case-insensitive check just in case) ---
+      ...(selectedType?.toLowerCase() === "exam"
+        ? [
+            {
+              name: "hasAnswers",
+              label: "Has Answers",
+              type: "switch",
+              section: "General Information",
+              onChange: (e) =>
+                setHasAnswers(typeof e === "boolean" ? e : e?.target?.checked),
+            },
+            // --- ONLY SHOW PRICE IF SWITCH IS TRUE ---
+            ...(hasAnswers
+              ? [
+                  {
+                    name: "answersPrice",
+                    label: "Answers Price",
+                    type: "numberdecimal",
+                    required: true,
+                    section: "General Information",
+                  },
+                ]
+              : []),
+          ]
+        : []),
+    ],
+    [
+      typeOptions,
+      categoryOptions,
+      courseOptions,
+      loadingCourses,
+      selectedType,
+      hasAnswers,
+    ],
+  );
 
   const onSave = async (formData) => {
+    // Safety check: Is the type actually exam right now?
+    const isExam = selectedType?.toLowerCase() === "exam";
+
     const payload = {
       ...formData,
       number: formData.number ? Number(formData.number) : 0,
       price: formData.price ? Number(formData.price) : 0,
       duration: formData.duration ? Number(formData.duration) : 0,
+      // If type isn't 'exam', force hasAnswers to false
+      hasAnswers: isExam ? Boolean(formData.hasAnswers) : false,
+      // If type isn't 'exam' or switch is off, force price to 0
+      answersPrice:
+        isExam && formData.hasAnswers && formData.answersPrice
+          ? Number(formData.answersPrice)
+          : 0,
     };
     await postData(payload, "/api/admin/package", "Package added successfully");
     navigate(-1);
@@ -129,7 +187,9 @@ const AddPackages = () => {
       fields={fields}
       onSave={onSave}
       onCancel={() => navigate(-1)}
-      initialData={{}} 
+      initialData={{
+        hasAnswers: false,
+      }}
     />
   );
 };
