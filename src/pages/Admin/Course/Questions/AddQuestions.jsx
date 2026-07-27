@@ -363,90 +363,163 @@ const AddQuestions = () => {
       },
 
       // --- Media Section ---
+      // كل عنصر في answers بيمثل "طريقة حل" مستقلة، وكل طريقة ليها صورة/بي دي إف/فيديو/نص خاص بيها
       {
-        name: "answerImage",
-        label: "Answer Image",
+        name: "answers",
+        label: "Solution Methods",
         type: "custom",
         section: "Solution Media",
-        fullWidth: false,
-        render: ({ value, onChange, formData, setFormData }) => (
-          <DrivePickerField
-            label="Answer Image"
-            value={value}
-            fieldName="answer_image"
-            allowedTypes={["image"]}
-            pickerTitle="Select Answer Image from Drive"
-            onOpen={() =>
-              openPicker(
-                "answerImage",
-                ["image"],
-                "Select Answer Image from Drive",
-                setFormData,
-              )
-            }
-            onClear={() => onChange("")}
-          />
-        ),
-      },
-      {
-        name: "pdf",
-        label: "Answer PDF",
-        type: "custom",
-        section: "Solution Media",
-        fullWidth: false,
-        render: ({ value, onChange, formData, setFormData }) => (
-          <DrivePickerField
-            label="Answer PDF"
-            value={value}
-            fieldName="pdf"
-            allowedTypes={["pdf"]}
-            pickerTitle="Select Answer PDF from Drive"
-            onOpen={() =>
-              openPicker(
-                "pdf",
-                ["pdf"],
-                "Select Answer PDF from Drive",
-                setFormData,
-              )
-            }
-            onClear={() => onChange("")}
-          />
-        ),
-      },
-      {
-        name: "video",
-        label: "Answer Video",
-        type: "custom",
-        section: "Solution Media",
-        fullWidth: false,
-        render: ({ value, onChange, formData, setFormData }) => (
-          <DrivePickerField
-            label="Answer Video"
-            value={value}
-            fieldName="answerVideo"
-            allowedTypes={["video"]}
-            pickerTitle="Select Answer Video from Drive"
-            onOpen={() =>
-              openPicker(
-                "video",
-                ["video"],
-                "Select Answer Video from Drive",
-                setFormData,
-              )
-            }
-            onClear={() => onChange("")}
-          />
-        ),
-      },
-      {
-        name: "answerText",
-        label: "Answer Text",
-        type: "custom",
         fullWidth: true,
-        render: ({ value, onChange }) => (
-          <TipTapMathEditor value={value} onChange={onChange} />
-        ),
-        section: "Solution Media",
+        render: ({ value, onChange, setFormData }) => {
+          const methods =
+            value && value.length
+              ? value
+              : [
+                  {
+                    answerImage: "",
+                    answerPdf: "",
+                    answerVideo: "",
+                    answerText: "",
+                  },
+                ];
+
+          const updateMethod = (index, patch) => {
+            onChange(
+              methods.map((m, i) => (i === index ? { ...m, ...patch } : m)),
+            );
+          };
+
+          const addMethod = () => {
+            onChange([
+              ...methods,
+              {
+                answerImage: "",
+                answerPdf: "",
+                answerVideo: "",
+                answerText: "",
+              },
+            ]);
+          };
+
+          const removeMethod = (index) => {
+            if (methods.length === 1) return; // لازم يفضل طريقة واحدة على الأقل
+            onChange(methods.filter((_, i) => i !== index));
+          };
+
+          // pseudo setFormData بيدي الـ DrivePicker شكل الـ setState العادي،
+          // بس بيطبق التحديث على عنصر الـ answers بتاع الطريقة دي بس
+          const makeMethodSetter = (index) => (updater) => {
+            setFormData((prevForm) => {
+              const prevAnswers =
+                prevForm.answers && prevForm.answers.length
+                  ? prevForm.answers
+                  : methods;
+              const prevItem = prevAnswers[index] || {};
+              const nextItem =
+                typeof updater === "function" ? updater(prevItem) : updater;
+              return {
+                ...prevForm,
+                answers: prevAnswers.map((m, i) =>
+                  i === index ? nextItem : m,
+                ),
+              };
+            });
+          };
+
+          return (
+            <div className="flex flex-col gap-6 w-full">
+              {methods.map((method, index) => (
+                <div
+                  key={index}
+                  className="border border-slate-200 rounded-2xl p-4 flex flex-col gap-4 bg-slate-50/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">
+                      Method {index + 1}
+                    </span>
+                    {methods.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeMethod(index)}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold"
+                      >
+                        🗑 Remove Method
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <DrivePickerField
+                      label="Answer Image"
+                      value={method.answerImage}
+                      allowedTypes={["image"]}
+                      pickerTitle="Select Answer Image from Drive"
+                      onOpen={() =>
+                        openPicker(
+                          "answerImage",
+                          ["image"],
+                          "Select Answer Image from Drive",
+                          makeMethodSetter(index),
+                        )
+                      }
+                      onClear={() => updateMethod(index, { answerImage: "" })}
+                    />
+                    <DrivePickerField
+                      label="Answer PDF"
+                      value={method.answerPdf}
+                      allowedTypes={["pdf"]}
+                      pickerTitle="Select Answer PDF from Drive"
+                      onOpen={() =>
+                        openPicker(
+                          "answerPdf",
+                          ["pdf"],
+                          "Select Answer PDF from Drive",
+                          makeMethodSetter(index),
+                        )
+                      }
+                      onClear={() => updateMethod(index, { answerPdf: "" })}
+                    />
+                    <DrivePickerField
+                      label="Answer Video"
+                      value={method.answerVideo}
+                      allowedTypes={["video"]}
+                      pickerTitle="Select Answer Video from Drive"
+                      onOpen={() =>
+                        openPicker(
+                          "answerVideo",
+                          ["video"],
+                          "Select Answer Video from Drive",
+                          makeMethodSetter(index),
+                        )
+                      }
+                      onClear={() => updateMethod(index, { answerVideo: "" })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 mb-1 block">
+                      Answer Text / Explanation
+                    </label>
+                    <TipTapMathEditor
+                      value={method.answerText}
+                      onChange={(val) =>
+                        updateMethod(index, { answerText: val })
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addMethod}
+                className="self-start flex items-center gap-2 px-4 py-2 bg-one/10 text-one font-bold rounded-xl hover:bg-one/20 transition-all text-sm"
+              >
+                ➕ Add Another Method
+              </button>
+            </div>
+          );
+        },
       },
     ],
     [SectionsOptions, ExamCodeOptions, years, months, ocrLoading],
@@ -463,10 +536,9 @@ const AddQuestions = () => {
     year: "",
     month: "",
     sectionId: "",
-    answerImage: "",
-    pdf: "",
-    video: "",
-    answerText: "",
+    answers: [
+      { answerImage: "", answerPdf: "", answerVideo: "", answerText: "" },
+    ],
   };
 
   const onSave = async (formData) => {
@@ -506,17 +578,30 @@ const AddQuestions = () => {
       gridInAnswers,
       correctOption,
       options,
+      answers,
 
       ...rest
     } = formData;
+
+    // كل "طريقة حل" لازم يكون فيها حاجة واحدة على الأقل (صورة/بي دي إف/فيديو/نص)
+    // عشان منبعتش عناصر فاضية للباك اند
+    const finalAnswers = (answers || [])
+      .map((a) => ({
+        answerImage: a.answerImage || null,
+        answerPdf: a.answerPdf || null,
+        answerVideo: a.answerVideo || null,
+        answerText: a.answerText || null,
+      }))
+      .filter(
+        (a) => a.answerImage || a.answerPdf || a.answerVideo || a.answerText,
+      );
 
     const payload = {
       ...rest,
       lessonId: lessonId || null,
       options: finalOptions,
       image: imageBase64 || formData.image || null,
-      answerPdf: rest.pdf, // 👈 if backend expects "answerPdf"
-      answerVideo: rest.video, // 👈 if backend expects "answerVideo"
+      answers: finalAnswers,
     };
 
     if (year) payload.year = Number(year);
