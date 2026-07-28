@@ -272,8 +272,10 @@ const AddSessions = () => {
 
   const formatTimeToHMS = (dateObj) => {
     if (!dateObj) return "";
-    const hours = String(dateObj.getHours()).padStart(2, "0");
-    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+    // بنستخدم UTC هنا عشان الوقت اللي بيتبعت للباك اند يكون دايماً UTC
+    // مهما كان التوقيت المحلي بتاع جهاز اليوزر
+    const hours = String(dateObj.getUTCHours()).padStart(2, "0");
+    const minutes = String(dateObj.getUTCMinutes()).padStart(2, "0");
     return `${hours}:${minutes}:00`;
   };
 
@@ -281,9 +283,13 @@ const AddSessions = () => {
     if (!timeStr) return null;
     const [hours, minutes] = timeStr.split(":");
     const d = new Date();
-    d.setHours(parseInt(hours, 10));
-    d.setMinutes(parseInt(minutes, 10));
-    d.setSeconds(0);
+    // القيمة المخزنة (سواء جاية من الباك اند أو اتحطت لسه) بتبقى UTC دايماً،
+    // فبنحطها كـ UTC هنا؛ وأي عرض للـ Date ده بتوقيت محلي (زي DatePicker)
+    // هيترجمها تلقائي لتوقيت جهاز اليوزر
+    d.setUTCHours(parseInt(hours, 10));
+    d.setUTCMinutes(parseInt(minutes, 10));
+    d.setUTCSeconds(0);
+    d.setUTCMilliseconds(0);
     return d;
   };
 

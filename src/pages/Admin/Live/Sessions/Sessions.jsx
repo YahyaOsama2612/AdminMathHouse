@@ -28,7 +28,7 @@ const Sessions = () => {
       setSelectedRow(null);
       refetch();
     } catch (e) {
-        throw e
+      throw e;
     }
   };
 
@@ -36,44 +36,74 @@ const Sessions = () => {
     navigate(`/admin/live/sessions/edit/${row.id}`);
   };
 
+  // الأوقات (timeFrom/timeTo) بتتخزن وتتبعت من الباك اند بتوقيت UTC،
+  // فبنحولها هنا لتوقيت الجهاز المحلي بتاع اللي بيشوف الجدول
+  const formatUTCTimeToLocal = (timeStr) => {
+    if (!timeStr) return "-";
+    const [hours, minutes] = timeStr.split(":");
+    const d = new Date();
+    d.setUTCHours(parseInt(hours, 10));
+    d.setUTCMinutes(parseInt(minutes, 10));
+    d.setUTCSeconds(0);
+    d.setUTCMilliseconds(0);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   const columns = [
     { header: "Name", key: "name" },
     // { header: "Category", key: "categoryName",filterable: true, filterType: 'select' },
     // { header: "Course", key: "courseName",filterable: true, filterType: 'select' },
     // { header: "Lesson", key: "lessonName" ,filterable: true, filterType: 'select'},
-    { header: "Type", key: "type" ,filterable: true, filterType: 'select'},
-    { header: "Group", key: "groupName" ,filterable: true, filterType: 'select'},
-    { header: "Teacher", key: "teacherName" ,filterable: true, filterType: 'select'},
-    { header: "Date", key: "sessionDate" ,filterable: true, filterType: 'select'  },
+    { header: "Type", key: "type", filterable: true, filterType: "select" },
+    {
+      header: "Group",
+      key: "groupName",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "Teacher",
+      key: "teacherName",
+      filterable: true,
+      filterType: "select",
+    },
+    {
+      header: "Date",
+      key: "sessionDate",
+      filterable: true,
+      filterType: "select",
+    },
     { header: "From", key: "timeFrom" },
     { header: "To", key: "timeTo" },
   ];
 
- const tableData = useMemo(() => {
-  return (
-    data?.data?.sessions?.map((s) => ({
-      id: s.id,
-      name: s.name,
-      // الحقول دي مش موجودة في الـ JSON الحالي، لو ضفتها في الـ API هتظهر تلقائياً
-      categoryName: s.categoryName || "-", 
-      courseName: s.courseName || "-",
-      lessonName: s.lessonName || "-",
-      
-      type: s.type,
-      
-      // ✅ التعديل هنا: الوصول للاسم من جوه الـ groups object
-      groupName: s.groups?.name || "-", 
-      
-      // ✅ التعديل هنا: الوصول للاسم من جوه الـ teacher object
-      teacherName: s.teacher?.name || "-", 
-      
-      sessionDate: s.sessionDate ? new Date(s.sessionDate).toLocaleDateString() : "-",
-      timeFrom: s.timeFrom,
-      timeTo: s.timeTo,
-      raw: s,
-    })) || []
-  );
-}, [data]);
+  const tableData = useMemo(() => {
+    return (
+      data?.data?.sessions?.map((s) => ({
+        id: s.id,
+        name: s.name,
+        // الحقول دي مش موجودة في الـ JSON الحالي، لو ضفتها في الـ API هتظهر تلقائياً
+        categoryName: s.categoryName || "-",
+        courseName: s.courseName || "-",
+        lessonName: s.lessonName || "-",
+
+        type: s.type,
+
+        // ✅ التعديل هنا: الوصول للاسم من جوه الـ groups object
+        groupName: s.groups?.name || "-",
+
+        // ✅ التعديل هنا: الوصول للاسم من جوه الـ teacher object
+        teacherName: s.teacher?.name || "-",
+
+        sessionDate: s.sessionDate
+          ? new Date(s.sessionDate).toLocaleDateString()
+          : "-",
+        timeFrom: formatUTCTimeToLocal(s.timeFrom),
+        timeTo: formatUTCTimeToLocal(s.timeTo),
+        raw: s,
+      })) || []
+    );
+  }, [data]);
 
   if (loading) return <Loader />;
   if (error) return <Errorpage />;
