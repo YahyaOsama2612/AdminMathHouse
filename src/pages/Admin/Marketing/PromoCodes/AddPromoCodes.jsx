@@ -20,12 +20,6 @@ const AddPromoCode = () => {
   const { postData, loading: saving } = usePost("/api/admin/promoCodes");
 
   const {
-    data: coursesRes,
-    loading: loadingCourses,
-    error: coursesError,
-  } = useGet("/api/admin/courses/selection");
-
-  const {
     data: packagesRes,
     loading: loadingPackages,
     error: packagesError,
@@ -38,15 +32,6 @@ const AddPromoCode = () => {
   } = useGet("/api/admin/promoCodes/currency");
 
   /* ================= Options ================= */
-  const courseOptions = useMemo(
-    () =>
-      coursesRes?.data?.map((c) => ({
-        value: c.value,
-        label: c.label,
-      })) || [],
-    [coursesRes],
-  );
-
   const packageOptions = useMemo(
     () =>
       packagesRes?.data?.map((p) => ({
@@ -141,13 +126,6 @@ const AddPromoCode = () => {
 
       /* ============= Applicable Scope ============= */
       {
-        name: "courseIds",
-        label: "Courses",
-        type: "multipleSelect",
-        options: courseOptions,
-        section: "Applicable Scope",
-      },
-      {
         name: "packageIds",
         label: "Packages",
         type: "multipleSelect",
@@ -178,13 +156,22 @@ const AddPromoCode = () => {
                     (rowDetails || []).flatMap((r) => r.chapterIds || []),
                   ),
                 ),
+                // Course scope is no longer chosen via a separate dropdown —
+                // it's derived from whatever courses the selected
+                // chapters/lessons belong to. Each row exposes a single
+                // courseId (not an array), so collect one per row.
+                courseIds: Array.from(
+                  new Set(
+                    (rowDetails || []).map((r) => r.courseId).filter(Boolean),
+                  ),
+                ),
               })
             }
           />
         ),
       },
     ],
-    [courseOptions, packageOptions, currencyOptions],
+    [packageOptions, currencyOptions],
   );
 
   /* ================= Initial Data ================= */
@@ -196,10 +183,9 @@ const AddPromoCode = () => {
       numberOfUsages: "",
       type: "generic",
       studentIds: [],
-      courseIds: [],
       packageIds: [],
       currencyIds: [],
-      lessonSelector: { lessonIds: [], chapterIds: [] },
+      lessonSelector: { lessonIds: [], chapterIds: [], courseIds: [] },
       startDate: "",
       endDate: "",
     }),
@@ -237,7 +223,7 @@ const AddPromoCode = () => {
       code: formData.code,
       discountAmount: Number(formData.discountAmount),
       numberOfUsages: Number(formData.numberOfUsages),
-      courseIds: formData.courseIds || [],
+      courseIds: formData.lessonSelector?.courseIds || [],
       packageIds: formData.packageIds || [],
       chapterIds: formData.lessonSelector?.chapterIds || [],
       lessonIds: formData.lessonSelector?.lessonIds || [],
@@ -260,8 +246,8 @@ const AddPromoCode = () => {
     navigate("/admin/marketing/promocodes");
   };
 
-  if (loadingCourses || loadingPackages || loadingCurrencies) return <Loader />;
-  if (coursesError || packagesError || currenciesError) return <Errorpage />;
+  if (loadingPackages || loadingCurrencies) return <Loader />;
+  if (packagesError || currenciesError) return <Errorpage />;
 
   return (
     <AddPage

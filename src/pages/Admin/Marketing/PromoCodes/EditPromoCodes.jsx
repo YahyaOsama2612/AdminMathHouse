@@ -25,12 +25,6 @@ const EditPromoCodes = () => {
   } = useGet(`/api/admin/promoCodes/${id}`);
 
   const {
-    data: coursesRes,
-    loading: loadingCourses,
-    error: coursesError,
-  } = useGet("/api/admin/courses/selection");
-
-  const {
     data: packagesRes,
     loading: loadingPackages,
     error: packagesError,
@@ -45,15 +39,6 @@ const EditPromoCodes = () => {
   const { putData, loading: saving } = usePut(`/api/admin/promoCodes/${id}`);
 
   /* ================= Options ================= */
-  const courseOptions = useMemo(
-    () =>
-      coursesRes?.data?.map((c) => ({
-        value: c.value,
-        label: c.label,
-      })) || [],
-    [coursesRes],
-  );
-
   const packageOptions = useMemo(
     () =>
       packagesRes?.data?.map((p) => ({
@@ -155,13 +140,6 @@ const EditPromoCodes = () => {
 
       /* ============= Applicable Scope ============= */
       {
-        name: "courseIds",
-        label: "Courses",
-        type: "multipleSelect",
-        options: courseOptions,
-        section: "Applicable Scope",
-      },
-      {
         name: "packageIds",
         label: "Packages",
         type: "multipleSelect",
@@ -193,13 +171,22 @@ const EditPromoCodes = () => {
                     (rowDetails || []).flatMap((r) => r.chapterIds || []),
                   ),
                 ),
+                // Course scope is no longer chosen via a separate dropdown —
+                // it's derived from whatever courses the selected
+                // chapters/lessons belong to. Each row exposes a single
+                // courseId (not an array), so collect one per row.
+                courseIds: Array.from(
+                  new Set(
+                    (rowDetails || []).map((r) => r.courseId).filter(Boolean),
+                  ),
+                ),
               })
             }
           />
         ),
       },
     ],
-    [courseOptions, packageOptions, currencyOptions, initialLessons],
+    [packageOptions, currencyOptions, initialLessons],
   );
 
   /* ================= Initial Data ================= */
@@ -211,12 +198,12 @@ const EditPromoCodes = () => {
       numberOfUsages: promoRes?.data?.data?.numberOfUsagesAllowed || "",
       type: promoRes?.data?.data?.type || "generic",
       studentIds: promoRes?.data?.data?.allowedStudents?.map((s) => s.id) || [],
-      courseIds: promoRes?.data?.data?.courses?.map((c) => c.id) || [],
       packageIds: promoRes?.data?.data?.packages?.map((p) => p.id) || [],
       currencyIds: promoRes?.data?.data?.currencies?.map((c) => c.id) || [],
       lessonSelector: {
         lessonIds: (promoRes?.data?.data?.lessons || []).map((l) => l.id),
         chapterIds: (promoRes?.data?.data?.chapters || []).map((c) => c.id),
+        courseIds: (promoRes?.data?.data?.courses || []).map((c) => c.id),
       },
       startDate: promoRes?.data?.data?.startDate?.split("T")[0] || "",
       endDate: promoRes?.data?.data?.endDate?.split("T")[0] || "",
@@ -251,7 +238,7 @@ const EditPromoCodes = () => {
       code: formData.code,
       discountAmount: Number(formData.discountAmount),
       numberOfUsages: Number(formData.numberOfUsages),
-      courseIds: formData.courseIds || [],
+      courseIds: formData.lessonSelector?.courseIds || [],
       packageIds: formData.packageIds || [],
       chapterIds: formData.lessonSelector?.chapterIds || [],
       lessonIds: formData.lessonSelector?.lessonIds || [],
@@ -274,16 +261,9 @@ const EditPromoCodes = () => {
     navigate("/admin/marketing/promocodes");
   };
 
-  if (
-    loadingPromo ||
-    loadingCourses ||
-    loadingPackages ||
-    loadingCurrencies ||
-    saving
-  )
+  if (loadingPromo || loadingPackages || loadingCurrencies || saving)
     return <Loader />;
-  if (promoError || coursesError || packagesError || currenciesError)
-    return <Errorpage />;
+  if (promoError || packagesError || currenciesError) return <Errorpage />;
 
   return (
     <AddPage
