@@ -23,6 +23,7 @@ import {
   MdTimeline, MdMonitor, MdPersonRemove, MdOutlineBarChart,
   MdSettingsSuggest
 } from "react-icons/md";
+import Favlogo from "../../public/favicon.svg";
 
 const AppLayout = () => {
   const [isExpanded, setIsExpanded] = useState(true);
