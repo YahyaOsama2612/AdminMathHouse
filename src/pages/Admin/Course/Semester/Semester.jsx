@@ -89,7 +89,7 @@ const Semester = () => {
         extraActions={(row) => (
           <div className="flex gap-2">
             <NavChild
-              route={`/admin/courses/chapters/${coursesId}`}
+              route={`/admin/courses/chapters/semester/${row.id}`}
               state={row.id}
             />
           </div>

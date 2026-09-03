@@ -9,12 +9,8 @@ import NavChild from "@/components/NavChild";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import toast from "react-hot-toast";
-import { 
-MdGridView  
-} from "react-icons/md";
-import { 
- FaBook
-} from "react-icons/fa";
+import { MdGridView } from "react-icons/md";
+import { FaBook } from "react-icons/fa";
 import IconButton from "@/components/IconButton";
 import { AiFillProduct } from "react-icons/ai";
 import PricePlansModal from "@/components/PricePlansModal";
@@ -23,8 +19,7 @@ import { MdAttachMoney } from "react-icons/md";
 // --- مكون إدخال الترتيب (Order Input) ---
 const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
   const [orderVal, setOrderVal] = useState(row.order);
- // ✅ NEW: prices popup
-  
+  // ✅ NEW: prices popup
 
   // تحديث القيمة تلقائياً لو اتغيرت من الـ API بعد الـ refetch
   useEffect(() => {
@@ -36,7 +31,9 @@ const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
 
     // 1. لو القيمة فاضية أو نفس الرقم الحالي، نرجع للرقم الأصلي ومفيش أكشن
     if (isNaN(newOrder) || newOrder === row.order) {
-      toast.error("Please enter a valid order number different from the current one.");
+      toast.error(
+        "Please enter a valid order number different from the current one.",
+      );
       setOrderVal(row.order);
       return;
     }
@@ -56,9 +53,9 @@ const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
       await patchData(
         { chapterIdA: row.id, chapterIdB: targetRow.id },
         null,
-        "Order updated successfully!"
+        "Order updated successfully!",
       );
-     await refetch();// تحديث الداتا بعد النجاح
+      await refetch(); // تحديث الداتا بعد النجاح
     } catch (err) {
       console.error(err);
       setOrderVal(row.order); // لو حصل error نرجع للقديم
@@ -84,23 +81,36 @@ const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
 
 // --- المكون الرئيسي للصفحة ---
 const Chapters = () => {
-  const { patchData, loading: loadingPatch } = usePatch("/api/admin/chapters/swap-order");
-  const { courseId } = useParams();
-  const location = useLocation(); 
+  const { patchData, loading: loadingPatch } = usePatch(
+    "/api/admin/chapters/swap-order",
+  );
+  const { courseId, semesterId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const semesterId = location.state;
-  const { data, loading, refetch, error } = useGet(`/api/admin/chapters/course/${courseId}`);
+
+  // تحديد API بناءً على وجود semesterId أو courseId
+  const apiEndpoint = semesterId
+    ? `/api/admin/chapters/semester/${semesterId}`
+    : `/api/admin/chapters/course/${courseId}`;
+
+  const { data, loading, refetch, error } = useGet(apiEndpoint);
   const { deleteData, loading: deleteLoading } = useDelete();
+
   const {
-      data: courseRes,
-      loading: loadingOne,
-      error: errorOne,
-    } = useGet(`/api/admin/courses/${courseId}`);
+    data: courseRes,
+    loading: loadingOne,
+    error: errorOne,
+  } = useGet(courseId ? `/api/admin/courses/${courseId}` : null);
   const [pricePopup, setPricePopup] = useState({
     open: false,
     row: null,
   });
-    const course = courseRes?.data || {};
+
+  // الحصول على معلومات الـ course من courseRes أو من أول chapter في البيانات
+  const course = courseRes?.data || data?.data?.chapters?.[0]?.course || {};
+
+  // الحصول على معلومات الـ semester من البيانات
+  const semester = data?.data?.chapters?.[0]?.semester || {};
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -139,10 +149,10 @@ const Chapters = () => {
       courseName: item.course?.name || "—",
       categoryName: item.category?.name || "—",
       teacherName: item.teacher?.name || "—",
-      prevId: list[index - 1]?.chapter.id || null, 
-      nextId: list[index + 1]?.chapter.id || null, 
+      prevId: list[index - 1]?.chapter.id || null,
+      nextId: list[index + 1]?.chapter.id || null,
       isFirst: index === 0,
-              prices: item.prices || [],
+      prices: item.prices || [],
       isLast: index === list.length - 1,
       raw: item,
     }));
@@ -164,7 +174,12 @@ const Chapters = () => {
     { header: "Name", key: "name" },
     // { header: "Course", key: "courseName" },
     // { header: "Category", key: "categoryName" },
-    { header: "Teacher", key: "teacherName", filterable: true, filterType: 'select' },
+    {
+      header: "Teacher",
+      key: "teacherName",
+      filterable: true,
+      filterType: "select",
+    },
     {
       header: "Order",
       key: "order",
@@ -180,72 +195,68 @@ const Chapters = () => {
     },
   ];
 
-  if (loading ||  loadingOne) {
+  if (loading || loadingOne) {
     return <Loader />;
   }
-  
-  if (error ||  errorOne) {
+
+  if (error || errorOne) {
     return <Errorpage />;
   }
 
   return (
     <div>
       <ReusableTable
-        title={`Chapters | ${course.name}`}
+        title={`Chapters | ${semesterId ? semester.name : course.name}`}
         titleAdd="Chapter"
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading || loadingPatch}
         onAddClick={() =>
-          navigate(`/admin/courses/chapters/add`, { 
-            state: { 
-              courseId: courseId, 
-              semesterId: semesterId 
-            }
+          navigate(`/admin/courses/chapters/add`, {
+            state: {
+              courseId: courseId || course?.id,
+              semesterId: semesterId,
+            },
           })
         }
         extraActions={(row) => (
           <>
             <NavChild route={`/admin/courses/lessons/${row.id}`} />
-<button
-                        onClick={() =>
-                          setPricePopup({ open: true, row })
-                        }
-                        className="px-2 py-1  rounded"
-                      >
-                        <MdAttachMoney className="text-3xl text-green-600" /> 
-                      </button>  
+            <button
+              onClick={() => setPricePopup({ open: true, row })}
+              className="px-2 py-1  rounded"
+            >
+              <MdAttachMoney className="text-3xl text-green-600" />
+            </button>
           </>
-
         )}
         onEdit={handleEdit}
         onDelete={handleDelete}
       >
-
-<div className="flex gap-2">
-              <IconButton
-  icon={MdGridView}
-  color="bg-one"
-  navigateTo={`/admin/courses/categories`}
-  name="Categories"
-/>
-                    <IconButton
-  icon={FaBook}
-  color="bg-one"
-  navigateTo={`/admin/courses/courses/${course.categoryId}`}
-  name="courses"
-/>
-{course.semesters && course.semesters.length > 0 && (
-  <IconButton
-    icon={AiFillProduct}
-    color="bg-one"
-    navigateTo={`/admin/courses/semester/${course.id}`}
-    name="Semesters"
-  />
-)}
-              
-              
-</div>
+        <div className="flex gap-2">
+          <IconButton
+            icon={MdGridView}
+            color="bg-one"
+            navigateTo={`/admin/courses/categories`}
+            name="Categories"
+          />
+          {(course.categoryId || data?.data?.chapters?.[0]?.category?.id) && (
+            <IconButton
+              icon={FaBook}
+              color="bg-one"
+              navigateTo={`/admin/courses/courses/${course.categoryId || data?.data?.chapters?.[0]?.category?.id}`}
+              name="courses"
+            />
+          )}
+          {course.semesters && course.semesters.length > 0 && (
+            <IconButton
+              icon={AiFillProduct}
+              color="bg-one"
+              navigateTo={`/admin/courses/semester/${course.id}`}
+              name="Semesters"
+            />
+          )}
+        </div>
       </ReusableTable>
 
       <ConfirmDeleteModal
@@ -256,10 +267,10 @@ const Chapters = () => {
         description={`Are you sure you want to delete "${selectedRow?.name}" ?`}
       />
       <PricePlansModal
-  open={pricePopup.open}
-  row={pricePopup.row}
-  onClose={() => setPricePopup({ open: false, row: null })}
-/>
+        open={pricePopup.open}
+        row={pricePopup.row}
+        onClose={() => setPricePopup({ open: false, row: null })}
+      />
     </div>
   );
 };
