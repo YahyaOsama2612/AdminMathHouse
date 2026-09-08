@@ -19,7 +19,6 @@ import { MdAttachMoney } from "react-icons/md";
 // --- مكون إدخال الترتيب (Order Input) ---
 const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
   const [orderVal, setOrderVal] = useState(row.order);
-  // ✅ NEW: prices popup
 
   // تحديث القيمة تلقائياً لو اتغيرت من الـ API بعد الـ refetch
   useEffect(() => {
@@ -88,10 +87,15 @@ const Chapters = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // ✅ استقبال courseId من location.state أيضاً
+  const stateData = location.state || {};
+  const finalCourseId = courseId || stateData.courseId;
+  const finalSemesterId = semesterId || stateData.semesterId;
+
   // تحديد API بناءً على وجود semesterId أو courseId
-  const apiEndpoint = semesterId
-    ? `/api/admin/chapters/semester/${semesterId}`
-    : `/api/admin/chapters/course/${courseId}`;
+  const apiEndpoint = finalSemesterId
+    ? `/api/admin/chapters/semester/${finalSemesterId}`
+    : `/api/admin/chapters/course/${finalCourseId}`;
 
   const { data, loading, refetch, error } = useGet(apiEndpoint);
   const { deleteData, loading: deleteLoading } = useDelete();
@@ -100,7 +104,8 @@ const Chapters = () => {
     data: courseRes,
     loading: loadingOne,
     error: errorOne,
-  } = useGet(courseId ? `/api/admin/courses/${courseId}` : null);
+  } = useGet(finalCourseId ? `/api/admin/courses/${finalCourseId}` : null);
+
   const [pricePopup, setPricePopup] = useState({
     open: false,
     row: null,
@@ -111,6 +116,7 @@ const Chapters = () => {
 
   // الحصول على معلومات الـ semester من البيانات
   const semester = data?.data?.chapters?.[0]?.semester || {};
+
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -172,8 +178,6 @@ const Chapters = () => {
       ),
     },
     { header: "Name", key: "name" },
-    // { header: "Course", key: "courseName" },
-    // { header: "Category", key: "categoryName" },
     {
       header: "Teacher",
       key: "teacherName",
@@ -206,7 +210,7 @@ const Chapters = () => {
   return (
     <div>
       <ReusableTable
-        title={`Chapters | ${semesterId ? semester.name : course.name}`}
+        title={`Chapters | ${finalSemesterId ? semester.name : course.name}`}
         titleAdd="Chapter"
         columns={columns}
         data={tableData}
@@ -214,8 +218,8 @@ const Chapters = () => {
         onAddClick={() =>
           navigate(`/admin/courses/chapters/add`, {
             state: {
-              courseId: courseId || course?.id,
-              semesterId: semesterId,
+              courseId: finalCourseId || course?.id,
+              semesterId: finalSemesterId,
             },
           })
         }

@@ -16,11 +16,17 @@ const AddChapters = () => {
 
   const { postData, loading: saving } = usePost("/api/admin/chapters");
 
-  const { data: teachersRes, loading: loadingTeachers, error: errorTeachers } =
-    useGet("/api/admin/teacher/selectionTeachers");
+  const {
+    data: teachersRes,
+    loading: loadingTeachers,
+    error: errorTeachers,
+  } = useGet("/api/admin/teacher/selectionTeachers");
 
-  const { data: coursesRes, loading: loadingCours, error } =
-    useGet("/api/admin/teacher/selectionCourses");
+  const {
+    data: coursesRes,
+    loading: loadingCours,
+    error,
+  } = useGet("/api/admin/teacher/selectionCourses");
 
   const teacherOptions = useMemo(() => {
     return (
@@ -60,15 +66,12 @@ const AddChapters = () => {
         section: "General Information",
       },
 
-      
-      
-
       {
         name: "description",
         label: "Description",
         type: "text",
         section: "General Information",
-        helperText : "leave empty for no description",
+        helperText: "leave empty for no description",
       },
 
       {
@@ -76,7 +79,8 @@ const AddChapters = () => {
         label: "Pre-requisition",
         type: "text",
         section: "General Information",
-helperText: "leave empty for no pre-requisition",      },
+        helperText: "leave empty for no pre-requisition",
+      },
 
       {
         name: "whatYouGain",
@@ -85,7 +89,7 @@ helperText: "leave empty for no pre-requisition",      },
         section: "General Information",
         helperText: "leave empty for no what you will gain",
       },
-{
+      {
         name: "pricePlans",
         label: "Price Plans",
         type: "custom",
@@ -102,7 +106,7 @@ helperText: "leave empty for no pre-requisition",      },
         section: "Media",
       },
     ],
-    [teacherOptions]
+    [teacherOptions],
   );
 
   // default values
@@ -116,7 +120,7 @@ helperText: "leave empty for no pre-requisition",      },
       whatYouGain: "",
       image: "",
     }),
-    []
+    [],
   );
 
   // file convert
@@ -130,6 +134,12 @@ helperText: "leave empty for no pre-requisition",      },
 
   // SAVE
   const onSave = async (formData) => {
+    // ✅ تحقق من courseId
+    if (!courseId) {
+      toast.error("Course ID is required. Please go back and try again.");
+      return;
+    }
+
     let imageBase64 = null;
 
     if (formData.image instanceof File) {
@@ -141,20 +151,21 @@ helperText: "leave empty for no pre-requisition",      },
       toast.error("Price plans are required");
       return;
     }
-  for (let i = 0; i < formData.pricePlans.length; i++) {
+
+    for (let i = 0; i < formData.pricePlans.length; i++) {
       const plan = formData.pricePlans[i];
-  
+
       if (!plan.label || !plan.days || !plan.priceEgp || !plan.priceUsd) {
         toast.error(`Plan ${i + 1}: all fields are required`);
         return;
       }
-  
+
       if (plan.hasDiscount) {
         if (!plan.discountEgp || !plan.discountUsd) {
           toast.error(`Plan ${i + 1}: discount fields are required`);
           return;
         }
-  
+
         if (
           Number(plan.discountEgp) > Number(plan.priceEgp) ||
           Number(plan.discountUsd) > Number(plan.priceUsd)
@@ -168,7 +179,7 @@ helperText: "leave empty for no pre-requisition",      },
     const payload = {
       name: formData.name,
       teacherId: formData.teacherId,
-      courseId: courseId,
+      courseId: courseId, // ✅ guaranteed to exist
       pricePlans: formData.pricePlans.map((p) => ({
         label: p.label,
         days: Number(p.days),
@@ -182,15 +193,28 @@ helperText: "leave empty for no pre-requisition",      },
 
     if (semesterId) payload.semesterId = semesterId;
     if (formData.description) payload.description = formData.description;
-    if (formData.preRequisition) payload.preRequisition = formData.preRequisition;
+    if (formData.preRequisition)
+      payload.preRequisition = formData.preRequisition;
     if (formData.whatYouGain) payload.whatYouGain = formData.whatYouGain;
     if (imageBase64) payload.image = imageBase64;
 
-    await postData(payload, "/api/admin/chapters", "Chapter added successfully");
+    await postData(
+      payload,
+      "/api/admin/chapters",
+      "Chapter added successfully",
+    );
 
-    navigate(`/admin/courses/chapters/${courseId}`, {
-      state: { courseId, semesterId },
-    });
+    if (semesterId) {
+      // إذا كان فيه semester، رجع للـ semester chapters
+      navigate(`/admin/courses/chapters/semester/${semesterId}`, {
+        state: { courseId, semesterId },
+      });
+    } else {
+      // وإلا رجع للـ course chapters
+      navigate(`/admin/courses/chapters/${courseId}`, {
+        state: { courseId, semesterId },
+      });
+    }
   };
 
   if (loadingTeachers || loadingCours) return <Loader />;

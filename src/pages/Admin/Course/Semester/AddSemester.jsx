@@ -1,16 +1,14 @@
 import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 
-import { useLocation } from "react-router-dom";
-
 const AddSemester = () => {
   const navigate = useNavigate();
   const { postData, loading: saving } = usePost("/api/admin/semester");
-const location = useLocation();
- const coursesId = location.state;
+  const location = useLocation();
+  const coursesId = location.state;
  
   const fields = useMemo(
     () => [
@@ -22,7 +20,6 @@ const location = useLocation();
         placeholder: "Enter semester name",
         section: "General Information",
       },
-      
     ],
     []
   );
@@ -40,8 +37,6 @@ const location = useLocation();
       return;
     }
 
-  
-
     const payload = {
       name: formData.name,
       courseId: coursesId,
@@ -49,20 +44,18 @@ const location = useLocation();
 
     try {
       await postData(payload, "/api/admin/semester", "Semester added successfully");
-      navigate(`/admin/courses/semester/${coursesId}`)
+      navigate(`/admin/courses/semester/${coursesId}`);
     } catch (error) {
       throw error;
     }
   };
 
- 
   return (
     <AddPage
       title="Add Semester"
       fields={fields}
       onSave={onSave}
       onCancel={() => navigate(`/admin/courses/semester/${coursesId}`)}
-       
       initialData={initialFormValues}
     />
   );

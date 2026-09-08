@@ -11,9 +11,12 @@ const AllSemesters = () => {
   const navigate = useNavigate();
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-  const { data, loading, error } = useGet("/api/admin/semester");
+
+  // ✅ أضف refetch
+  const { data, loading, error, refetch } = useGet("/api/admin/semester");
   const { deleteData, loading: deleteLoading } = useDelete();
-const handleDelete = (row) => {
+
+  const handleDelete = (row) => {
     setSelectedRow(row);
     setOpenDeleteModal(true);
   };
@@ -23,27 +26,28 @@ const handleDelete = (row) => {
       await deleteData(`/api/admin/semester/${selectedRow.id}`);
       setOpenDeleteModal(false);
       setSelectedRow(null);
-      refetch();
+      refetch();  // ✅ الآن refetch موجود
     } catch (e) {
       throw e;
     }
   };
+
   const handleEdit = (row) => {
     navigate(`/admin/courses/semester/edit/${row.id}`, 
       { state: row.courseId });
   };
+
   const columns = [
     {
       header: "Semester Name",
       key: "name",
     },
-       {
+    {
       header: "Category",
       key: "category",
       filterable: true,
       filterType: "select",
     },
-    
     {
       header: "Course",
       key: "course",
@@ -59,6 +63,7 @@ const handleDelete = (row) => {
         name: sem.name,
         course: sem.course?.name || "—",
         category: sem.category?.name || "—",
+        courseId: sem.courseId,
         raw: sem,
       })) || []
     );
@@ -73,22 +78,21 @@ const handleDelete = (row) => {
         title="All Semesters"
         columns={columns}
         data={tableData}
-        loading={loading||deleteLoading}
-         onEdit={handleEdit}
+        loading={loading || deleteLoading}
+        onEdit={handleEdit}
         onDelete={handleDelete}
-                rowsPerPage={5}
-
+        rowsPerPage={5}
       />
 
-        <ConfirmDeleteModal
-              open={openDeleteModal}
-              onClose={() => setOpenDeleteModal(false)}
-              onConfirm={confirmDelete}
-              title="Delete Semester"
-              description={`Are you sure you want to delete "${selectedRow?.name}" ?`}
-            />
+      <ConfirmDeleteModal
+        open={openDeleteModal}
+        onClose={() => setOpenDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Semester"
+        description={`Are you sure you want to delete "${selectedRow?.name}" ?`}
+      />
     </div>
   );
 };
 
-export default AllSemesters;    
+export default AllSemesters;

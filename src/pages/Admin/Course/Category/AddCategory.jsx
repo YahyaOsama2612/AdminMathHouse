@@ -5,12 +5,16 @@ import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
+
 const AddCategory = () => {
   const navigate = useNavigate();
-  
-  const { postData, loading: saving } = usePost("/api/admin/category");
-  const { data: categoriesRes, loading: loadingCats ,error } = useGet("/api/admin/category");
 
+  const { postData, loading: saving } = usePost("/api/admin/category");
+  const {
+    data: categoriesRes,
+    loading: loadingCats,
+    error,
+  } = useGet("/api/admin/category");
 
   const parentOptions = useMemo(() => {
     return (
@@ -35,10 +39,10 @@ const AddCategory = () => {
         name: "description",
         label: "Description",
         type: "text",
-                required: true,
-        placeholder: " description",
+        required: true,
+        placeholder: "Enter description",
         section: "General Information",
-        },
+      },
       {
         name: "parentCategoryId",
         label: "Parent Category (Optional)",
@@ -54,7 +58,7 @@ const AddCategory = () => {
         section: "General Information",
       },
     ],
-    [parentOptions]
+    [parentOptions],
   );
 
   const fileToBase64 = (file) =>
@@ -65,17 +69,19 @@ const AddCategory = () => {
       reader.readAsDataURL(file);
     });
 
-  const initialFormValues = useMemo(() => ({
-    name: "",
-    description: "",
-    parentCategoryId: "",
-    image: "",
-  }), []);
+  const initialFormValues = useMemo(
+    () => ({
+      name: "",
+      description: "",
+      parentCategoryId: "",
+      image: "",
+    }),
+    [],
+  );
 
   const onSave = async (formData) => {
- 
-
     let imageBase64 = null;
+
     if (formData.image instanceof File) {
       imageBase64 = await fileToBase64(formData.image);
     }
@@ -84,20 +90,25 @@ const AddCategory = () => {
       name: formData.name,
       description: formData.description || "",
       image: imageBase64,
-      parentCategoryId: formData.parentCategoryId || null, 
+      parentCategoryId: formData.parentCategoryId || null,
     };
 
     try {
-      await postData(payload, "/api/admin/category", "Category added successfully");
+      await postData(
+        payload,
+        "/api/admin/category",
+        "Category added successfully",
+      );
       navigate("/admin/courses/categories");
     } catch (error) {
-    
       throw error;
     }
   };
+
   if (loadingCats) {
     return <Loader />;
   }
+
   if (error) {
     return <Errorpage />;
   }
@@ -108,8 +119,7 @@ const AddCategory = () => {
       fields={fields}
       onSave={onSave}
       onCancel={() => navigate("/admin/courses/categories")}
-        
-      initialData={initialFormValues} 
+      initialData={initialFormValues}
     />
   );
 };

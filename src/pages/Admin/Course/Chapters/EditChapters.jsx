@@ -1,4 +1,4 @@
-  import React, { useMemo } from "react";
+import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AddPage from "@/components/AddPage";
@@ -52,7 +52,7 @@ const EditChapters = () => {
     [coursesRes]
   );
 
-  // ---------------- FIELDS ----------------
+  // FIELDS
   const fields = useMemo(
     () => [
       {
@@ -78,9 +78,8 @@ const EditChapters = () => {
         options: courseOptions,
         section: "General Information",
       },
-    
 
-      // 🔥 PRICE PLANS SYSTEM (NEW)
+      // PRICE PLANS SYSTEM
       {
         name: "pricePlans",
         label: "Price Plans",
@@ -100,24 +99,21 @@ const EditChapters = () => {
         label: "Description",
         type: "text",
         section: "General Information",
-                helperText : "leave empty for no description",
-
+        helperText: "leave empty for no description",
       },
       {
         name: "preRequisition",
         label: "Pre-requisition",
         type: "text",
         section: "General Information",
-        helperText: "leave empty for no pre-requisition"
-
+        helperText: "leave empty for no pre-requisition",
       },
       {
         name: "whatYouGain",
         label: "What You Will Gain",
         type: "text",
         section: "General Information",
-                helperText: "leave empty for no what you will gain",
-
+        helperText: "leave empty for no what you will gain",
       },
       {
         name: "image",
@@ -129,35 +125,34 @@ const EditChapters = () => {
     [teacherOptions, courseOptions]
   );
 
-  // ---------------- INITIAL DATA ----------------
-const initialData = useMemo(() => {
-  const data = chapterRes?.data;
+  // INITIAL DATA
+  const initialData = useMemo(() => {
+    const data = chapterRes?.data;
 
-  return {
-    name: data?.chapter?.name || "",
-    teacherId: data?.teacher?.id || "",
-    courseId: data?.course?.id || "",
-    duration: data?.chapter?.duration || "",
+    return {
+      name: data?.chapter?.name || "",
+      teacherId: data?.teacher?.id || "",
+      courseId: data?.course?.id || "",
+      duration: data?.chapter?.duration || "",
+      description: data?.chapter?.description || "",
+      preRequisition: data?.chapter?.preRequisition || "",
+      whatYouGain: data?.chapter?.whatYouGain || "",
+      image: data?.chapter?.image || "",
 
-    description: data?.chapter?.description || "",
-    preRequisition: data?.chapter?.preRequisition || "",
-    whatYouGain: data?.chapter?.whatYouGain || "",
-    image: data?.chapter?.image || "",
+      pricePlans:
+        data?.prices?.map((p) => ({
+          label: p.durationLabel,
+          days: p.durationDays,
+          priceEgp: p.priceEgp,
+          priceUsd: p.priceUsd,
+          hasDiscount: p.hasDiscount,
+          discountEgp: p.discountEgp,
+          discountUsd: p.discountUsd,
+        })) || [],
+    };
+  }, [chapterRes]);
 
-    // 🔥 المهم هنا
-    pricePlans:
-      data?.prices?.map((p) => ({
-        label: p.durationLabel,
-        days: p.durationDays,
-        priceEgp: p.priceEgp,
-        priceUsd: p.priceUsd,
-        hasDiscount: p.hasDiscount,
-        discountEgp: p.discountEgp,
-        discountUsd: p.discountUsd,
-      })) || [],
-  };
-}, [chapterRes]);
-  // ---------------- SAVE ----------------
+  // SAVE
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -167,36 +162,36 @@ const initialData = useMemo(() => {
     });
 
   const onSave = async (formData) => {
-    
- if (!formData.pricePlans || formData.pricePlans.length === 0) {
-    toast.error("You must add at least one price plan");
-    return;
-  }
-
-  // ❌ validation لكل plan
-  for (let i = 0; i < formData.pricePlans.length; i++) {
-    const plan = formData.pricePlans[i];
-
-    if (!plan.label || !plan.days || !plan.priceEgp || !plan.priceUsd) {
-      toast.error(`Plan ${i + 1}: all fields are required`);
+    if (!formData.pricePlans || formData.pricePlans.length === 0) {
+      toast.error("You must add at least one price plan");
       return;
     }
 
-    if (plan.hasDiscount) {
-      if (!plan.discountEgp || !plan.discountUsd) {
-        toast.error(`Plan ${i + 1}: discount fields are required`);
+    // validation لكل plan
+    for (let i = 0; i < formData.pricePlans.length; i++) {
+      const plan = formData.pricePlans[i];
+
+      if (!plan.label || !plan.days || !plan.priceEgp || !plan.priceUsd) {
+        toast.error(`Plan ${i + 1}: all fields are required`);
         return;
       }
 
-      if (
-        Number(plan.discountEgp) > Number(plan.priceEgp) ||
-        Number(plan.discountUsd) > Number(plan.priceUsd)
-      ) {
-        toast.error(`Plan ${i + 1}: discount can't be greater than price`);
-        return;
+      if (plan.hasDiscount) {
+        if (!plan.discountEgp || !plan.discountUsd) {
+          toast.error(`Plan ${i + 1}: discount fields are required`);
+          return;
+        }
+
+        if (
+          Number(plan.discountEgp) > Number(plan.priceEgp) ||
+          Number(plan.discountUsd) > Number(plan.priceUsd)
+        ) {
+          toast.error(`Plan ${i + 1}: discount can't be greater than price`);
+          return;
+        }
       }
     }
-  }
+
     let imageBase64 = null;
 
     if (formData.image instanceof File) {
@@ -215,7 +210,7 @@ const initialData = useMemo(() => {
       image: imageBase64,
     };
 
-    // 🔥 convert pricePlans → backend format
+    // convert pricePlans → backend format
     payload.pricePlans = formData.pricePlans.map((p) => ({
       label: p.label,
       days: Number(p.days),
@@ -235,14 +230,14 @@ const initialData = useMemo(() => {
     navigate(-1);
   };
 
-  // ---------------- LOADING ----------------
+  // LOADING
   if (loadingChapter || loadingTeachers || loadingCourses)
     return <Loader />;
 
   if (error || errorTeachers || errorCourses)
     return <Errorpage />;
 
-  // ---------------- UI ----------------
+  // UI
   return (
     <AddPage
       title="Edit Chapter"

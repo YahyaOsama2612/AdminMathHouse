@@ -101,7 +101,7 @@ const EditCategory = () => {
     const payload = {
       name: formData.name,
       description: formData.description || "",
-      image: imageBase64, // ممكن تبقى null لو المستخدم ما غيّرش الصورة
+      image: imageBase64,
       parentCategoryId: formData.parentCategoryId || null,
     };
 
@@ -114,11 +114,7 @@ const EditCategory = () => {
   };
 
   if (loadingCats || loadingOne) {
-    return (
-      <div className="">
-        <Loader />
-      </div>
-    );
+    return <Loader />;
   }
 
   if (error || errorOne) {
@@ -137,7 +133,7 @@ const EditCategory = () => {
         name: category?.name || "",
         description: category?.description || "",
         parentCategoryId: category?.parentCategoryId || "",
-        image: category?.image || "", // لو الـ API بيرجع صورة
+        image: category?.image || "",
       }}
     />
   );

@@ -7,10 +7,11 @@ import useDelete from "@/hooks/useDelete";
 import NavChild from "../../../../components/NavChild";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
+
 const Category = () => {
   const navigate = useNavigate();
 
-  const { data, loading, refetch ,error } = useGet("/api/admin/category");
+  const { data, loading, refetch, error } = useGet("/api/admin/category");
   const { deleteData, loading: deleteLoading } = useDelete();
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
@@ -28,9 +29,10 @@ const Category = () => {
       setSelectedRow(null);
       refetch();
     } catch (e) {
-        throw e
+      throw e;
     }
   };
+
   const columns = [
     {
       header: "Image",
@@ -45,8 +47,12 @@ const Category = () => {
     },
     { header: "Name", key: "name" },
     { header: "Description", key: "description" },
-    { header: "Parent", key: "parentName",filterable: true, filterType: 'select' },
-    // { header: "Level", key: "level" ,filterable: true, filterType: 'select'},
+    {
+      header: "Parent",
+      key: "parentName",
+      filterable: true,
+      filterType: "select",
+    },
   ];
 
   const tableData = useMemo(() => {
@@ -70,12 +76,15 @@ const Category = () => {
   const handleEdit = (row) => {
     navigate(`/admin/courses/categories/edit/${row.id}`);
   };
-if (loading ) {
-  return <Loader />;
-}
-if (error) {
-  return <Errorpage />;
-}
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  if (error) {
+    return <Errorpage />;
+  }
+
   return (
     <div>
       <ReusableTable
@@ -87,10 +96,9 @@ if (error) {
         onAddClick={() => navigate("/admin/courses/categories/add")}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        extraActions={(row) => (
-          row.isLeaf &&( <NavChild route={`/admin/courses/courses/${row.id}`}/>)
-      
-        )}
+        extraActions={(row) =>
+          row.isLeaf && <NavChild route={`/admin/courses/courses/${row.id}`} />
+        }
       />
 
       <ConfirmDeleteModal

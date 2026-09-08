@@ -8,13 +8,12 @@ import NavChild from "@/components/NavChild";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import usePost from "@/hooks/usePost";
-import { GiTeacher } from "react-icons/gi";
-import { PiExamFill } from "react-icons/pi";
 import { MdGridView } from "react-icons/md";
 import IconButton from "@/components/IconButton";
 import { MdAttachMoney } from "react-icons/md";
 import PricePlansModal from "@/components/PricePlansModal";
 import { Users, ClipboardList, DollarSign } from "lucide-react";
+
 const Courses = () => {
   const navigate = useNavigate();
   const { categoryId } = useParams();
@@ -33,7 +32,7 @@ const Courses = () => {
 
   const [optionPopup, setOptionPopup] = useState({ open: false, row: null });
 
-  // ✅ NEW: prices popup
+  // prices popup
   const [pricePopup, setPricePopup] = useState({
     open: false,
     row: null,
@@ -124,7 +123,7 @@ const Courses = () => {
     },
   ];
 
-  // ✅ UPDATED: include prices
+  // UPDATED: include prices
   const tableData = useMemo(() => {
     return (
       data?.data?.data?.map((course) => ({
@@ -134,10 +133,7 @@ const Courses = () => {
         image: course.image,
         duration: course.duration,
         isHaveSemester: course.isHaveSemester,
-
-        // 👇 NEW
         prices: course.prices || [],
-
         teachers: course.teachers,
         raw: course,
       })) || []
@@ -154,6 +150,7 @@ const Courses = () => {
   const availableTeachers = teachers.filter(
     (teacher) => !assignedTeacherIds.includes(teacher.id),
   );
+
   const courseTeachers = useMemo(() => {
     if (!selectedRow) return [];
 
@@ -161,6 +158,7 @@ const Courses = () => {
       teacher.courses?.some((course) => course.id === selectedRow.id),
     );
   }, [teachers, selectedRow]);
+
   if (loading || loadingOne) return <Loader />;
   if (error || errorOne) return <Errorpage />;
 
@@ -210,7 +208,7 @@ const Courses = () => {
               <ClipboardList className="w-5 h-5 text-red-900" />
             </button>
 
-            {/* 💰 Prices */}
+            {/* Prices */}
             <button
               onClick={() => setPricePopup({ open: true, row })}
               className="p-2 rounded-lg hover:bg-slate-100 transition"
@@ -243,6 +241,7 @@ const Courses = () => {
         row={pricePopup.row}
         onClose={() => setPricePopup({ open: false, row: null })}
       />
+
       {optionPopup.open && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg">
@@ -254,7 +253,6 @@ const Courses = () => {
                 }
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-lg transition-colors text-left"
               >
-                {/* Exam Icon */}
                 <svg
                   className="w-4 h-4 opacity-70"
                   fill="none"
@@ -285,7 +283,6 @@ const Courses = () => {
                 }
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-lg transition-colors text-left"
               >
-                {/* Diagnostic/Shield Icon */}
                 <svg
                   className="w-4 h-4 opacity-70"
                   fill="none"
@@ -317,6 +314,7 @@ const Courses = () => {
           </div>
         </div>
       )}
+
       {openTeacherModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">

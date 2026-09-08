@@ -3,9 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
+import { toast } from "react-hot-toast";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
+
 const EditCourses = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -59,9 +61,8 @@ const EditCourses = () => {
         options: teacherOptions,
       },
 
-
-      
       { name: "isHaveSemester", label: "Semester", type: "switch" },
+      
       {
         name: "pricePlans",
         label: "Price Plans",
@@ -90,35 +91,38 @@ const EditCourses = () => {
     if (formData.image instanceof File) {
       imageBase64 = await fileToBase64(formData.image);
     }
- if (!formData.pricePlans || formData.pricePlans.length === 0) {
-    toast.error("You must add at least one price plan");
-    return;
-  }
 
-  // ❌ validation لكل plan
-  for (let i = 0; i < formData.pricePlans.length; i++) {
-    const plan = formData.pricePlans[i];
-
-    if (!plan.label || !plan.days || !plan.priceEgp || !plan.priceUsd) {
-      toast.error(`Plan ${i + 1}: all fields are required`);
+    // ✅ validation - تحقق من price plans
+    if (!formData.pricePlans || formData.pricePlans.length === 0) {
+      toast.error("You must add at least one price plan");
       return;
     }
 
-    if (plan.hasDiscount) {
-      if (!plan.discountEgp || !plan.discountUsd) {
-        toast.error(`Plan ${i + 1}: discount fields are required`);
+    // ❌ validation لكل plan
+    for (let i = 0; i < formData.pricePlans.length; i++) {
+      const plan = formData.pricePlans[i];
+
+      if (!plan.label || !plan.days || !plan.priceEgp || !plan.priceUsd) {
+        toast.error(`Plan ${i + 1}: all fields are required`);
         return;
       }
 
-      if (
-        Number(plan.discountEgp) > Number(plan.priceEgp) ||
-        Number(plan.discountUsd) > Number(plan.priceUsd)
-      ) {
-        toast.error(`Plan ${i + 1}: discount can't be greater than price`);
-        return;
+      if (plan.hasDiscount) {
+        if (!plan.discountEgp || !plan.discountUsd) {
+          toast.error(`Plan ${i + 1}: discount fields are required`);
+          return;
+        }
+
+        if (
+          Number(plan.discountEgp) > Number(plan.priceEgp) ||
+          Number(plan.discountUsd) > Number(plan.priceUsd)
+        ) {
+          toast.error(`Plan ${i + 1}: discount can't be greater than price`);
+          return;
+        }
       }
     }
-  }
+
     const payload = {
       name: formData.name,
       categoryId: formData.categoryId,
@@ -168,7 +172,7 @@ const EditCourses = () => {
         description: course?.description || "",
         categoryId: course?.categoryId || "",
         teacherIds: course?.teachers?.map((t) => t.teacherId) || [],
-          image: course?.image || "",
+        image: course?.image || "",
         isHaveSemester: course?.isHaveSemester || false,
 
         // ✅ أهم جزء (mapping)

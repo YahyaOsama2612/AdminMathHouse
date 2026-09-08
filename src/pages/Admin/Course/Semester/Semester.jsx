@@ -10,6 +10,7 @@ import NavChild from "@/components/NavChild";
 import { MdGridView } from "react-icons/md";
 import { FaBook } from "react-icons/fa";
 import IconButton from "@/components/IconButton";
+
 const Semester = () => {
   const navigate = useNavigate();
   const { coursesId } = useParams();
@@ -47,7 +48,6 @@ const Semester = () => {
 
   const columns = [
     { header: "Name", key: "name" },
-    // { header: "Course", key: "course" },
   ];
 
   const tableData = useMemo(() => {
@@ -88,9 +88,10 @@ const Semester = () => {
         onDelete={handleDelete}
         extraActions={(row) => (
           <div className="flex gap-2">
+            {/* ✅ تمرير courseId مع semesterId */}
             <NavChild
               route={`/admin/courses/chapters/semester/${row.id}`}
-              state={row.id}
+              state={{ semesterId: row.id, courseId: coursesId }}
             />
           </div>
         )}
