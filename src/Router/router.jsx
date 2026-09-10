@@ -124,6 +124,11 @@ import PaymentPackage from "../pages/Admin/Payments/PaymentPackage/PaymentPackag
 import DriveLayout from "../Layout/DriveLayout";
 import PaymentContent from "../pages/Admin/Payments/PaymentContent/PaymentContent";
 
+// ✅ استيراد مكونات الواجب الإضافي
+import ExtraHomework from "../pages/Admin/Homework/ExtraHomework";
+import AddExtraHomework from "../pages/Admin/Homework/AddExtraHomework";
+import EditExtraHomework from "../pages/Admin/Homework/EditExtraHomework";
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -287,6 +292,11 @@ const router = createBrowserRouter([
       },
 
       { path: "payment/payment-content", element: <PaymentContent /> },
+
+      // ✅ مسارات الواجب الإضافي
+      { path: "extra-homework", element: <ExtraHomework /> },
+      { path: "extra-homework/add", element: <AddExtraHomework /> },
+      { path: "extra-homework/edit/:id", element: <EditExtraHomework /> },
     ],
   },
 ]);

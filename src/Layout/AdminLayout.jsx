@@ -64,7 +64,9 @@ const menuItems = [
     module: "courses",
     children: [
       { title: "Categories", path: "/admin/courses/categories", icon: <MdGridView size={18} /> },
-      {title: "filter", path: "/admin/Filter", icon: <BsBookHalf size={18} /> },
+      { title: "Filter", path: "/admin/Filter", icon: <BsBookHalf size={18} /> },
+      // ✅ إضافة الواجب الإضافي تحت الدورات
+      { title: "Extra Homework", path: "/admin/extra-homework", icon: <FaTasks size={18} /> },
       // { title: "All Courses", path: "/admin/courses/courses/allcourses", icon: <FaBook size={18} /> },
       // { title: "All Semesters", path: "/admin/courses/semester/allsemesters", icon: <AiFillProduct size={18} /> },
       // { title: "All Chapters", path: "/admin/courses/chapters/allchapters", icon: <MdLayers size={18} /> },
