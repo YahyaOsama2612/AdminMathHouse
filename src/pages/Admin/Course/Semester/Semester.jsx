@@ -46,9 +46,7 @@ const Semester = () => {
     }
   };
 
-  const columns = [
-    { header: "Name", key: "name" },
-  ];
+  const columns = [{ header: "Name", key: "name" }];
 
   const tableData = useMemo(() => {
     return (
@@ -62,8 +60,7 @@ const Semester = () => {
   }, [data]);
 
   const handleEdit = (row) => {
-    navigate(`/admin/courses/semester/edit/${row.id}`,
-       { state: coursesId });
+    navigate(`/admin/courses/semester/edit/${row.id}`, { state: coursesId });
   };
 
   if (loading && loadingOne) {
@@ -88,11 +85,16 @@ const Semester = () => {
         onDelete={handleDelete}
         extraActions={(row) => (
           <div className="flex gap-2">
-            {/* ✅ تمرير courseId مع semesterId */}
-            <NavChild
-              route={`/admin/courses/chapters/semester/${row.id}`}
-              state={{ semesterId: row.id, courseId: coursesId }}
-            />
+            {/* ✅ استخدم navigate بدل NavChild عشان الـ URL تكون آمنة */}
+            <button
+              onClick={() =>
+                navigate(`/admin/courses/chapters/semester/${row.id}`)
+              }
+              className="flex items-center gap-1 text-blue-500 hover:text-blue-700"
+              title="View Chapters"
+            >
+              📚 Chapters
+            </button>
           </div>
         )}
       >

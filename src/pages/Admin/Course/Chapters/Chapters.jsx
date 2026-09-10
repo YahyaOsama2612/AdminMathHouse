@@ -66,10 +66,10 @@ const OrderInputCell = ({ row, tableData, patchData, refetch, loading }) => {
       type="number"
       value={orderVal}
       onChange={(e) => setOrderVal(e.target.value)}
-      onBlur={handleUpdate} // يعمل التبديل لما تضغط كليك بره
+      onBlur={handleUpdate}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
-          e.target.blur(); // يفعل الـ onBlur تلقائيًا لما تضغط Enter
+          e.target.blur();
         }
       }}
       disabled={loading}
@@ -190,7 +190,7 @@ const Chapters = () => {
       render: (value, row) => (
         <OrderInputCell
           row={row}
-          tableData={tableData} // تمرير الداتا عشان الـ Component يبحث فيها
+          tableData={tableData}
           patchData={patchData}
           refetch={refetch}
           loading={loading || loadingPatch}
@@ -215,14 +215,24 @@ const Chapters = () => {
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading || loadingPatch}
-        onAddClick={() =>
-          navigate(`/admin/courses/chapters/add`, {
-            state: {
-              courseId: finalCourseId || course?.id,
-              semesterId: finalSemesterId,
-            },
-          })
-        }
+        onAddClick={() => {
+          // ✅ إذا كان semesterId موجود، استخدم الـ URL الجديد مع semesterId
+          if (finalSemesterId) {
+            navigate(`/admin/courses/chapters/semester/${finalSemesterId}/add`, {
+              state: {
+                courseId: finalCourseId || course?.id,
+                semesterId: finalSemesterId,
+              },
+            });
+          } else {
+            // بخلاف ذلك استخدم الـ route العادي
+            navigate(`/admin/courses/chapters/add`, {
+              state: {
+                courseId: finalCourseId || course?.id,
+              },
+            });
+          }
+        }}
         extraActions={(row) => (
           <>
             <NavChild route={`/admin/courses/lessons/${row.id}`} />

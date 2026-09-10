@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AddPage from "@/components/AddPage";
@@ -11,6 +11,7 @@ import PricePlansField from "@/components/PricePlansField";
 const EditChapters = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [selectedCourseId, setSelectedCourseId] = useState("");
 
   const {
     data: chapterRes,
@@ -30,9 +31,15 @@ const EditChapters = () => {
     error: errorCourses,
   } = useGet("/api/admin/teacher/selectionCourses");
 
-  const { putData, loading: saving } = usePut(
-    `/api/admin/chapters/${id}`
+  const {
+    data: semestersRes,
+    loading: loadingSemesters,
+    error: errorSemesters,
+  } = useGet(
+    selectedCourseId ? `/api/admin/semester/course/${selectedCourseId}` : null,
   );
+
+  const { putData, loading: saving } = usePut(`/api/admin/chapters/${id}`);
 
   const teacherOptions = useMemo(
     () =>
@@ -40,7 +47,7 @@ const EditChapters = () => {
         value: t.id,
         label: t.name,
       })) || [],
-    [teachersRes]
+    [teachersRes],
   );
 
   const courseOptions = useMemo(
@@ -49,8 +56,26 @@ const EditChapters = () => {
         value: c.id,
         label: c.name,
       })) || [],
-    [coursesRes]
+    [coursesRes],
   );
+
+  const semesterOptions = useMemo(() => {
+    const list = semestersRes?.data?.data || semestersRes?.data || [];
+
+    return (
+      list.map((s) => ({
+        value: s.id,
+        label: s.name,
+      })) || []
+    );
+  }, [semestersRes]);
+
+  useEffect(() => {
+    const chapterCourseId = chapterRes?.data?.course?.id;
+    if (chapterCourseId) {
+      setSelectedCourseId(chapterCourseId);
+    }
+  }, [chapterRes]);
 
   // FIELDS
   const fields = useMemo(
@@ -77,6 +102,23 @@ const EditChapters = () => {
         required: true,
         options: courseOptions,
         section: "General Information",
+        onChange: (selectedCourse, setFormData) => {
+          setSelectedCourseId(selectedCourse);
+          setFormData((prev) => ({
+            ...prev,
+            courseId: selectedCourse,
+            semesterId: "",
+          }));
+        },
+      },
+      {
+        name: "semesterId",
+        label: "Semester",
+        type: "select",
+        required: false,
+        options: semesterOptions,
+        isDisabled: !selectedCourseId,
+        section: "General Information",
       },
 
       // PRICE PLANS SYSTEM
@@ -87,10 +129,7 @@ const EditChapters = () => {
         fullWidth: true,
         section: "Pricing",
         render: ({ value, onChange }) => (
-          <PricePlansField
-            value={value || []}
-            onChange={onChange}
-          />
+          <PricePlansField value={value || []} onChange={onChange} />
         ),
       },
 
@@ -122,7 +161,7 @@ const EditChapters = () => {
         section: "Media",
       },
     ],
-    [teacherOptions, courseOptions]
+    [teacherOptions, courseOptions, semesterOptions, selectedCourseId],
   );
 
   // INITIAL DATA
@@ -133,6 +172,7 @@ const EditChapters = () => {
       name: data?.chapter?.name || "",
       teacherId: data?.teacher?.id || "",
       courseId: data?.course?.id || "",
+      semesterId: data?.semester?.id || data?.chapter?.semesterId || "",
       duration: data?.chapter?.duration || "",
       description: data?.chapter?.description || "",
       preRequisition: data?.chapter?.preRequisition || "",
@@ -204,6 +244,7 @@ const EditChapters = () => {
       name: formData.name,
       teacherId: formData.teacherId,
       courseId: formData.courseId,
+      semesterId: formData.semesterId || undefined,
       description: formData.description || "",
       preRequisition: formData.preRequisition || "",
       whatYouGain: formData.whatYouGain || "",
@@ -224,17 +265,17 @@ const EditChapters = () => {
     await putData(
       payload,
       `/api/admin/chapters/${id}`,
-      "Chapter updated successfully"
+      "Chapter updated successfully",
     );
 
     navigate(-1);
   };
 
   // LOADING
-  if (loadingChapter || loadingTeachers || loadingCourses)
+  if (loadingChapter || loadingTeachers || loadingCourses || loadingSemesters)
     return <Loader />;
 
-  if (error || errorTeachers || errorCourses)
+  if (error || errorTeachers || errorCourses || errorSemesters)
     return <Errorpage />;
 
   // UI

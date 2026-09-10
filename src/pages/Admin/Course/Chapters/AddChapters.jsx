@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
@@ -12,7 +12,14 @@ const AddChapters = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { courseId, semesterId } = location.state || {};
+  // ✅ استقبل semesterId من الـ URL params
+  const { semesterId: paramSemesterId } = useParams();
+
+  // استقبل courseId من location.state (للـ backward compatibility)
+  const { courseId, semesterId: stateSemesterId } = location.state || {};
+
+  // ✅ استخدم paramSemesterId إذا كان موجود، وإلا استخدم من state
+  const semesterId = paramSemesterId || stateSemesterId;
 
   const { postData, loading: saving } = usePost("/api/admin/chapters");
 
@@ -114,7 +121,7 @@ const AddChapters = () => {
     () => ({
       name: "",
       teacherId: "",
-      pricePlans: [], // ✅ important
+      pricePlans: [],
       description: "",
       preRequisition: "",
       whatYouGain: "",
@@ -179,7 +186,7 @@ const AddChapters = () => {
     const payload = {
       name: formData.name,
       teacherId: formData.teacherId,
-      courseId: courseId, // ✅ guaranteed to exist
+      courseId: courseId,
       pricePlans: formData.pricePlans.map((p) => ({
         label: p.label,
         days: Number(p.days),
@@ -191,6 +198,7 @@ const AddChapters = () => {
       })),
     };
 
+    // ✅ إضافة semesterId إن كان موجود (من الـ URL أو state)
     if (semesterId) payload.semesterId = semesterId;
     if (formData.description) payload.description = formData.description;
     if (formData.preRequisition)
@@ -204,15 +212,14 @@ const AddChapters = () => {
       "Chapter added successfully",
     );
 
+    // ✅ Navigate based on semesterId
     if (semesterId) {
-      // إذا كان فيه semester، رجع للـ semester chapters
       navigate(`/admin/courses/chapters/semester/${semesterId}`, {
         state: { courseId, semesterId },
       });
     } else {
-      // وإلا رجع للـ course chapters
       navigate(`/admin/courses/chapters/${courseId}`, {
-        state: { courseId, semesterId },
+        state: { courseId },
       });
     }
   };
