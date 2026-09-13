@@ -13,29 +13,31 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
   const [errors, setErrors] = useState({});
   const [previews, setPreviews] = useState({});
 
-  // Initialize default data
-
-  const [formData, setFormData] = useState(() =>
-    fields.reduce(
+  // Initialize default data with initialData priority
+  const [formData, setFormData] = useState(() => {
+    const defaults = fields.reduce(
       (acc, field) => ({ ...acc, [field.name]: field.defaultValue ?? "" }),
       {},
-    ),
-  );
+    );
+    // ✅ Merge initialData على top of defaults - initialData يأخذ الأولوية
+    return initialData ? { ...defaults, ...initialData } : defaults;
+  });
 
   // Dirty Check (to detect unsaved changes)
+  const initialDefaults = fields.reduce(
+    (acc, field) => ({ ...acc, [field.name]: field.defaultValue ?? "" }),
+    {},
+  );
+
   const isDirty =
     JSON.stringify(formData) !==
     JSON.stringify(
-      initialData ||
-        fields.reduce(
-          (acc, field) => ({ ...acc, [field.name]: field.defaultValue ?? "" }),
-          {},
-        ),
+      initialData ? { ...initialDefaults, ...initialData } : initialDefaults,
     );
+
+  // ✅ Only set up image previews when initialData changes
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      setFormData((prev) => ({ ...prev, ...initialData }));
-
       const newPreviews = {};
       Object.keys(initialData).forEach((key) => {
         if (
@@ -47,7 +49,6 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
       });
       setPreviews(newPreviews);
     }
-    // 👇🔥 استخدمنا JSON.stringify عشان الكومبوننت ميعملش إعادة تعيين (Reset) للفورم فجأة
   }, [JSON.stringify(initialData)]);
 
   // --- Validation Logic (Translated) ---

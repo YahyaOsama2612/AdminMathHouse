@@ -372,7 +372,7 @@ const AddQuestions = () => {
         fullWidth: true,
         render: ({ value, onChange, setFormData }) => {
           const methods =
-            value && value.length
+            Array.isArray(value) && value.length > 0
               ? value
               : [
                   {
