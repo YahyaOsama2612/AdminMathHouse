@@ -417,12 +417,12 @@ const EditQuestions = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <DrivePickerField
                       value={method.answerImage}
-                      allowedTypes={[]}
+                      allowedTypes={["image"]}
                       onOpen={() =>
                         openPicker(
                           "answerImage",
-                          [],
-                          "Select from Drive",
+                          ["image"],
+                          "Select Image",
                           makeMethodSetter(index),
                         )
                       }
@@ -430,12 +430,12 @@ const EditQuestions = () => {
                     />
                     <DrivePickerField
                       value={method.answerPdf}
-                      allowedTypes={[]}
+                      allowedTypes={["pdf"]}
                       onOpen={() =>
                         openPicker(
                           "answerPdf",
-                          [],
-                          "Select from Drive",
+                          ["pdf"],
+                          "Select PDF",
                           makeMethodSetter(index),
                         )
                       }
@@ -443,12 +443,12 @@ const EditQuestions = () => {
                     />
                     <DrivePickerField
                       value={method.answerVideo}
-                      allowedTypes={[]}
+                      allowedTypes={["video"]}
                       onOpen={() =>
                         openPicker(
                           "answerVideo",
-                          [],
-                          "Select from Drive",
+                          ["video"],
+                          "Select Video",
                           makeMethodSetter(index),
                         )
                       }
@@ -586,23 +586,15 @@ const EditQuestions = () => {
     }
     const { gridInAnswers, correctOption, answers, ...rest } = formData;
 
-    const hasMediaSelection = (answers || []).some(
-      (a) => a.answerImage || a.answerPdf || a.answerVideo,
-    );
-
-    if (hasMediaSelection) {
-      toast.error(
-        "Only answer text / message is allowed. Remove image, PDF, and video fields before saving.",
-      );
-      return;
-    }
-
-    // كل "طريقة حل" لازم يكون فيها answerText فقط، وبدون أي media آخر
+    // كل "طريقة حل" تحتوي على media (image/pdf/video) و/أو نص
     const finalAnswers = (answers || [])
       .map((a) => ({
         answerText: a.answerText || null,
+        answerImage: a.answerImage || null,
+        answerPdf: a.answerPdf || null,
+        answerVideo: a.answerVideo || null,
       }))
-      .filter((a) => a.answerText);
+      .filter((a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo);
 
     const payload = {
       ...rest,

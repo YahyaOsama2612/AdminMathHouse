@@ -453,13 +453,13 @@ const AddQuestions = () => {
                     <DrivePickerField
                       label="Answer Image"
                       value={method.answerImage}
-                      allowedTypes={[]}
-                      pickerTitle="Select from Drive"
+                      allowedTypes={["image"]}
+                      pickerTitle="Select Image"
                       onOpen={() =>
                         openPicker(
                           "answerImage",
-                          [],
-                          "Select from Drive",
+                          ["image"],
+                          "Select Image",
                           makeMethodSetter(index),
                         )
                       }
@@ -468,13 +468,13 @@ const AddQuestions = () => {
                     <DrivePickerField
                       label="Answer PDF"
                       value={method.answerPdf}
-                      allowedTypes={[]}
-                      pickerTitle="Select from Drive"
+                      allowedTypes={["pdf"]}
+                      pickerTitle="Select PDF"
                       onOpen={() =>
                         openPicker(
                           "answerPdf",
-                          [],
-                          "Select from Drive",
+                          ["pdf"],
+                          "Select PDF",
                           makeMethodSetter(index),
                         )
                       }
@@ -483,13 +483,13 @@ const AddQuestions = () => {
                     <DrivePickerField
                       label="Answer Video"
                       value={method.answerVideo}
-                      allowedTypes={[]}
-                      pickerTitle="Select from Drive"
+                      allowedTypes={["video"]}
+                      pickerTitle="Select Video"
                       onOpen={() =>
                         openPicker(
                           "answerVideo",
-                          [],
-                          "Select from Drive",
+                          ["video"],
+                          "Select Video",
                           makeMethodSetter(index),
                         )
                       }
@@ -596,23 +596,15 @@ const AddQuestions = () => {
       ...rest
     } = formData;
 
-    const hasMediaSelection = (answers || []).some(
-      (a) => a.answerImage || a.answerPdf || a.answerVideo,
-    );
-
-    if (hasMediaSelection) {
-      toast.error(
-        "Only answer text / message is allowed. Remove image, PDF, and video fields before saving.",
-      );
-      return;
-    }
-
-    // كل "طريقة حل" لازم يكون فيها answerText فقط، وبدون أي media آخر
+    // كل "طريقة حل" تحتوي على media (image/pdf/video) و/أو نص
     const finalAnswers = (answers || [])
       .map((a) => ({
         answerText: a.answerText || null,
+        answerImage: a.answerImage || null,
+        answerPdf: a.answerPdf || null,
+        answerVideo: a.answerVideo || null,
       }))
-      .filter((a) => a.answerText);
+      .filter((a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo);
 
     const payload = {
       ...rest,
