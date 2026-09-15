@@ -232,7 +232,7 @@ const AddQuestions = () => {
       {
         name: "question",
         label: "Question Content",
-        required: true,
+        required: false,
         type: "custom",
         section: "General Information",
         fullWidth: true,
@@ -315,10 +315,11 @@ const AddQuestions = () => {
         name: "options",
         label: "Multiple Choice Options",
         type: "dynamic-list",
-        required: true,
+        required: false,
         section: "Answers Configuration",
         hidden: (formData) => formData.answerType === "Grid in",
-        helperText: "Enter the text for options A, B, C, D...",
+        helperText:
+          "Optional: leave empty to send letters (A, B, C, D) without text.",
       },
       {
         name: "correctOption",
@@ -328,12 +329,12 @@ const AddQuestions = () => {
         section: "Answers Configuration",
         hidden: (formData) => formData.answerType === "Grid in",
         render: ({ value, onChange, formData }) => {
-          const count = formData.options?.length || 4;
+          const count = Math.max(formData.options?.length || 0, 4);
           const letters = Array.from({ length: count }, (_, i) =>
             String.fromCharCode(65 + i),
           );
           return (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
               {letters.map((l) => (
                 <button
                   key={l}
@@ -553,13 +554,20 @@ const AddQuestions = () => {
 
     let finalOptions = [];
     if (formData.answerType === "MCQ") {
-      finalOptions = (formData.options || [])
-        .map((ans, index) => ({
-          answer: ans?.trim(),
-          isCorrect: formData.correctOption === String.fromCharCode(65 + index),
-          order: String.fromCharCode(65 + index),
-        }))
-        .filter((opt) => opt.answer);
+      if (!formData.correctOption) {
+        toast.error("Please mark the correct letter");
+        return;
+      }
+      const count = Math.max(formData.options?.length || 0, 4);
+      finalOptions = Array.from({ length: count }, (_, index) => {
+        const letter = String.fromCharCode(65 + index);
+        const ansText = formData.options?.[index]?.trim();
+        return {
+          answer: ansText || letter,
+          order: letter,
+          isCorrect: formData.correctOption === letter,
+        };
+      });
     } else {
       finalOptions = (formData.gridInAnswers || [])
         .filter((ans) => ans.trim() !== "")
@@ -568,6 +576,11 @@ const AddQuestions = () => {
           isCorrect: true,
           order: null,
         }));
+
+      if (formData.answerType === "Grid in" && finalOptions.length === 0) {
+        toast.error("Please add at least one accepted answer for Grid-in");
+        return;
+      }
     }
 
     const {

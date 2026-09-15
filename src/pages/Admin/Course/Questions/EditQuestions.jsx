@@ -186,7 +186,7 @@ const EditQuestions = () => {
         name: "question",
         label: "Question Content",
         type: "custom",
-        required: true,
+        required: false,
         section: "General Information",
         fullWidth: true,
         render: ({ value, onChange }) => (
@@ -283,7 +283,7 @@ const EditQuestions = () => {
         name: "options",
         label: "Multiple Choice Options",
         type: "dynamic-list",
-        required: true,
+        required: false,
         section: "Answers Configuration",
         hidden: (formData) => formData.answerType === "Grid in",
       },
@@ -295,8 +295,9 @@ const EditQuestions = () => {
         section: "Answers Configuration",
         hidden: (formData) => formData.answerType === "Grid in",
         render: ({ value, onChange, formData }) => {
+          const count = Math.max(formData.options?.length || 0, 4);
           const letters = Array.from(
-            { length: formData.options?.length || 4 },
+            { length: count },
             (_, i) => String.fromCharCode(65 + i),
           );
           return (
@@ -490,9 +491,15 @@ const EditQuestions = () => {
     const q = questionRes.data.data;
 
     const isGridIn = q.answerType === "Grid in";
-    const options = !isGridIn
-      ? q.options?.map((opt) => opt.answer) || ["", "", "", ""]
-      : ["", "", "", ""];
+    let options = ["", "", "", ""];
+    if (!isGridIn) {
+      if (q.options && q.options.length > 0) {
+        options = q.options.map((opt) => opt.answer);
+        while (options.length < 4) {
+          options.push("");
+        }
+      }
+    }
     const gridInAnswers = isGridIn
       ? q.options?.map((opt) => opt.answer) || [""]
       : [""];
@@ -549,13 +556,20 @@ const EditQuestions = () => {
 
     let finalOptions = [];
     if (formData.answerType === "MCQ") {
-      finalOptions = (formData.options || [])
-        .map((ans, index) => ({
-          answer: ans?.trim(),
-          isCorrect: formData.correctOption === String.fromCharCode(65 + index),
-          order: String.fromCharCode(65 + index),
-        }))
-        .filter((opt) => opt.answer);
+      if (!formData.correctOption) {
+        toast.error("Please mark the correct letter");
+        return;
+      }
+      const count = Math.max(formData.options?.length || 0, 4);
+      finalOptions = Array.from({ length: count }, (_, index) => {
+        const letter = String.fromCharCode(65 + index);
+        const ansText = formData.options?.[index]?.trim();
+        return {
+          answer: ansText || letter,
+          order: letter,
+          isCorrect: formData.correctOption === letter,
+        };
+      });
     } else {
       finalOptions = (formData.gridInAnswers || [])
         .filter((ans) => ans.trim() !== "")
@@ -564,6 +578,11 @@ const EditQuestions = () => {
           isCorrect: true,
           order: null,
         }));
+
+      if (formData.answerType === "Grid in" && finalOptions.length === 0) {
+        toast.error("Please add at least one accepted answer for Grid-in");
+        return;
+      }
     }
     const { gridInAnswers, correctOption, answers, ...rest } = formData;
 
