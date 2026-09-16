@@ -563,7 +563,7 @@ const AddQuestions = () => {
         const letter = String.fromCharCode(65 + index);
         const ansText = formData.options?.[index]?.trim();
         return {
-          answer: ansText || letter,
+          answer: ansText || "",
           order: letter,
           isCorrect: formData.correctOption === letter,
         };
@@ -604,7 +604,9 @@ const AddQuestions = () => {
         answerPdf: a.answerPdf || null,
         answerVideo: a.answerVideo || null,
       }))
-      .filter((a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo);
+      .filter(
+        (a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo,
+      );
 
     const payload = {
       ...rest,

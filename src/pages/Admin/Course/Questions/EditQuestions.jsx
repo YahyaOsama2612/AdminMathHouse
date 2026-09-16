@@ -296,9 +296,8 @@ const EditQuestions = () => {
         hidden: (formData) => formData.answerType === "Grid in",
         render: ({ value, onChange, formData }) => {
           const count = Math.max(formData.options?.length || 0, 4);
-          const letters = Array.from(
-            { length: count },
-            (_, i) => String.fromCharCode(65 + i),
+          const letters = Array.from({ length: count }, (_, i) =>
+            String.fromCharCode(65 + i),
           );
           return (
             <div className="flex flex-wrap gap-3">
@@ -565,7 +564,7 @@ const EditQuestions = () => {
         const letter = String.fromCharCode(65 + index);
         const ansText = formData.options?.[index]?.trim();
         return {
-          answer: ansText || letter,
+          answer: ansText || "",
           order: letter,
           isCorrect: formData.correctOption === letter,
         };
@@ -594,7 +593,9 @@ const EditQuestions = () => {
         answerPdf: a.answerPdf || null,
         answerVideo: a.answerVideo || null,
       }))
-      .filter((a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo);
+      .filter(
+        (a) => a.answerText || a.answerImage || a.answerPdf || a.answerVideo,
+      );
 
     const payload = {
       ...rest,
