@@ -183,6 +183,13 @@ const EditQuestions = () => {
         ),
       },
       {
+        name: "questionNumber", // حقل رقم السؤال الجديد
+        label: "Question Number",
+        type: "number",
+        required: false,
+        section: "General Information",
+      },
+      {
         name: "question",
         label: "Question Content",
         type: "custom",
