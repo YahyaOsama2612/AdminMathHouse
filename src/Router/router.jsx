@@ -129,6 +129,10 @@ import ExtraHomework from "../pages/Admin/Homework/ExtraHomework";
 import AddExtraHomework from "../pages/Admin/Homework/AddExtraHomework";
 import EditExtraHomework from "../pages/Admin/Homework/EditExtraHomework";
 
+import RatingQuestions from "../pages/Admin/Settings/RatingQuestions/RatingQuestions";
+import AddRatingQuestion from "../pages/Admin/Settings/RatingQuestions/AddRatingQuestion";
+import EditRatingQuestion from "../pages/Admin/Settings/RatingQuestions/EditRatingQuestion";
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -234,6 +238,10 @@ const router = createBrowserRouter([
       { path: "settings/currency", element: <Currency /> },
       { path: "settings/currency/add", element: <AddCurrency /> },
       { path: "settings/currency/edit/:id", element: <EditCurrency /> },
+
+      { path: "settings/rating-questions", element: <RatingQuestions /> },
+      { path: "settings/rating-questions/add", element: <AddRatingQuestion /> },
+      { path: "settings/rating-questions/edit/:id", element: <EditRatingQuestion /> },
 
       { path: "packages/packages", element: <Packages /> },
       { path: "packages/packages/add", element: <AddPackages /> },

@@ -133,6 +133,7 @@ const menuItems = [
       { title: "Exam Code", path: "/admin/settings/examcode", icon: <FaRegEdit size={18} /> },
       { title: "Section", path: "/admin/settings/section", icon: <FaPlayCircle size={18} /> },
       { title: "Currency", path: "/admin/settings/currency", icon: <FaDollarSign size={18} /> },
+      { title: "Rating Questions", path: "/admin/settings/rating-questions", icon: <FaClipboardList size={18} /> },
     ],
   },
   {
