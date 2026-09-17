@@ -19,6 +19,7 @@ import {
   Plus,
   X,
   Clock,
+  Star,
 } from "lucide-react";
 import api from "@/api/api";
 import useGet from "@/hooks/useGet";
@@ -200,6 +201,7 @@ const StudentInformation = () => {
           studentName={`${student?.firstname} ${student?.lastname}`}
           grade={student?.grade?.nameAr}
         />
+        <SessionRatingsSection studentId={id} />
       </div>
 
       {isTopUpOpen && (
@@ -1332,6 +1334,147 @@ const ExamDetails = ({ exam }) => {
               Show more ({mistakes.length - mistakesToShow} remaining)
             </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SessionRatingsSection = ({ studentId }) => {
+  const { data: res, loading, error } = useGet(
+    studentId ? `/api/admin/session-ratings/student/${studentId}` : ""
+  );
+
+  const ratingsList = useMemo(() => {
+    const raw = res?.data?.data || res?.data?.ratings || res?.data || [];
+    if (!Array.isArray(raw)) return [];
+
+    const list = [];
+    raw.forEach((item) => {
+      const qrs = item.questionRatings || item.ratings;
+      if (qrs && Array.isArray(qrs) && qrs.length > 0) {
+        qrs.forEach((r) => {
+          list.push({
+            id: r.id || `${item.id}-${r.questionId}`,
+            sessionName: item.session?.name || item.sessionName || "Session",
+            sessionDate: item.session?.sessionDate || item.sessionDate,
+            generalComment: item.generalComment,
+            overallRating: item.overallRating,
+            questionTitle: r.questionTitle || r.question?.title || "Evaluation Criteria",
+            category: r.category || r.question?.category || "general",
+            rating: Number(r.rating) || 0,
+            comment: r.comment || "",
+            createdAt: r.createdAt || item.createdAt,
+          });
+        });
+      } else {
+        list.push({
+          id: item.id,
+          sessionName: item.session?.name || item.sessionName || "Session",
+          sessionDate: item.session?.sessionDate || item.sessionDate,
+          generalComment: item.generalComment,
+          overallRating: item.overallRating,
+          questionTitle: item.questionTitle || item.question?.title || "Evaluation Criteria",
+          category: item.category || item.question?.category || "general",
+          rating: Number(item.overallRating ?? item.rating ?? 0),
+          comment: item.comment || "",
+          createdAt: item.createdAt,
+        });
+      }
+    });
+    return list;
+  }, [res]);
+
+  const avgRating = useMemo(() => {
+    if (ratingsList.length === 0) return 0;
+    const sum = ratingsList.reduce((acc, curr) => acc + curr.rating, 0);
+    return (sum / ratingsList.length).toFixed(1);
+  }, [ratingsList]);
+
+  return (
+    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl">
+            <Star className="w-6 h-6 fill-amber-500" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">
+              Session Evaluations & Ratings
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Teacher evaluations and criteria scores recorded during live sessions
+            </p>
+          </div>
+        </div>
+
+        {ratingsList.length > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700">
+              Total: {ratingsList.length} reviews
+            </span>
+            <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              Avg: {avgRating} / 10
+            </span>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="py-6 text-center text-sm text-gray-400">
+          Loading student session evaluations...
+        </div>
+      ) : error ? (
+        <div className="py-4 text-center text-sm text-red-500 bg-red-50 rounded-xl">
+          Unable to fetch session evaluations for this student.
+        </div>
+      ) : ratingsList.length === 0 ? (
+        <div className="py-8 text-center text-sm text-gray-400">
+          No session ratings recorded for this student yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ratingsList.map((r) => (
+            <div
+              key={r.id}
+              className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all space-y-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#7D0A0A] bg-[#FBEAEA] px-2.5 py-0.5 rounded-full">
+                  {r.category}
+                </span>
+                <span className="text-sm font-extrabold text-amber-600 flex items-center gap-1">
+                  <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                  {r.rating}
+                  <span className="text-xs text-gray-400 font-normal">/ 10</span>
+                </span>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 leading-snug">
+                  {r.questionTitle}
+                </h4>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <Clock size={12} />
+                  {r.sessionName}{" "}
+                  {r.sessionDate ? `• ${new Date(r.sessionDate).toLocaleDateString()}` : ""}
+                </p>
+              </div>
+
+              {r.comment && (
+                <p className="text-xs text-gray-600 bg-white p-2 rounded-xl border border-gray-100">
+                  {r.comment}
+                </p>
+              )}
+
+              {r.generalComment && (
+                <p className="text-[11px] text-gray-400 italic">
+                  Session note: "{r.generalComment}"
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

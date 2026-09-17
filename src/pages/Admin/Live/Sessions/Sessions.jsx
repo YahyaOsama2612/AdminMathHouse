@@ -6,6 +6,7 @@ import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
+import { Star } from "lucide-react";
 
 const Sessions = () => {
   const navigate = useNavigate();
@@ -119,6 +120,15 @@ const Sessions = () => {
         onAddClick={() => navigate("/admin/live/sessions/add")}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        extraActions={(row) => (
+          <button
+            onClick={() => navigate(`/admin/live/sessions/${row.id}/ratings`)}
+            className="group p-2 rounded-lg transition-all duration-200 hover:bg-amber-500 hover:scale-105"
+            title="Session Ratings"
+          >
+            <Star className="w-4 h-4 text-amber-500 transition-colors duration-200 group-hover:text-white" />
+          </button>
+        )}
       />
 
       <ConfirmDeleteModal

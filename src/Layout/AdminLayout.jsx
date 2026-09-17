@@ -12,7 +12,8 @@ import {
   FaRegFileAlt, FaTasks, FaBell, FaCog, FaHashtag, FaRegEdit, 
   FaDollarSign, FaUserTimes, FaWallet, FaRegClock, FaPiggyBank, 
   FaReceipt, FaExternalLinkAlt, FaTicketAlt, 
-  FaShieldAlt, FaFingerprint, FaUserFriends, FaSchool, FaLock, FaRegComments
+  FaShieldAlt, FaFingerprint, FaUserFriends, FaSchool, FaLock, FaRegComments,
+  FaStar
 } from "react-icons/fa";
 import { FaHeadphonesAlt } from "react-icons/fa";
 import { CiMenuBurger } from "react-icons/ci";
@@ -84,6 +85,7 @@ const menuItems = [
     module: "live",
     children: [
       { title: "Sessions", path: "/admin/live/sessions", icon: <MdMonitor size={18} /> },
+      { title: "Session Ratings", path: "/admin/live/session-ratings", icon: <FaStar size={18} /> },
       { title: "Groups", path: "/admin/live/groups", icon: <FaUserFriends size={18} /> },
       { title: "Academic", path: "/admin/live/academic", icon: <FaSchool size={18} /> },
       { title: "Private Sessions", path: "/admin/live/private-sessions", icon: <FaLock size={18} /> },
