@@ -20,9 +20,17 @@ import {
   X,
   Clock,
   Star,
+  FileText,
+  Eye,
+  CheckCircle2,
+  AlertCircle,
+  MessageSquare,
+  Pencil,
+  Save,
 } from "lucide-react";
 import api from "@/api/api";
 import useGet from "@/hooks/useGet";
+import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import {
@@ -202,6 +210,7 @@ const StudentInformation = () => {
           grade={student?.grade?.nameAr}
         />
         <SessionRatingsSection studentId={id} />
+        <ExtraHomeworkSection studentId={id} />
       </div>
 
       {isTopUpOpen && (
@@ -1341,8 +1350,12 @@ const ExamDetails = ({ exam }) => {
 };
 
 const SessionRatingsSection = ({ studentId }) => {
-  const { data: res, loading, error } = useGet(
-    studentId ? `/api/admin/session-ratings/student/${studentId}` : ""
+  const {
+    data: res,
+    loading,
+    error,
+  } = useGet(
+    studentId ? `/api/admin/session-ratings/student/${studentId}` : "",
   );
 
   const ratingsList = useMemo(() => {
@@ -1360,7 +1373,8 @@ const SessionRatingsSection = ({ studentId }) => {
             sessionDate: item.session?.sessionDate || item.sessionDate,
             generalComment: item.generalComment,
             overallRating: item.overallRating,
-            questionTitle: r.questionTitle || r.question?.title || "Evaluation Criteria",
+            questionTitle:
+              r.questionTitle || r.question?.title || "Evaluation Criteria",
             category: r.category || r.question?.category || "general",
             rating: Number(r.rating) || 0,
             comment: r.comment || "",
@@ -1374,7 +1388,8 @@ const SessionRatingsSection = ({ studentId }) => {
           sessionDate: item.session?.sessionDate || item.sessionDate,
           generalComment: item.generalComment,
           overallRating: item.overallRating,
-          questionTitle: item.questionTitle || item.question?.title || "Evaluation Criteria",
+          questionTitle:
+            item.questionTitle || item.question?.title || "Evaluation Criteria",
           category: item.category || item.question?.category || "general",
           rating: Number(item.overallRating ?? item.rating ?? 0),
           comment: item.comment || "",
@@ -1403,7 +1418,8 @@ const SessionRatingsSection = ({ studentId }) => {
               Session Evaluations & Ratings
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Teacher evaluations and criteria scores recorded during live sessions
+              Teacher evaluations and criteria scores recorded during live
+              sessions
             </p>
           </div>
         </div>
@@ -1447,7 +1463,9 @@ const SessionRatingsSection = ({ studentId }) => {
                 <span className="text-sm font-extrabold text-amber-600 flex items-center gap-1">
                   <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
                   {r.rating}
-                  <span className="text-xs text-gray-400 font-normal">/ 10</span>
+                  <span className="text-xs text-gray-400 font-normal">
+                    / 10
+                  </span>
                 </span>
               </div>
 
@@ -1458,7 +1476,9 @@ const SessionRatingsSection = ({ studentId }) => {
                 <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                   <Clock size={12} />
                   {r.sessionName}{" "}
-                  {r.sessionDate ? `• ${new Date(r.sessionDate).toLocaleDateString()}` : ""}
+                  {r.sessionDate
+                    ? `• ${new Date(r.sessionDate).toLocaleDateString()}`
+                    : ""}
                 </p>
               </div>
 
@@ -1475,6 +1495,368 @@ const SessionRatingsSection = ({ studentId }) => {
               )}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Extra Homework: مراجعة وتصحيح اللي الطالب سلّمه ─────────────
+const EH_STATUS = {
+  assigned: { label: "Not submitted", className: "bg-gray-100 text-gray-600" },
+  submitted: { label: "Needs review", className: "bg-amber-50 text-amber-700" },
+  graded: { label: "Graded", className: "bg-green-50 text-green-700" },
+};
+
+const ehFormatDate = (value) =>
+  value
+    ? new Date(value).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "—";
+
+const ExtraHomeworkSection = ({ studentId }) => {
+  // { [assignmentId]: { open, score, feedback, saving, error } }
+  const [forms, setForms] = useState({});
+  // التعديلات اللي اتحفظت في الجلسة دي لحد ما البيانات تتحدث
+  const [overrides, setOverrides] = useState({});
+
+  const {
+    data: res,
+    loading,
+    error,
+    refetch,
+  } = useGet(studentId ? `/api/admin/extra-homework/student/${studentId}` : "");
+  const { putData } = usePut();
+
+  const homework = useMemo(() => {
+    const payload = res?.data?.data || res?.data || {};
+    const list = Array.isArray(payload.homework) ? payload.homework : [];
+    return list.map((h) => ({ ...h, ...(overrides[h.assignmentId] || {}) }));
+  }, [res, overrides]);
+
+  const counts = useMemo(
+    () =>
+      homework.reduce(
+        (acc, h) => {
+          acc[h.status] = (acc[h.status] || 0) + 1;
+          return acc;
+        },
+        { assigned: 0, submitted: 0, graded: 0 },
+      ),
+    [homework],
+  );
+
+  const updateForm = (key, patch) =>
+    setForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+
+  const openForm = (h) =>
+    updateForm(h.assignmentId, {
+      open: true,
+      score: h.score ?? "",
+      feedback: h.feedback ?? "",
+      error: null,
+    });
+
+  const closeForm = (key) => updateForm(key, { open: false, error: null });
+
+  const handleSaveReview = async (h) => {
+    const key = h.assignmentId;
+    const form = forms[key] || {};
+    const score = Number(form.score);
+
+    if (
+      form.score === "" ||
+      form.score === null ||
+      Number.isNaN(score) ||
+      score < 0
+    ) {
+      updateForm(key, { error: "Enter a score of 0 or more." });
+      return;
+    }
+
+    updateForm(key, { saving: true, error: null });
+    try {
+      await putData(
+        { score, feedback: form.feedback?.trim() || "", status: "graded" },
+        `/api/admin/extra-homework/${h.homeworkId}/submissions/${h.assignmentId}/review`,
+        "Grade saved",
+      );
+      setOverrides((prev) => ({
+        ...prev,
+        [key]: {
+          status: "graded",
+          score,
+          feedback: form.feedback?.trim() || null,
+          reviewedAt: new Date().toISOString(),
+        },
+      }));
+      updateForm(key, { open: false, saving: false });
+      refetch?.();
+    } catch (err) {
+      updateForm(key, {
+        saving: false,
+        error: err?.message || "The grade couldn't be saved. Try again.",
+      });
+    }
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-one/10 text-one rounded-2xl">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Extra Homework</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              What this student submitted, and their grades
+            </p>
+          </div>
+        </div>
+
+        {homework.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700">
+              {counts.submitted} to review
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-green-50 text-green-700">
+              {counts.graded} graded
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-600">
+              {counts.assigned} not submitted
+            </span>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="py-6 text-center text-sm text-gray-400">
+          Loading extra homework...
+        </div>
+      ) : error ? (
+        <div className="py-4 text-center text-sm text-red-500 bg-red-50 rounded-xl">
+          Unable to fetch extra homework for this student.
+        </div>
+      ) : homework.length === 0 ? (
+        <div className="py-8 text-center text-sm text-gray-400">
+          No extra homework assigned to this student yet.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {homework.map((h) => {
+            const key = h.assignmentId;
+            const form = forms[key] || {};
+            const statusStyle = EH_STATUS[h.status] || EH_STATUS.assigned;
+            const hasSubmission =
+              h.status === "submitted" || h.status === "graded";
+            const isLate =
+              h.submittedAt &&
+              h.dueDate &&
+              new Date(h.submittedAt) > new Date(h.dueDate);
+
+            return (
+              <div
+                key={key}
+                className="p-5 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-4"
+              >
+                {/* Title + status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="text-base font-bold text-gray-900">
+                      {h.title || "Untitled homework"}
+                    </h4>
+                    {h.description && (
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {h.description}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-xl ${statusStyle.className}`}
+                  >
+                    {statusStyle.label}
+                  </span>
+                </div>
+
+                {/* Dates */}
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Clock size={12} /> Due {ehFormatDate(h.dueDate)}
+                  </span>
+                  {h.submittedAt && (
+                    <span
+                      className={`flex items-center gap-1 ${isLate ? "text-red-600 font-semibold" : ""}`}
+                    >
+                      <CheckCircle2 size={12} /> Submitted{" "}
+                      {ehFormatDate(h.submittedAt)}
+                      {isLate && " (late)"}
+                    </span>
+                  )}
+                  {h.reviewedAt && (
+                    <span className="flex items-center gap-1">
+                      <Award size={12} /> Reviewed {ehFormatDate(h.reviewedAt)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Files */}
+                <div className="flex flex-wrap gap-2">
+                  {h.submittedPdf && (
+                    <a
+                      href={h.submittedPdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl bg-one text-white hover:bg-one/90 transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Student's solution
+                    </a>
+                  )}
+                  {h.pdfUrl && (
+                    <a
+                      href={h.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Homework PDF
+                    </a>
+                  )}
+                  {h.link && (
+                    <a
+                      href={h.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Homework link
+                    </a>
+                  )}
+                </div>
+
+                {h.studentNotes && (
+                  <p className="text-sm text-gray-700 bg-white p-3 rounded-xl border border-gray-100">
+                    <span className="font-semibold">Student notes: </span>
+                    {h.studentNotes}
+                  </p>
+                )}
+
+                {/* Grade display */}
+                {h.status === "graded" && !form.open && (
+                  <div className="flex flex-wrap items-start justify-between gap-3 bg-white p-4 rounded-xl border border-gray-100">
+                    <div className="space-y-1">
+                      <p className="flex items-center gap-1.5 text-sm font-bold text-green-700">
+                        <Award className="w-4 h-4" />
+                        Score: {h.score ?? "—"}
+                      </p>
+                      {h.feedback && (
+                        <p className="flex items-start gap-1.5 text-sm text-gray-600">
+                          <MessageSquare className="w-4 h-4 mt-0.5 shrink-0" />
+                          {h.feedback}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openForm(h)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit grade
+                    </button>
+                  </div>
+                )}
+
+                {/* Grade action */}
+                {h.status === "submitted" && !form.open && (
+                  <button
+                    type="button"
+                    onClick={() => openForm(h)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-one text-white hover:bg-one/90 transition-colors"
+                  >
+                    <Award className="w-4 h-4" />
+                    Grade submission
+                  </button>
+                )}
+
+                {!hasSubmission && (
+                  <p className="text-sm text-gray-400">
+                    The student hasn't submitted this homework yet.
+                  </p>
+                )}
+
+                {/* Review form */}
+                {hasSubmission && form.open && (
+                  <div className="bg-white p-4 rounded-xl border border-one/20 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <label className="sm:col-span-1 space-y-1">
+                        <span className="text-xs font-semibold text-gray-600">
+                          Score
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.score}
+                          onChange={(e) =>
+                            updateForm(key, { score: e.target.value })
+                          }
+                          disabled={form.saving}
+                          className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-one/40 disabled:opacity-60"
+                        />
+                      </label>
+                      <label className="sm:col-span-3 space-y-1">
+                        <span className="text-xs font-semibold text-gray-600">
+                          Feedback for the student
+                        </span>
+                        <textarea
+                          rows={2}
+                          value={form.feedback}
+                          onChange={(e) =>
+                            updateForm(key, { feedback: e.target.value })
+                          }
+                          disabled={form.saving}
+                          placeholder="e.g. Great work on step 4!"
+                          className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-one/40 disabled:opacity-60"
+                        />
+                      </label>
+                    </div>
+
+                    {form.error && (
+                      <p className="flex items-center gap-1.5 text-sm text-red-600">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {form.error}
+                      </p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveReview(h)}
+                        disabled={form.saving}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-one text-white hover:bg-one/90 disabled:opacity-50 transition-colors"
+                      >
+                        <Save className="w-4 h-4" />
+                        {form.saving ? "Saving..." : "Save grade"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => closeForm(key)}
+                        disabled={form.saving}
+                        className="px-4 py-2 text-sm font-medium rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
