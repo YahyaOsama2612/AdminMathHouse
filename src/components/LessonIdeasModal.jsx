@@ -7,10 +7,10 @@ import usePut from "@/hooks/usePut";
 import DrivePicker from "./Drivepicker";
 
 const LessonIdeasModal = ({ open, onClose, lessonId }) => {
-  if (!open) return null;
-
+  // ✅ كل الـ hooks لازم تتنادى قبل أي early return (Rules of Hooks)
   const { data, loading, refetch } = useGet(
     `/api/admin/lessons/ideas/lesson/${lessonId}`,
+    { skip: !open },
   );
 
   const { postData, loading: adding } = usePost("/api/admin/lessons/ideas");
@@ -22,6 +22,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
   const [newFile, setNewFile] = useState("");
   const [newFileTitle, setNewFileTitle] = useState("");
   const [newVideo, setNewVideo] = useState("");
+  const [newVideoGuid, setNewVideoGuid] = useState("");
   const [newVideoTitle, setNewVideoTitle] = useState("");
 
   const [editingId, setEditingId] = useState(null);
@@ -29,11 +30,15 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
   const [editingFile, setEditingFile] = useState("");
   const [editingFileTitle, setEditingFileTitle] = useState("");
   const [editingVideo, setEditingVideo] = useState("");
+  const [editingVideoGuid, setEditingVideoGuid] = useState("");
   const [editingVideoTitle, setEditingVideoTitle] = useState("");
 
   // Which field the DrivePicker is currently filling:
   // "new-pdf" | "new-video" | "edit-pdf" | "edit-video" | null
   const [pickerTarget, setPickerTarget] = useState(null);
+
+  // ✅ الـ early return بعد كل الـ hooks
+  if (!open) return null;
 
   const ideas = data?.data?.ideas || [];
 
@@ -52,23 +57,51 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
       ? "Select a PDF"
       : "Select a video";
 
+  // ---------- Reset helpers ----------
+  const resetNewForm = () => {
+    setNewIdea("");
+    setNewFile("");
+    setNewFileTitle("");
+    setNewVideo("");
+    setNewVideoGuid("");
+    setNewVideoTitle("");
+  };
+
+  const resetEditForm = () => {
+    setEditingId(null);
+    setEditingValue("");
+    setEditingFile("");
+    setEditingFileTitle("");
+    setEditingVideo("");
+    setEditingVideoGuid("");
+    setEditingVideoTitle("");
+  };
+
   const handleDriveSelect = (file) => {
+    // للتأكد من شكل الداتا اللي راجعة من الـ Drive (امسحه بعد ما تتأكد)
+    console.log("picked file:", file);
+
+    // فيديوهات Bunny ممكن ماترجعش sourceUrl، فنستخدم الـ bunnyGuid كـ fallback
+    const videoValue = file.sourceUrl || file.bunnyGuid || "";
+
     switch (pickerTarget) {
       case "new-pdf":
-        setNewFile(file.sourceUrl);
-        setNewFileTitle(file.title);
+        setNewFile(file.sourceUrl || "");
+        setNewFileTitle(file.title || "");
         break;
       case "new-video":
-        setNewVideo(file.sourceUrl);
-        setNewVideoTitle(file.title);
+        setNewVideo(videoValue);
+        setNewVideoGuid(file.bunnyGuid || "");
+        setNewVideoTitle(file.title || "");
         break;
       case "edit-pdf":
-        setEditingFile(file.sourceUrl);
-        setEditingFileTitle(file.title);
+        setEditingFile(file.sourceUrl || "");
+        setEditingFileTitle(file.title || "");
         break;
       case "edit-video":
-        setEditingVideo(file.sourceUrl);
-        setEditingVideoTitle(file.title);
+        setEditingVideo(videoValue);
+        setEditingVideoGuid(file.bunnyGuid || "");
+        setEditingVideoTitle(file.title || "");
         break;
       default:
         break;
@@ -78,22 +111,21 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
   // Add new idea
   const handleAdd = async () => {
     if (!newIdea.trim()) return;
+
     await postData(
       {
         idea: newIdea,
         pdf: newFile,
-        video: newVideo,
+        // الـ backend بيقبل واحد بس: external link في video أو Drive video في bunnyGuid
+        video: newVideoGuid ? null : newVideo || null,
+        bunnyGuid: newVideoGuid || null,
         lessonId,
       },
       "/api/admin/lessons/ideas",
       "Idea added",
     );
 
-    setNewIdea("");
-    setNewFile("");
-    setNewFileTitle("");
-    setNewVideo("");
-    setNewVideoTitle("");
+    resetNewForm();
     refetch();
   };
 
@@ -105,19 +137,26 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
       {
         idea: editingValue,
         pdf: editingFile,
-        video: editingVideo,
+        // واحد بس منهم يتبعت، والتاني null عشان يتمسح لو كان متخزّن قبل كده
+        video: editingVideoGuid ? null : editingVideo || null,
+        bunnyGuid: editingVideoGuid || null,
       },
       `/api/admin/lessons/ideas/${id}`,
       "Idea updated",
     );
 
-    setEditingId(null);
-    setEditingValue("");
-    setEditingFile("");
-    setEditingFileTitle("");
-    setEditingVideo("");
-    setEditingVideoTitle("");
+    resetEditForm();
     refetch();
+  };
+
+  const startEditing = (idea) => {
+    setEditingId(idea.id);
+    setEditingValue(idea.idea || "");
+    setEditingFile(idea.pdf || "");
+    setEditingFileTitle("");
+    setEditingVideo(idea.video || idea.bunnyGuid || "");
+    setEditingVideoGuid(idea.bunnyGuid || "");
+    setEditingVideoTitle("");
   };
 
   return (
@@ -132,7 +171,6 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
         </div>
 
         {/* Add Idea */}
-
         <div className="border border-gray-200 rounded-xl p-5 bg-gray-50 space-y-4">
           <h3 className="text-lg font-semibold text-gray-800">Add New Idea</h3>
 
@@ -164,6 +202,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
               onPick={() => openPicker("new-video")}
               onClear={() => {
                 setNewVideo("");
+                setNewVideoGuid("");
                 setNewVideoTitle("");
               }}
             />
@@ -178,6 +217,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
             </button>
           </div>
         </div>
+
         <div className="border-t border-gray-200 pt-5 mt-6">
           <h3 className="text-lg font-semibold text-gray-700">Current Ideas</h3>
           <p className="text-sm text-gray-500 mt-1">
@@ -186,16 +226,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
         </div>
 
         {/* Ideas List */}
-        <div
-          className="
-    flex-1
-    overflow-y-auto
-    pr-2
-    space-y-3
-    min-h-0
-    custom-scroll
-  "
-        >
+        <div className="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0 custom-scroll">
           {ideas.map((idea, index) => (
             <div
               key={idea.id}
@@ -232,6 +263,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
                       onPick={() => openPicker("edit-video")}
                       onClear={() => {
                         setEditingVideo("");
+                        setEditingVideoGuid("");
                         setEditingVideoTitle("");
                       }}
                     />
@@ -258,6 +290,11 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
                       >
                         🎥 Video: {idea.video}
                       </a>
+                    )}
+                    {!idea.video && idea.bunnyGuid && (
+                      <p className="text-sm text-gray-600 break-all">
+                        🎥 Drive video: {idea.bunnyGuid}
+                      </p>
                     )}
                   </div>
                 )}
@@ -303,32 +340,15 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
                       onClick={() => handleUpdate(idea.id)}
                       className="text-green-600"
                     >
-                      Save
+                      {updating ? "Saving..." : "Save"}
                     </button>
-                    <button
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditingValue("");
-                        setEditingFile("");
-                        setEditingFileTitle("");
-                        setEditingVideo("");
-                        setEditingVideoTitle("");
-                      }}
-                      className="text-gray-500"
-                    >
+                    <button onClick={resetEditForm} className="text-gray-500">
                       Cancel
                     </button>
                   </>
                 ) : (
                   <button
-                    onClick={() => {
-                      setEditingId(idea.id);
-                      setEditingValue(idea.idea);
-                      setEditingFile(idea.pdf || "");
-                      setEditingFileTitle("");
-                      setEditingVideo(idea.video || "");
-                      setEditingVideoTitle("");
-                    }}
+                    onClick={() => startEditing(idea)}
                     className="text-blue-600"
                   >
                     Edit
