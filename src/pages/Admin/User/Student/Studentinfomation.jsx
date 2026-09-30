@@ -454,11 +454,10 @@ const CoursesSection = ({ courses }) => {
               </div>
               {course.status && (
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold shrink-0 ${
-                    course.status === "active"
+                  className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold shrink-0 ${course.status === "active"
                       ? "bg-green-100 text-green-600"
                       : "bg-gray-200 text-gray-500"
-                  }`}
+                    }`}
                 >
                   {course.status}
                 </span>
@@ -643,15 +642,6 @@ const QuizReportsSection = ({
     }
   };
 
-  const handleGenerateMistakes = (type) => {
-    // You can replace this with your actual API call to generate the PDFs
-    const selectedIds = Array.from(selectedQuizzes);
-    console.log(`Generating ${type} mistakes PDF for quizzes:`, selectedIds);
-    toast.success(
-      `${type === "empty" ? "Empty" : "Answers"} Mistakes PDF generated and sent to Teacher Dashboard!`,
-    );
-  };
-
   const toggleQuizSelection = (quizId, e) => {
     e.stopPropagation();
     const newSet = new Set(selectedQuizzes);
@@ -713,18 +703,6 @@ const QuizReportsSection = ({
               <span className="text-sm font-bold text-[#7D0A0A]">
                 Mistakes Count: {selectedMistakesCount}
               </span>
-              <button
-                onClick={() => handleGenerateMistakes("empty")}
-                className="ml-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
-              >
-                Generate Empty PDF
-              </button>
-              <button
-                onClick={() => handleGenerateMistakes("answers")}
-                className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
-              >
-                Generate Answers PDF
-              </button>
             </div>
           )}
 
@@ -797,11 +775,10 @@ const QuizReportsSection = ({
 
                   <div className="flex items-center gap-3 shrink-0 ml-4">
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                        quiz.status === "absent"
+                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${quiz.status === "absent"
                           ? "bg-red-100 text-red-600"
                           : "bg-green-100 text-green-600"
-                      }`}
+                        }`}
                     >
                       {quiz.status}
                     </span>
@@ -1073,14 +1050,6 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
     }
   };
 
-  const handleGenerateMistakes = (type) => {
-    const selectedIds = Array.from(selectedExams);
-    console.log(`Generating ${type} mistakes PDF for exams:`, selectedIds);
-    toast.success(
-      `${type === "empty" ? "Empty" : "Answers"} Mistakes PDF generated and sent to Teacher Dashboard!`,
-    );
-  };
-
   const toggleExamSelection = (examId, e) => {
     e.stopPropagation();
     const newSet = new Set(selectedExams);
@@ -1135,18 +1104,6 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
               <span className="text-sm font-bold text-[#7D0A0A]">
                 Mistakes Count: {selectedMistakesCount}
               </span>
-              <button
-                onClick={() => handleGenerateMistakes("empty")}
-                className="ml-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
-              >
-                Generate Empty PDF
-              </button>
-              <button
-                onClick={() => handleGenerateMistakes("answers")}
-                className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-700 transition-colors"
-              >
-                Generate Answers PDF
-              </button>
             </div>
           )}
 
@@ -1223,13 +1180,12 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
 
                   <div className="flex items-center gap-3 shrink-0 ml-4">
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                        exam.status === "absent"
+                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${exam.status === "absent"
                           ? "bg-red-100 text-red-600"
                           : passed
                             ? "bg-green-100 text-green-600"
                             : "bg-amber-100 text-amber-600"
-                      }`}
+                        }`}
                     >
                       {exam.status}
                     </span>
@@ -1511,9 +1467,9 @@ const EH_STATUS = {
 const ehFormatDate = (value) =>
   value
     ? new Date(value).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
+      dateStyle: "medium",
+      timeStyle: "short",
+    })
     : "—";
 
 const ExtraHomeworkSection = ({ studentId }) => {

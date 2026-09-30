@@ -59,6 +59,14 @@ const Student = () => {
     setPage(1);
   };
 
+  // ⌨️ Enter في أي input جوه الـ search/filters = Submit
+  const handleKeyDown = (e) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    if (e.target.tagName !== "INPUT") return; // مش على الأزرار أو الـ textarea
+    e.preventDefault();
+    handleSearchSubmit();
+  };
+
   const columns = [
     {
       header: "Full Name",
@@ -84,7 +92,7 @@ const Student = () => {
           onClick={() => navigate(`/admin/users/student-information/${row.id}`)}
           className="text-blue-600 hover:underline font-medium text-left cursor-pointer"
         >
-          View 
+          View
         </button>
       ),
     },
@@ -112,14 +120,14 @@ const Student = () => {
   if (error) return <Errorpage />;
 
   return (
-    <div className="p-6">
+    <div className="p-6" onKeyDown={handleKeyDown}>
       <ReusableTableSearch
         title="Students Management"
         titleAdd="Student"
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading}
-       
+
         searchTerm={tempFilters.search}
         onSearchChange={(val) =>
           setTempFilters((prev) => ({ ...prev, search: val }))
@@ -128,7 +136,7 @@ const Student = () => {
         onFilterChange={(key, val) =>
           setTempFilters((prev) => ({ ...prev, [key]: val }))
         }
- 
+
         filters={[
           { key: "grade", label: "Grade", options: [] }, // يمكنك ملء الخيارات هنا
           { key: "category", label: "Category", options: [] },
@@ -145,6 +153,7 @@ const Student = () => {
       >
         {/* زر الـ Submit */}
         <button
+          type="button"
           onClick={handleSearchSubmit}
           className="bg-one text-white px-5 py-2 rounded-lg font-bold hover:bg-one/90 transition-all text-sm"
         >
