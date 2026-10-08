@@ -7,6 +7,9 @@ import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
+import PdfUploadField, {
+  pdfUploadPayload,
+} from "@/components/PdfUploadField";
 
 const EditLessons = () => {
   const { id } = useParams();
@@ -80,6 +83,24 @@ const EditLessons = () => {
         helperText: "leave empty for no image",
       },
       {
+        name: "session_pdf",
+        label: "Session PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
+        name: "session_answers_pdf",
+        label: "Session Answers PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
         name: "pricePlans",
         label: "Price Plans",
         type: "custom",
@@ -103,6 +124,12 @@ const EditLessons = () => {
       preRequisition: lessonRes?.data?.lesson?.preRequisition || "",
       whatYouGain: lessonRes?.data?.lesson?.whatYouGain || "",
       image: lessonRes?.data?.lesson?.image || "",
+      session_pdf: lessonRes?.data?.lesson?.session_pdf
+        ? { url: lessonRes.data.lesson.session_pdf }
+        : null,
+      session_answers_pdf: lessonRes?.data?.lesson?.session_answers_pdf
+        ? { url: lessonRes.data.lesson.session_answers_pdf }
+        : null,
       pricePlans:
         lessonRes?.data?.prices?.map((p) => ({
           label: p.durationLabel,
@@ -156,6 +183,8 @@ const EditLessons = () => {
     const payload = {
       ...formData,
       image: imageBase64,
+      session_pdf: pdfUploadPayload(formData.session_pdf),
+      session_answers_pdf: pdfUploadPayload(formData.session_answers_pdf),
       pricePlans: formData.pricePlans.map((p) => ({
         ...p,
         days: Number(p.days),
@@ -185,6 +214,7 @@ const EditLessons = () => {
 
   return (
     <AddPage
+      key={lessonRes?.data?.lesson?.id || "loading"}
       title="Edit Lesson"
       fields={fields}
       onSave={onSave}

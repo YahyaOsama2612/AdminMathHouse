@@ -7,6 +7,9 @@ import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
+import PdfUploadField, {
+  pdfUploadPayload,
+} from "@/components/PdfUploadField";
 
 const AddLessons = () => {
   const navigate = useNavigate();
@@ -82,6 +85,24 @@ const AddLessons = () => {
         helperText: "leave empty for no image",
       },
       {
+        name: "session_pdf",
+        label: "Session PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
+        name: "session_answers_pdf",
+        label: "Session Answers PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
         name: "pricePlans",
         label: "Price Plans",
         type: "custom",
@@ -112,6 +133,8 @@ const AddLessons = () => {
       preRequisition: "",
       whatYouGain: "",
       image: "",
+      session_pdf: null,
+      session_answers_pdf: null,
     }),
     [],
   );
@@ -157,6 +180,8 @@ const AddLessons = () => {
     const payload = {
       ...formData,
       image: imageBase64,
+      session_pdf: pdfUploadPayload(formData.session_pdf),
+      session_answers_pdf: pdfUploadPayload(formData.session_answers_pdf),
       chapterId: chapterId,
 
       pricePlans: formData.pricePlans.map((p) => ({

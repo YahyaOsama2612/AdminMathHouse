@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/api";
 import usePost from "@/hooks/usePost";
@@ -7,10 +7,12 @@ import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import SearchStudents from "@/components/SearchStudents";
 import HierarchicalLessonSelector from "@/components/HierarchicalLessonSelector";
+import SessionExamSelect from "./SessionExamSelect";
+import ExamSessionCourseFields from "./ExamSessionCourseFields";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { ArrowLeft, AlertCircle, FileText, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 // Rendered once per student in the attendance table. Memoized so typing in
@@ -39,119 +41,6 @@ const AttendanceRow = React.memo(function AttendanceRow({
     </tr>
   );
 });
-
-// ================== PDF upload helpers ==================
-const MAX_PDF_MB = 10;
-
-// بيرجّع { data: { students: [{ id, name }] } }
-const STUDENTS_LOOKUP_URL = "/api/admin/session/select/students";
-
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result); // "data:application/pdf;base64,...."
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
-
-// value shape: { base64, name, url } | null
-//  - base64: ملف جديد اتختار دلوقتي
-//  - url: ملف موجود بالفعل جاي من الباك اند (في الـ Edit)
-const PdfUploadField = ({ label, hint, value, onChange, compact = false }) => {
-  const inputRef = useRef(null);
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // يسمح باختيار نفس الملف تاني
-    if (!file) return;
-    if (file.type !== "application/pdf") {
-      toast.error("Only PDF files are allowed");
-      return;
-    }
-    if (file.size > MAX_PDF_MB * 1024 * 1024) {
-      toast.error(`PDF must be smaller than ${MAX_PDF_MB}MB`);
-      return;
-    }
-    try {
-      const base64 = await fileToBase64(file);
-      onChange({ base64, name: file.name, url: null });
-    } catch {
-      toast.error("Could not read this file, try another one");
-    }
-  };
-
-  const hasFile = Boolean(value?.base64 || value?.url);
-
-  return (
-    <div className={`flex flex-col gap-1.5 ${compact ? "" : "w-full"}`}>
-      {label && (
-        <label className="text-sm font-bold text-slate-700">{label}</label>
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        className="hidden"
-        onChange={handleFile}
-      />
-      {hasFile ? (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50">
-          <FileText size={18} className="text-emerald-600 shrink-0" />
-          {value.base64 ? (
-            <span className="text-xs font-medium text-slate-700 truncate flex-1">
-              {value.name}
-            </span>
-          ) : (
-            <a
-              href={value.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-medium text-one underline truncate flex-1"
-            >
-              View current PDF
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="text-xs font-bold px-2 py-1 rounded-lg text-slate-600 hover:bg-white"
-          >
-            Replace
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="p-1 rounded-lg text-red-500 hover:bg-red-50"
-            aria-label="Remove PDF"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className={`flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-one hover:text-one transition-all ${compact ? "p-2 text-xs" : "p-4 text-sm"}`}
-        >
-          <Upload size={compact ? 14 : 18} />
-          <span className="font-semibold">Upload PDF</span>
-        </button>
-      )}
-      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
-    </div>
-  );
-};
-
-// بيحوّل قيمة الـ PdfUploadField لقيمة تتبعت للباك اند:
-//  - ملف جديد  → base64
-//  - ملف قديم ماتغيرش → undefined (المفتاح مش هيتبعت خالص في JSON)
-//  - اتشال     → null
-const pdfPayloadValue = (v) => {
-  if (v?.base64) return v.base64;
-  if (v?.url) return undefined;
-  return null;
-};
-// =========================================================
 
 const AddSessions = () => {
   const navigate = useNavigate();
@@ -221,6 +110,10 @@ const AddSessions = () => {
     name: "",
     scheduleType: "once",
     sessionRelationalType: "Explanation",
+    examId: "",
+    examCategoryId: "",
+    examSubCategoryId: "",
+    examCourseId: "",
     assignToGroup: true,
     assignToStudents: false,
     groupId: "",
@@ -272,126 +165,9 @@ const AddSessions = () => {
     return map;
   }, [groupMembers]);
 
-  // ================== Session PDFs ==================
-  const isMistakes = formData.sessionRelationalType === "Mistakes";
+  const isExamSession = formData.sessionRelationalType === "Exam";
 
-  // لأي تايب غير Mistakes: PDF بدون حل + PDF بالحل
-  const [sessionPdfs, setSessionPdfs] = useState({
-    withoutSolution: null,
-    withSolution: null,
-  });
-
-  // لتايب Mistakes: PDF لكل طالب → { [studentId]: { base64, name, url } }
-  const [mistakesPdfs, setMistakesPdfs] = useState({});
-
-  // أسماء الطلاب اللي اتختاروا من SearchStudents { [id]: name }
-  const [searchedStudentNames, setSearchedStudentNames] = useState({});
-
-  // SearchStudents بيبعت الـ ids في أول argument، والطلاب نفسهم (بأساميهم) في التاني
-  const handleStudentsChange = (ids, selectedStudents) => {
-    handleSelectChange("userIds", ids);
-    if (Array.isArray(selectedStudents) && selectedStudents.length) {
-      setSearchedStudentNames((prev) => {
-        const next = { ...prev };
-        selectedStudents.forEach((s) => {
-          const sid = s?.id ?? s?.value ?? s?.studentId;
-          const sname = s?.name ?? s?.studentName ?? s?.fullName ?? s?.label;
-          if (sid && sname) next[sid] = String(sname).trim();
-        });
-        return next;
-      });
-    }
-  };
-
-  const studentNameMap = useMemo(() => {
-    const map = new Map(attendanceNameMap);
-    Object.entries(searchedStudentNames).forEach(([sid, sname]) =>
-      map.set(sid, sname),
-    );
-    attendanceData?.forEach((s) => {
-      if (s.studentId && s.studentName && s.studentName !== "Unnamed Student")
-        map.set(s.studentId, s.studentName);
-    });
-    return map;
-  }, [attendanceNameMap, searchedStudentNames, attendanceData]);
-
-  // كل الطلاب اللي في السيشن (طلاب الجروب + الطلاب المختارين) بدون تكرار
-  const mistakesStudents = useMemo(() => {
-    const ids = [];
-    if (formData.assignToGroup && formData.groupId)
-      groupMembers.forEach((s) => ids.push(s.id || s.studentId));
-    if (formData.assignToStudents) ids.push(...(formData.userIds || []));
-    return [...new Set(ids.filter(Boolean))].map((id) => ({
-      id,
-      name: studentNameMap.get(id) || "Unknown student",
-    }));
-  }, [
-    formData.assignToGroup,
-    formData.groupId,
-    formData.assignToStudents,
-    formData.userIds,
-    groupMembers,
-    studentNameMap,
-  ]);
-
-  const uploadedMistakesCount = mistakesStudents.filter(
-    (s) => mistakesPdfs[s.id]?.base64 || mistakesPdfs[s.id]?.url,
-  ).length;
-
-  const buildMistakesPayload = () => {
-    const list = [];
-    mistakesStudents.forEach((s) => {
-      const v = mistakesPdfs[s.id];
-      if (v?.base64) list.push({ studentId: s.id, pdf: v.base64 });
-    });
-    return list;
-  };
-
-  // 🔎 لو فيه طلاب في list الـ Mistakes من غير اسم، بنجيب أساميهم من
-  // endpoint البحث عن الطلاب ونقارن الـ value (id) بالـ id المختار
-  const lookedUpIdsRef = useRef(new Set());
-  useEffect(() => {
-    if (!isMistakes) return;
-    const missing = mistakesStudents
-      .map((s) => s.id)
-      .filter(
-        (sid) => !studentNameMap.has(sid) && !lookedUpIdsRef.current.has(sid),
-      );
-    if (!missing.length) return;
-    missing.forEach((sid) => lookedUpIdsRef.current.add(sid));
-
-    (async () => {
-      const pending = new Set(missing);
-      const found = {};
-      try {
-        let page = 1;
-        let totalPages = 1;
-        do {
-          const res = await api.get(STUDENTS_LOOKUP_URL, {
-            params: { page, limit: 100 },
-          });
-          const payload = res?.data?.data || {};
-          // الـ endpoint بيرجّع { students: [{ id, name }] }
-          const list = payload.students || payload.data || [];
-          list.forEach((st) => {
-            const sid = st.id ?? st.value;
-            const sname = st.name ?? st.label ?? st.nickname ?? "";
-            if (pending.has(sid)) {
-              found[sid] = String(sname).replace(/\s+/g, " ").trim();
-              pending.delete(sid);
-            }
-          });
-          totalPages = payload.pagination?.totalPages || 1;
-          page += 1;
-        } while (pending.size && page <= totalPages);
-      } catch (err) {
-        console.error("Failed to load student names", err);
-      }
-      if (Object.keys(found).length) {
-        setSearchedStudentNames((prev) => ({ ...prev, ...found }));
-      }
-    })();
-  }, [isMistakes, mistakesStudents, studentNameMap]);
+  const handleStudentsChange = (ids) => handleSelectChange("userIds", ids);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -402,6 +178,29 @@ const AddSessions = () => {
   const handleSelectChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleSessionTypeChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      sessionRelationalType: value,
+      ...(value === "Exam" ? { lessonIds: [], lessonsFullDetails: [] } : {}),
+    }));
+    setAttendanceData(null);
+    setCourseColumns([]);
+    setErrors((prev) => ({ ...prev, examId: "", lessonIds: "" }));
+  };
+
+  const handleExamCourseChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === "examCategoryId"
+        ? { examSubCategoryId: "", examCourseId: "" }
+        : field === "examSubCategoryId"
+          ? { examCourseId: "" }
+          : {}),
+    }));
   };
 
   const handleHierarchyChange = (ids, fullDetails) => {
@@ -531,6 +330,9 @@ const AddSessions = () => {
     const tempErrors = {};
     if (!formData.name.trim()) tempErrors.name = "Session name is required";
     if (!formData.teacherId) tempErrors.teacherId = "Teacher is required";
+    if (formData.sessionRelationalType === "Exam" && !formData.examId) {
+      tempErrors.examId = "Select an exam for this session";
+    }
 
     if (!formData.assignToGroup && !formData.assignToStudents) {
       tempErrors.assignmentTarget = "Select at least one of Group or Students";
@@ -545,7 +347,10 @@ const AddSessions = () => {
       tempErrors.userIds = "At least one student must be selected";
     }
 
-    if (!formData.lessonIds || formData.lessonIds.length === 0) {
+    if (
+      !isExamSession &&
+      (!formData.lessonIds || formData.lessonIds.length === 0)
+    ) {
       tempErrors.lessonIds = "At least one lesson must be selected";
     }
 
@@ -572,6 +377,9 @@ const AddSessions = () => {
     if (tab === "info") {
       if (!formData.name.trim()) tempErrors.name = "Session name is required";
       if (!formData.teacherId) tempErrors.teacherId = "Teacher is required";
+      if (formData.sessionRelationalType === "Exam" && !formData.examId) {
+        tempErrors.examId = "Select an exam for this session";
+      }
     }
 
     if (tab === "schedule") {
@@ -601,7 +409,10 @@ const AddSessions = () => {
       ) {
         tempErrors.userIds = "At least one student must be selected";
       }
-      if (!formData.lessonIds || formData.lessonIds.length === 0) {
+      if (
+        !isExamSession &&
+        (!formData.lessonIds || formData.lessonIds.length === 0)
+      ) {
         tempErrors.lessonIds = "At least one lesson must be selected";
       }
     }
@@ -652,34 +463,35 @@ const AddSessions = () => {
       name: formData.name,
       scheduleType: formData.scheduleType,
       teacherId: formData.teacherId,
+      sessionRelationalType: formData.sessionRelationalType,
+      ...(formData.sessionRelationalType === "Exam"
+        ? { examId: formData.examId }
+        : {}),
       groupIds:
         formData.assignToGroup && formData.groupId ? [formData.groupId] : [],
       studentIds: formData.assignToStudents ? formData.userIds : [],
 
-      categoryId: primaryRow.categoryId || null,
-      subCategoryId: primaryRow.subCategoryId || primaryRow.categoryId || null,
-      courseId: primaryRow.courseId || null,
-      chapterIds: allChapterIds,
-      lessonIds: formData.lessonIds,
+      categoryId: isExamSession
+        ? formData.examCategoryId || null
+        : primaryRow.categoryId || null,
+      subCategoryId: isExamSession
+        ? formData.examSubCategoryId || null
+        : primaryRow.subCategoryId || primaryRow.categoryId || null,
+      courseId: isExamSession
+        ? formData.examCourseId || null
+        : primaryRow.courseId || null,
+      chapterIds: isExamSession ? [] : allChapterIds,
+      lessonIds: isExamSession ? [] : formData.lessonIds,
 
       session_link: formData.session_link || null,
       material_link: formData.material_link || null,
       teacher_material_link: formData.teacher_material_link || null,
-
-      // 📄 PDFs
-      ...(isMistakes
-        ? { studentMistakesPdfs: buildMistakesPayload() }
-        : {
-          pdf_without_solution: pdfPayloadValue(sessionPdfs.withoutSolution),
-          pdf_with_solution: pdfPayloadValue(sessionPdfs.withSolution),
-        }),
 
       ...(formData.scheduleType === "once"
         ? {
           sessionDate: formData.sessionDate,
           timeFrom: formData.timeFrom,
           timeTo: formData.timeTo,
-          sessionRelationalType: formData.sessionRelationalType,
         }
         : {
           startDate: formData.startDate,
@@ -755,7 +567,7 @@ const AddSessions = () => {
               onClick={() => setActiveTab("links")}
               className={`font-bold text-sm py-2 rounded-md transition-all ${activeTab === "links" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
             >
-              🔗 Links & PDFs
+              🔗 Links & Lesson PDFs
             </button>
           </div>
         </div>
@@ -813,10 +625,17 @@ const AddSessions = () => {
                   (opt) => opt.value === formData.sessionRelationalType,
                 )}
                 onChange={(selected) =>
-                  handleSelectChange("sessionRelationalType", selected.value)
+                  handleSessionTypeChange(selected.value)
                 }
               />
             </div>
+            {formData.sessionRelationalType === "Exam" && (
+              <SessionExamSelect
+                value={formData.examId}
+                onChange={(examId) => handleSelectChange("examId", examId)}
+                error={errors.examId}
+              />
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-bold text-slate-700">
@@ -1275,14 +1094,18 @@ const AddSessions = () => {
                     <span className="text-red-500">*</span>
                   )}
                 </label>
-                <button
-                  type="button"
-                  onClick={handleGenerateAttendance}
-                  disabled={attendanceLoading || !formData.userIds?.length}
-                  className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all"
-                >
-                  {attendanceLoading ? "Generating..." : "Generate Attendance"}
-                </button>
+                {!isExamSession && (
+                  <button
+                    type="button"
+                    onClick={handleGenerateAttendance}
+                    disabled={attendanceLoading || !formData.userIds?.length}
+                    className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all"
+                  >
+                    {attendanceLoading
+                      ? "Generating..."
+                      : "Generate Attendance"}
+                  </button>
+                )}
               </div>
               <SearchStudents
                 value={formData.userIds}
@@ -1290,7 +1113,7 @@ const AddSessions = () => {
                 error={errors.userIds}
               />
 
-              {attendanceData?.length > 0 && (
+              {!isExamSession && attendanceData?.length > 0 && (
                 <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
                   <p className="text-xs font-bold text-slate-500 px-3 pt-3">
                     Student Attendance / Progress
@@ -1352,22 +1175,37 @@ const AddSessions = () => {
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5 w-full border-t border-slate-100 pt-4">
-              <label className="text-sm font-bold text-slate-700 mb-2">
-                Lesson Hierarchy Selection{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <HierarchicalLessonSelector
-                value={formData.lessonIds}
-                onChange={handleHierarchyChange}
-              />
-              {errors.lessonIds && (
-                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle size={14} />
-                  {errors.lessonIds}
+            {isExamSession ? (
+              <>
+                <p className="border-t border-slate-100 pt-4 text-sm text-slate-500">
+                  Exam sessions use the selected exam and do not require lesson
+                  assignments.
                 </p>
-              )}
-            </div>
+                <ExamSessionCourseFields
+                  categoryId={formData.examCategoryId}
+                  subCategoryId={formData.examSubCategoryId}
+                  courseId={formData.examCourseId}
+                  onChange={handleExamCourseChange}
+                />
+              </>
+            ) : (
+              <div className="flex flex-col gap-1.5 w-full border-t border-slate-100 pt-4">
+                <label className="text-sm font-bold text-slate-700 mb-2">
+                  Lesson Hierarchy Selection{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <HierarchicalLessonSelector
+                  value={formData.lessonIds}
+                  onChange={handleHierarchyChange}
+                />
+                {errors.lessonIds && (
+                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                    <AlertCircle size={14} />
+                    {errors.lessonIds}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1429,67 +1267,18 @@ const AddSessions = () => {
         >
           <div className="border-b border-slate-100 pb-2">
             <h2 className="text-lg font-bold text-slate-700">
-              {isMistakes ? "Mistakes PDF for each student" : "Session PDFs"}
+              PDFs from assigned lessons
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              {isMistakes
-                ? "Upload a separate PDF with each student's own mistakes."
-                : "Upload the session sheet twice: one without solutions and one with solutions."}
+              Session PDFs are provided by the lessons assigned to this
+              session. Mistakes PDFs are generated automatically.
             </p>
           </div>
 
-          {isMistakes ? (
-            mistakesStudents.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">
-                Choose a group or students in "Content & Users" first, then
-                upload each student's PDF here.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-slate-500">
-                  {uploadedMistakesCount} of {mistakesStudents.length} students
-                  have a PDF
-                </p>
-                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
-                  {mistakesStudents.map((s, idx) => (
-                    <div
-                      key={s.id}
-                      className="grid grid-cols-1 md:grid-cols-[2rem_1fr_minmax(0,22rem)] items-center gap-3 p-3"
-                    >
-                      <span className="text-xs text-slate-400">{idx + 1}</span>
-                      <span className="text-sm font-medium text-slate-700 truncate">
-                        {s.name}
-                      </span>
-                      <PdfUploadField
-                        compact
-                        value={mistakesPdfs[s.id] || null}
-                        onChange={(v) =>
-                          setMistakesPdfs((prev) => ({ ...prev, [s.id]: v }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <PdfUploadField
-                label="PDF without solutions"
-                value={sessionPdfs.withoutSolution}
-                onChange={(v) =>
-                  setSessionPdfs((prev) => ({ ...prev, withoutSolution: v }))
-                }
-              />
-              <PdfUploadField
-                label="PDF with solutions"
-                value={sessionPdfs.withSolution}
-                onChange={(v) =>
-                  setSessionPdfs((prev) => ({ ...prev, withSolution: v }))
-                }
-              />
-            </div>
-          )}
+          <p className="text-sm text-slate-500">
+            Assign lessons in the content step to provide their session and
+            answer PDFs.
+          </p>
         </div>
 
         {/* Actions Footer */}

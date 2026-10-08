@@ -7,6 +7,9 @@ import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import SectionsEditor, { sumDurations } from "./Sectionseditor";
+import PdfUploadField, {
+  pdfUploadPayload,
+} from "@/components/PdfUploadField";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -141,6 +144,24 @@ const EditExam = () => {
         section: "General Information",
       },
       {
+        name: "session_pdf",
+        label: "Session PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
+        name: "session_answers_pdf",
+        label: "Session Answers PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
         name: "sections",
         label: "Sections",
         fullWidth: true,
@@ -199,6 +220,10 @@ const EditExam = () => {
       codeId: exam.codeId || "",
       rawScoreId: exam.rawScoreId || "",
       calculators: parsedCalculators,
+      session_pdf: exam.session_pdf ? { url: exam.session_pdf } : null,
+      session_answers_pdf: exam.session_answers_pdf
+        ? { url: exam.session_answers_pdf }
+        : null,
       sections,
     };
   }, [examRes]);
@@ -233,6 +258,8 @@ const EditExam = () => {
 
     const payload = {
       ...formData,
+      session_pdf: pdfUploadPayload(formData.session_pdf),
+      session_answers_pdf: pdfUploadPayload(formData.session_answers_pdf),
       duration: sumDurations(sections),
       totalScore: Number(formData.totalScore),
       passScore: Number(formData.passScore),
@@ -258,6 +285,7 @@ const EditExam = () => {
 
   return (
     <AddPage
+      key={examRes?.data?.data?.id || "loading"}
       title="Edit Exam"
       fields={fields}
       onSave={onSave}

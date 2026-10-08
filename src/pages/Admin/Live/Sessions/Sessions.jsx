@@ -6,7 +6,7 @@ import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-import { Star } from "lucide-react";
+import { FileText, Star, X } from "lucide-react";
 
 const Sessions = () => {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ const Sessions = () => {
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedSessionPdfs, setSelectedSessionPdfs] = useState(null);
 
   const handleDelete = (row) => {
     setSelectedRow(row);
@@ -101,6 +102,17 @@ const Sessions = () => {
           : "-",
         timeFrom: formatUTCTimeToLocal(s.timeFrom),
         timeTo: formatUTCTimeToLocal(s.timeTo),
+        sessionRelationalType: s.sessionRelationalType,
+        effectiveSessionPdf: s.effective_session_pdf,
+        effectiveSessionAnswersPdf: s.effective_session_answers_pdf,
+        effectiveSessionPdfs: Array.isArray(s.effective_session_pdfs)
+          ? s.effective_session_pdfs
+          : [],
+        effectiveSessionAnswersPdfs: Array.isArray(
+          s.effective_session_answers_pdfs,
+        )
+          ? s.effective_session_answers_pdfs
+          : [],
         raw: s,
       })) || []
     );
@@ -121,15 +133,135 @@ const Sessions = () => {
         onEdit={handleEdit}
         onDelete={handleDelete}
         extraActions={(row) => (
-          <button
-            onClick={() => navigate(`/admin/live/sessions/${row.id}/ratings`)}
-            className="group p-2 rounded-lg transition-all duration-200 hover:bg-amber-500 hover:scale-105"
-            title="Session Ratings"
-          >
-            <Star className="w-4 h-4 text-amber-500 transition-colors duration-200 group-hover:text-white" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setSelectedSessionPdfs(row)}
+              className="px-3 py-1.5 rounded-lg border border-one/20 text-one text-xs font-semibold hover:bg-one hover:text-white transition-colors"
+              title="View session PDFs"
+            >
+              View
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/live/sessions/${row.id}/ratings`)}
+              className="group p-2 rounded-lg transition-all duration-200 hover:bg-amber-500 hover:scale-105"
+              title="Session Ratings"
+            >
+              <Star className="w-4 h-4 text-amber-500 transition-colors duration-200 group-hover:text-white" />
+            </button>
+          </>
         )}
       />
+
+      {selectedSessionPdfs && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setSelectedSessionPdfs(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="session-pdfs-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <h2
+                id="session-pdfs-title"
+                className="text-lg font-bold text-slate-800"
+              >
+                PDFs for {selectedSessionPdfs.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelectedSessionPdfs(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {selectedSessionPdfs.sessionRelationalType === "Mistakes" ? (
+                [
+                  {
+                    label: "Session PDF",
+                    url: selectedSessionPdfs.effectiveSessionPdf,
+                  },
+                  {
+                    label: "Session Answers PDF",
+                    url: selectedSessionPdfs.effectiveSessionAnswersPdf,
+                  },
+                ].map(({ label, url }) =>
+                  url ? (
+                    <a
+                      key={label}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-one hover:bg-one/5"
+                    >
+                      <FileText size={18} />
+                      <span className="font-semibold">{label}</span>
+                      <span className="ml-auto text-xs underline">
+                        Open PDF
+                      </span>
+                    </a>
+                  ) : (
+                    <p
+                      key={label}
+                      className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500"
+                    >
+                      {label} is not available for this session.
+                    </p>
+                  ),
+                )
+              ) : (
+                [
+                  {
+                    label: "Session PDFs",
+                    files: selectedSessionPdfs.effectiveSessionPdfs,
+                  },
+                  {
+                    label: "Session Answers PDFs",
+                    files: selectedSessionPdfs.effectiveSessionAnswersPdfs,
+                  },
+                ].map(({ label, files }) => (
+                  <section key={label} className="space-y-2">
+                    <h3 className="text-sm font-bold text-slate-700">
+                      {label}
+                    </h3>
+                    {files.length ? (
+                      files.map((file, index) => (
+                        <a
+                          key={`${file.sourceId || file.pdf}-${index}`}
+                          href={file.pdf}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-one hover:bg-one/5"
+                        >
+                          <FileText size={18} />
+                          <span className="font-semibold">
+                            {file.name || `PDF ${index + 1}`}
+                          </span>
+                          <span className="ml-auto text-xs underline">
+                            Open PDF
+                          </span>
+                        </a>
+                      ))
+                    ) : (
+                      <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                        No PDFs are available.
+                      </p>
+                    )}
+                  </section>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmDeleteModal
         open={openDeleteModal}

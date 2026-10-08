@@ -6,6 +6,9 @@ import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
 import Loader from "@/components/Loader";
 import SectionsEditor, { sumDurations } from "./Sectionseditor";
+import PdfUploadField, {
+  pdfUploadPayload,
+} from "@/components/PdfUploadField";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -133,6 +136,24 @@ const AddExam = () => {
         section: "General Information",
       },
       {
+        name: "session_pdf",
+        label: "Session PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
+        name: "session_answers_pdf",
+        label: "Session Answers PDF",
+        type: "custom",
+        fullWidth: true,
+        render: ({ value, onChange }) => (
+          <PdfUploadField value={value} onChange={onChange} />
+        ),
+      },
+      {
         name: "sections",
         label: "Sections",
         fullWidth: true,
@@ -178,6 +199,8 @@ const AddExam = () => {
 
     const payload = {
       ...formData,
+      session_pdf: pdfUploadPayload(formData.session_pdf),
+      session_answers_pdf: pdfUploadPayload(formData.session_answers_pdf),
       duration: sumDurations(sections),
       totalScore: Number(formData.totalScore),
       passScore: Number(formData.passScore),
@@ -220,6 +243,8 @@ const AddExam = () => {
           codeId: "",
           rawScoreId: "",
           calculators: [],
+          session_pdf: null,
+          session_answers_pdf: null,
           sections: [],
         }}
       />
