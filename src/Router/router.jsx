@@ -83,6 +83,7 @@ import Sessions from "../pages/Admin/Live/Sessions/Sessions";
 import AddSessions from "../pages/Admin/Live/Sessions/AddSessions";
 import EditSessions from "../pages/Admin/Live/Sessions/EditSessions";
 import SessionRatings from "../pages/Admin/Live/SessionRatings/SessionRatings";
+import AvailabilityPlans from "../pages/Admin/Live/AvailabilityPlans/AvailabilityPlans";
 
 import Popup from "../pages/Admin/Marketing/Popup/Popup";
 import AddPopup from "../pages/Admin/Marketing/Popup/AddPopup";
@@ -257,6 +258,7 @@ const router = createBrowserRouter([
       { path: "live/sessions/edit/:id", element: <EditSessions /> },
       { path: "live/session-ratings", element: <SessionRatings /> },
       { path: "live/sessions/:sessionId/ratings", element: <SessionRatings /> },
+      { path: "live/availability-plans", element: <AvailabilityPlans /> },
 
       { path: "marketing/popup", element: <Popup /> },
       { path: "marketing/popup/add", element: <AddPopup /> },

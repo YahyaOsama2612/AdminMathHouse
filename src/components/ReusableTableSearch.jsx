@@ -80,18 +80,28 @@ children,
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   {filter.label}
                 </label>
-                <select
-                  value={filterValues[filter.key] || ""}
-                  onChange={(e) => onFilterChange(filter.key, e.target.value)}
-                  className="w-full p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors cursor-pointer"
-                >
-                  <option value="">All</option>
-                  {filter.options.map((opt, i) => (
-                    <option key={i} value={opt.value || opt}>
-                      {opt.label || opt}
-                    </option>
-                  ))}
-                </select>
+                {filter.type === "text" ? (
+                  <input
+                    type="text"
+                    value={filterValues[filter.key] || ""}
+                    onChange={(e) => onFilterChange(filter.key, e.target.value)}
+                    placeholder={`Search ${filter.label}...`}
+                    className="w-full p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors"
+                  />
+                ) : (
+                  <select
+                    value={filterValues[filter.key] || ""}
+                    onChange={(e) => onFilterChange(filter.key, e.target.value)}
+                    className="w-full p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors cursor-pointer"
+                  >
+                    <option value="">All</option>
+                    {(filter.options || []).map((opt, i) => (
+                      <option key={i} value={opt.value || opt}>
+                        {opt.label || opt}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             ))}
           </div>

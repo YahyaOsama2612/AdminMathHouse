@@ -86,6 +86,7 @@ const menuItems = [
     children: [
       { title: "Sessions", path: "/admin/live/sessions", icon: <MdMonitor size={18} /> },
       { title: "Session Ratings", path: "/admin/live/session-ratings", icon: <FaStar size={18} /> },
+      { title: "Availability Plans", path: "/admin/live/availability-plans", icon: <FaRegClock size={18} /> },
       { title: "Groups", path: "/admin/live/groups", icon: <FaUserFriends size={18} /> },
       { title: "Academic", path: "/admin/live/academic", icon: <FaSchool size={18} /> },
       { title: "Private Sessions", path: "/admin/live/private-sessions", icon: <FaLock size={18} /> },
