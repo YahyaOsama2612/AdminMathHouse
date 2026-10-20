@@ -15,6 +15,22 @@ import "react-datepicker/dist/react-datepicker.css";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
+// Timezone-safe date helpers (avoid toISOString(), which shifts the day in UTC+ zones)
+const toLocalDateString = (date) => {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const parseLocalDate = (str) => {
+  if (!str) return null;
+  const [y, m, d] = String(str).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+
 // Rendered once per student in the attendance table. Memoized so typing in
 // unrelated form fields (name, links, etc.) doesn't re-render every row.
 const AttendanceRow = React.memo(function AttendanceRow({
@@ -683,12 +699,12 @@ const AddSessions = () => {
                 <DatePicker
                   minDate={new Date()}
                   selected={
-                    formData.sessionDate ? new Date(formData.sessionDate) : null
+                    parseLocalDate(formData.sessionDate)
                   }
                   onChange={(date) =>
                     handleSelectChange(
                       "sessionDate",
-                      date ? date.toISOString().split("T")[0] : "",
+                      toLocalDateString(date),
                     )
                   }
                   dateFormat="yyyy-MM-dd"
@@ -765,12 +781,12 @@ const AddSessions = () => {
                   <DatePicker
                     minDate={new Date()}
                     selected={
-                      formData.startDate ? new Date(formData.startDate) : null
+                      parseLocalDate(formData.startDate)
                     }
                     onChange={(date) =>
                       handleSelectChange(
                         "startDate",
-                        date ? date.toISOString().split("T")[0] : "",
+                        toLocalDateString(date),
                       )
                     }
                     dateFormat="yyyy-MM-dd"
@@ -792,12 +808,12 @@ const AddSessions = () => {
                   <DatePicker
                     minDate={new Date()}
                     selected={
-                      formData.endDate ? new Date(formData.endDate) : null
+                      parseLocalDate(formData.endDate)
                     }
                     onChange={(date) =>
                       handleSelectChange(
                         "endDate",
-                        date ? date.toISOString().split("T")[0] : "",
+                        toLocalDateString(date),
                       )
                     }
                     dateFormat="yyyy-MM-dd"
