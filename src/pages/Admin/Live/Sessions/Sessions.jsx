@@ -38,17 +38,21 @@ const Sessions = () => {
     navigate(`/admin/live/sessions/edit/${row.id}`);
   };
 
-  // الأوقات (timeFrom/timeTo) بتتخزن وتتبعت من الباك اند بتوقيت UTC،
-  // فبنحولها هنا لتوقيت الجهاز المحلي بتاع اللي بيشوف الجدول
+  // الأوقات (timeFrom/timeTo) جاية من الباك اند UTC،
+  // فبنعرضها +3 ساعات ثابتة (مش معتمدة على توقيت جهاز اليوزر)
+  // "08:30:00" -> "11:30 AM"
   const formatUTCTimeToLocal = (timeStr) => {
     if (!timeStr) return "-";
-    const [hours, minutes] = timeStr.split(":");
-    const d = new Date();
-    d.setUTCHours(parseInt(hours, 10));
-    d.setUTCMinutes(parseInt(minutes, 10));
-    d.setUTCSeconds(0);
-    d.setUTCMilliseconds(0);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const [h, m] = timeStr.split(":").map((v) => parseInt(v, 10));
+    const total = ((((h || 0) + 3) * 60 + (m || 0)) % 1440 + 1440) % 1440;
+    const hours24 = Math.floor(total / 60);
+    const minutes = total % 60;
+    const period = hours24 >= 12 ? "PM" : "AM";
+    const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+    return `${String(hours12).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0",
+    )} ${period}`;
   };
 
   const columns = [

@@ -32,6 +32,19 @@ const parseLocalDate = (str) => {
   return new Date(y, m - 1, d);
 };
 
+// Server returns times in UTC — shift them +3 so the form shows Cairo time.
+// "08:30:00" -> "11:30:00"
+const DISPLAY_OFFSET_HOURS = 3;
+const shiftTimeForDisplay = (timeStr) => {
+  if (!timeStr) return "";
+  const [h, m] = String(timeStr).split(":").map((v) => parseInt(v, 10));
+  const total =
+    ((((h || 0) + DISPLAY_OFFSET_HOURS) * 60 + (m || 0)) % 1440 + 1440) % 1440;
+  const hh = String(Math.floor(total / 60)).padStart(2, "0");
+  const mm = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}:00`;
+};
+
 // Rendered once per student in the attendance table. Memoized so typing in
 // unrelated form fields (name, links, etc.) doesn't re-render every row.
 const AttendanceRow = React.memo(function AttendanceRow({
@@ -228,12 +241,18 @@ const EditSessions = () => {
         sessionDate: session.sessionDate
           ? session.sessionDate.split("T")[0]
           : "",
-        timeFrom: session.timeFrom || "",
-        timeTo: session.timeTo || "",
+        // السيرفر بيرجّع الوقت UTC، فبنزوّد 3 ساعات عشان الأدمن يشوف
+        // نفس الوقت اللي اختاره، ولو حفظ تاني يتبعت زي ما هو
+        timeFrom: shiftTimeForDisplay(session.timeFrom),
+        timeTo: shiftTimeForDisplay(session.timeTo),
         startDate: session.startDate ? session.startDate.split("T")[0] : "",
         endDate: session.endDate ? session.endDate.split("T")[0] : "",
         recurringDays: session.recurringDays?.length
-          ? session.recurringDays
+          ? session.recurringDays.map((d) => ({
+            ...d,
+            timeFrom: shiftTimeForDisplay(d.timeFrom),
+            timeTo: shiftTimeForDisplay(d.timeTo),
+          }))
           : [{ dayOfWeek: "", timeFrom: "", timeTo: "" }],
         lessonIds: session.lessons?.map((l) => l.id) || [],
         lessonsFullDetails: initialLessonsFullDetails, // pre-filled from loaded session data
@@ -422,10 +441,9 @@ const EditSessions = () => {
 
   const formatTimeToHMS = (dateObj) => {
     if (!dateObj) return "";
-    // بنستخدم UTC هنا عشان الوقت اللي بيتبعت للباك اند يكون دايماً UTC
-    // مهما كان التوقيت المحلي بتاع جهاز اليوزر
-    const hours = String(dateObj.getUTCHours()).padStart(2, "0");
-    const minutes = String(dateObj.getUTCMinutes()).padStart(2, "0");
+    // الوقت بيتبعت زي ما الأدمن اختاره بالظبط (من غير أي تحويل لـ UTC)
+    const hours = String(dateObj.getHours()).padStart(2, "0");
+    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
     return `${hours}:${minutes}:00`;
   };
 
@@ -433,13 +451,8 @@ const EditSessions = () => {
     if (!timeStr) return null;
     const [hours, minutes] = timeStr.split(":");
     const d = new Date();
-    // القيمة اللي جاية من الباك اند (أو اتحطت لسه) بتبقى UTC دايماً، فبنحطها
-    // كـ UTC هنا؛ وأي عرض للـ Date ده بتوقيت محلي (زي DatePicker) هيترجمها
-    // تلقائي لتوقيت جهاز اليوزر
-    d.setUTCHours(parseInt(hours, 10));
-    d.setUTCMinutes(parseInt(minutes, 10));
-    d.setUTCSeconds(0);
-    d.setUTCMilliseconds(0);
+    // بيتعرض في الـ picker زي ما هو في الـ formData بالظبط (من غير تحويل)
+    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
     return d;
   };
 
