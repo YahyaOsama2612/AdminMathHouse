@@ -38,15 +38,13 @@ const Sessions = () => {
     navigate(`/admin/live/sessions/edit/${row.id}`);
   };
 
-  // الأوقات (timeFrom/timeTo) جاية من الباك اند UTC،
-  // فبنعرضها +3 ساعات ثابتة (مش معتمدة على توقيت جهاز اليوزر)
-  // "08:30:00" -> "11:30 AM"
+  // الأوقات (timeFrom/timeTo) جاية صح من الباك اند، فبنعرضها زي ما هي
+  // "11:30:00" -> "11:30 AM"
   const formatUTCTimeToLocal = (timeStr) => {
     if (!timeStr) return "-";
     const [h, m] = timeStr.split(":").map((v) => parseInt(v, 10));
-    const total = ((((h || 0) + 3) * 60 + (m || 0)) % 1440 + 1440) % 1440;
-    const hours24 = Math.floor(total / 60);
-    const minutes = total % 60;
+    const hours24 = h || 0;
+    const minutes = m || 0;
     const period = hours24 >= 12 ? "PM" : "AM";
     const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
     return `${String(hours12).padStart(2, "0")}:${String(minutes).padStart(

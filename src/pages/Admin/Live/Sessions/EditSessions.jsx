@@ -32,19 +32,6 @@ const parseLocalDate = (str) => {
   return new Date(y, m - 1, d);
 };
 
-// Server returns times in UTC — shift them +3 so the form shows Cairo time.
-// "08:30:00" -> "11:30:00"
-const DISPLAY_OFFSET_HOURS = 3;
-const shiftTimeForDisplay = (timeStr) => {
-  if (!timeStr) return "";
-  const [h, m] = String(timeStr).split(":").map((v) => parseInt(v, 10));
-  const total =
-    ((((h || 0) + DISPLAY_OFFSET_HOURS) * 60 + (m || 0)) % 1440 + 1440) % 1440;
-  const hh = String(Math.floor(total / 60)).padStart(2, "0");
-  const mm = String(total % 60).padStart(2, "0");
-  return `${hh}:${mm}:00`;
-};
-
 // Rendered once per student in the attendance table. Memoized so typing in
 // unrelated form fields (name, links, etc.) doesn't re-render every row.
 const AttendanceRow = React.memo(function AttendanceRow({
@@ -241,18 +228,13 @@ const EditSessions = () => {
         sessionDate: session.sessionDate
           ? session.sessionDate.split("T")[0]
           : "",
-        // السيرفر بيرجّع الوقت UTC، فبنزوّد 3 ساعات عشان الأدمن يشوف
-        // نفس الوقت اللي اختاره، ولو حفظ تاني يتبعت زي ما هو
-        timeFrom: shiftTimeForDisplay(session.timeFrom),
-        timeTo: shiftTimeForDisplay(session.timeTo),
+        // الوقت جاي صح من الباك اند، فبيتحط في الفورم زي ما هو
+        timeFrom: session.timeFrom || "",
+        timeTo: session.timeTo || "",
         startDate: session.startDate ? session.startDate.split("T")[0] : "",
         endDate: session.endDate ? session.endDate.split("T")[0] : "",
         recurringDays: session.recurringDays?.length
-          ? session.recurringDays.map((d) => ({
-            ...d,
-            timeFrom: shiftTimeForDisplay(d.timeFrom),
-            timeTo: shiftTimeForDisplay(d.timeTo),
-          }))
+          ? session.recurringDays
           : [{ dayOfWeek: "", timeFrom: "", timeTo: "" }],
         lessonIds: session.lessons?.map((l) => l.id) || [],
         lessonsFullDetails: initialLessonsFullDetails, // pre-filled from loaded session data
