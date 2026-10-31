@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AddPage from "@/components/AddPage";
@@ -16,7 +16,7 @@ const AddChapters = () => {
   const { semesterId: paramSemesterId } = useParams();
 
   // استقبل courseId من location.state (للـ backward compatibility)
-  const { courseId, semesterId: stateSemesterId } = location.state || {};
+  const { courseId: stateCourseId, semesterId: stateSemesterId } = location.state || {};
 
   // ✅ استخدم paramSemesterId إذا كان موجود، وإلا استخدم من state
   const semesterId = paramSemesterId || stateSemesterId;
@@ -34,6 +34,38 @@ const AddChapters = () => {
     loading: loadingCours,
     error,
   } = useGet("/api/admin/teacher/selectionCourses");
+
+  // جلب بيانات الـ semester لمعرفة الـ courseId إن لم يكن متوفراً في الـ state
+  const {
+    data: semesterRes,
+    loading: loadingSemester,
+  } = useGet(
+    semesterId && !stateCourseId ? `/api/admin/semester/${semesterId}` : null,
+  );
+
+  const fetchedSemester =
+    semesterRes?.data?.data?.[0] ||
+    (Array.isArray(semesterRes?.data?.data)
+      ? semesterRes?.data?.data[0]
+      : semesterRes?.data?.data) ||
+    semesterRes?.data?.semester ||
+    semesterRes?.data;
+
+  const [selectedCourseId, setSelectedCourseId] = useState(stateCourseId || "");
+
+  useEffect(() => {
+    if (stateCourseId) {
+      setSelectedCourseId(stateCourseId);
+    } else if (fetchedSemester?.courseId || fetchedSemester?.course?.id) {
+      setSelectedCourseId(fetchedSemester?.courseId || fetchedSemester?.course?.id);
+    }
+  }, [stateCourseId, fetchedSemester]);
+
+  const effectiveCourseId =
+    stateCourseId ||
+    fetchedSemester?.courseId ||
+    fetchedSemester?.course?.id ||
+    selectedCourseId;
 
   const teacherOptions = useMemo(() => {
     return (
@@ -63,6 +95,26 @@ const AddChapters = () => {
         required: true,
         section: "General Information",
       },
+
+      ...(!effectiveCourseId
+        ? [
+            {
+              name: "courseId",
+              label: "Course",
+              type: "select",
+              required: true,
+              options: courseOptions,
+              section: "General Information",
+              onChange: (selectedCourse, setFormData) => {
+                setSelectedCourseId(selectedCourse);
+                setFormData((prev) => ({
+                  ...prev,
+                  courseId: selectedCourse,
+                }));
+              },
+            },
+          ]
+        : []),
 
       {
         name: "teacherId",
@@ -113,7 +165,7 @@ const AddChapters = () => {
         section: "Media",
       },
     ],
-    [teacherOptions],
+    [teacherOptions, courseOptions, effectiveCourseId],
   );
 
   // default values
@@ -121,13 +173,14 @@ const AddChapters = () => {
     () => ({
       name: "",
       teacherId: "",
+      courseId: effectiveCourseId || "",
       pricePlans: [],
       description: "",
       preRequisition: "",
       whatYouGain: "",
       image: "",
     }),
-    [],
+    [effectiveCourseId],
   );
 
   // file convert
@@ -141,9 +194,11 @@ const AddChapters = () => {
 
   // SAVE
   const onSave = async (formData) => {
+    const finalCourseId = effectiveCourseId || formData.courseId;
+
     // ✅ تحقق من courseId
-    if (!courseId) {
-      toast.error("Course ID is required. Please go back and try again.");
+    if (!finalCourseId) {
+      toast.error("Course ID is required. Please select a course and try again.");
       return;
     }
 
@@ -186,7 +241,7 @@ const AddChapters = () => {
     const payload = {
       name: formData.name,
       teacherId: formData.teacherId,
-      courseId: courseId,
+      courseId: finalCourseId,
       pricePlans: formData.pricePlans.map((p) => ({
         label: p.label,
         days: Number(p.days),
@@ -215,16 +270,21 @@ const AddChapters = () => {
     // ✅ Navigate based on semesterId
     if (semesterId) {
       navigate(`/admin/courses/chapters/semester/${semesterId}`, {
-        state: { courseId, semesterId },
+        state: { courseId: finalCourseId, semesterId },
       });
     } else {
-      navigate(`/admin/courses/chapters/${courseId}`, {
-        state: { courseId },
+      navigate(`/admin/courses/chapters/${finalCourseId}`, {
+        state: { courseId: finalCourseId },
       });
     }
   };
 
-  if (loadingTeachers || loadingCours) return <Loader />;
+  if (
+    loadingTeachers ||
+    loadingCours ||
+    (semesterId && !stateCourseId && loadingSemester)
+  )
+    return <Loader />;
   if (error || errorTeachers) return <Errorpage />;
 
   return (

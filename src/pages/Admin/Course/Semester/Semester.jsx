@@ -88,7 +88,14 @@ const Semester = () => {
             {/* ✅ استخدم navigate بدل NavChild عشان الـ URL تكون آمنة */}
             <button
               onClick={() =>
-                navigate(`/admin/courses/chapters/semester/${row.id}`)
+                navigate(`/admin/courses/chapters/semester/${row.id}`, {
+                  state: {
+                    courseId: coursesId || row.raw?.courseId,
+                    semesterId: row.id,
+                    semesterName: row.name,
+                    courseName: course?.name,
+                  },
+                })
               }
               className="flex items-center gap-1 text-blue-500 hover:text-blue-700"
               title="View Chapters"

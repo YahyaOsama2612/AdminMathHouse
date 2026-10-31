@@ -100,22 +100,60 @@ const Chapters = () => {
   const { data, loading, refetch, error } = useGet(apiEndpoint);
   const { deleteData, loading: deleteLoading } = useDelete();
 
+  // جلب بيانات الـ semester إن وجد finalSemesterId
+  const {
+    data: semesterRes,
+    loading: loadingSemester,
+  } = useGet(finalSemesterId ? `/api/admin/semester/${finalSemesterId}` : null);
+
+  const fetchedSemester =
+    semesterRes?.data?.data?.[0] ||
+    (Array.isArray(semesterRes?.data?.data)
+      ? semesterRes?.data?.data[0]
+      : semesterRes?.data?.data) ||
+    semesterRes?.data?.semester ||
+    semesterRes?.data;
+
+  // الحصول على معلومات الـ semester من semesterRes أو أول chapter أو location.state
+  const semester =
+    fetchedSemester ||
+    data?.data?.chapters?.[0]?.semester ||
+    (stateData.semesterName
+      ? { name: stateData.semesterName, id: finalSemesterId }
+      : {});
+
+  // حساب الـ courseId الفعلي
+  const effectiveCourseId =
+    finalCourseId ||
+    semester?.courseId ||
+    semester?.course?.id ||
+    data?.data?.chapters?.[0]?.course?.id ||
+    stateData?.courseId;
+
   const {
     data: courseRes,
     loading: loadingOne,
     error: errorOne,
-  } = useGet(finalCourseId ? `/api/admin/courses/${finalCourseId}` : null);
+  } = useGet(effectiveCourseId ? `/api/admin/courses/${effectiveCourseId}` : null);
 
   const [pricePopup, setPricePopup] = useState({
     open: false,
     row: null,
   });
 
-  // الحصول على معلومات الـ course من courseRes أو من أول chapter في البيانات
-  const course = courseRes?.data || data?.data?.chapters?.[0]?.course || {};
+  const fetchedCourse =
+    courseRes?.data?.course ||
+    courseRes?.data?.data ||
+    courseRes?.data;
 
-  // الحصول على معلومات الـ semester من البيانات
-  const semester = data?.data?.chapters?.[0]?.semester || {};
+  // الحصول على معلومات الـ course من courseRes أو semester أو أول chapter أو location.state
+  const course =
+    fetchedCourse ||
+    semester?.course ||
+    data?.data?.chapters?.[0]?.course ||
+    (stateData.courseName
+      ? { name: stateData.courseName, id: effectiveCourseId }
+      : {});
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -199,36 +237,58 @@ const Chapters = () => {
     },
   ];
 
-  if (loading || loadingOne) {
+  if (
+    loading ||
+    (effectiveCourseId && loadingOne) ||
+    (finalSemesterId && loadingSemester)
+  ) {
     return <Loader />;
   }
 
-  if (error || errorOne) {
+  if (error) {
     return <Errorpage />;
   }
+
+  const semesterTitleName = semester?.name || stateData?.semesterName;
+  const courseTitleName = course?.name || stateData?.courseName;
+  const pageTitle = `Chapters | ${
+    finalSemesterId
+      ? semesterTitleName || "Semester"
+      : courseTitleName || "Course"
+  }`;
 
   return (
     <div>
       <ReusableTable
-        title={`Chapters | ${finalSemesterId ? semester.name : course.name}`}
+        title={pageTitle}
         titleAdd="Chapter"
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading || loadingPatch}
         onAddClick={() => {
+          const targetCourseId =
+            effectiveCourseId ||
+            course?.id ||
+            semester?.courseId ||
+            semester?.course?.id ||
+            stateData?.courseId;
+
           // ✅ إذا كان semesterId موجود، استخدم الـ URL الجديد مع semesterId
           if (finalSemesterId) {
             navigate(`/admin/courses/chapters/semester/${finalSemesterId}/add`, {
               state: {
-                courseId: finalCourseId || course?.id,
+                courseId: targetCourseId,
                 semesterId: finalSemesterId,
+                semesterName: semester?.name,
+                courseName: course?.name,
               },
             });
           } else {
             // بخلاف ذلك استخدم الـ route العادي
             navigate(`/admin/courses/chapters/add`, {
               state: {
-                courseId: finalCourseId || course?.id,
+                courseId: targetCourseId,
+                courseName: course?.name,
               },
             });
           }
@@ -262,11 +322,11 @@ const Chapters = () => {
               name="courses"
             />
           )}
-          {course.semesters && course.semesters.length > 0 && (
+          {(finalSemesterId || (course.semesters && course.semesters.length > 0)) && (effectiveCourseId || course?.id) && (
             <IconButton
               icon={AiFillProduct}
               color="bg-one"
-              navigateTo={`/admin/courses/semester/${course.id}`}
+              navigateTo={`/admin/courses/semester/${effectiveCourseId || course?.id}`}
               name="Semesters"
             />
           )}

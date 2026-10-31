@@ -181,9 +181,15 @@ const Courses = () => {
           <div className="flex gap-2">
             {/* Semester / Chapters */}
             {row.isHaveSemester ? (
-              <NavChild route={`/admin/courses/semester/${row.id}`} />
+              <NavChild
+                route={`/admin/courses/semester/${row.id}`}
+                state={{ courseId: row.id, courseName: row.name }}
+              />
             ) : (
-              <NavChild route={`/admin/courses/chapters/${row.id}`} />
+              <NavChild
+                route={`/admin/courses/chapters/${row.id}`}
+                state={{ courseId: row.id, courseName: row.name }}
+              />
             )}
 
             {/* Teachers */}

@@ -71,7 +71,10 @@ const EditChapters = () => {
   }, [semestersRes]);
 
   useEffect(() => {
-    const chapterCourseId = chapterRes?.data?.course?.id;
+    const chapterCourseId =
+      chapterRes?.data?.course?.id ||
+      chapterRes?.data?.chapter?.courseId ||
+      chapterRes?.data?.courseId;
     if (chapterCourseId) {
       setSelectedCourseId(chapterCourseId);
     }
