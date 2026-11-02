@@ -212,3 +212,94 @@ export const exportExamReport = async ({ studentName, grade, exams = [] }) => {
     `${safeFileName(studentName)}_Exam_Report.xlsx`,
   );
 };
+
+/* ---------------------------------------------------------------------- */
+/* 5. Export: Common Lessons report                                       */
+/* ---------------------------------------------------------------------- */
+export const exportCommonLessonsReport = async ({
+  sessionName = "",
+  studentNames = [],
+  commonLessons = [],
+}) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Common Lessons");
+
+  sheet.columns = [
+    { width: 8 },  // #
+    { width: 35 }, // Chapter
+    { width: 45 }, // Lesson Name
+  ];
+
+  sheet.mergeCells("A1:C1");
+  const titleCell = sheet.getCell("A1");
+  titleCell.value = "COMMON LESSONS REPORT";
+  titleCell.font = { bold: true, size: 14, color: { argb: "FF1E293B" } };
+  titleCell.alignment = { vertical: "middle" };
+
+  let currentRow = 2;
+  if (sessionName) {
+    sheet.mergeCells(`A${currentRow}:C${currentRow}`);
+    const sessionCell = sheet.getCell(`A${currentRow}`);
+    sessionCell.value = `Session: ${sessionName}`;
+    sessionCell.font = { bold: true, size: 11, color: { argb: "FF475569" } };
+    currentRow++;
+  }
+
+  if (studentNames && studentNames.length > 0) {
+    sheet.mergeCells(`A${currentRow}:C${currentRow}`);
+    const studentsCell = sheet.getCell(`A${currentRow}`);
+    studentsCell.value = `Students (${studentNames.length}): ${studentNames.join(", ")}`;
+    studentsCell.font = { size: 10, color: { argb: "FF64748B" } };
+    currentRow++;
+  }
+
+  sheet.mergeCells(`A${currentRow}:C${currentRow}`);
+  const dateCell = sheet.getCell(`A${currentRow}`);
+  dateCell.value = `Generated: ${new Date().toLocaleString()}`;
+  dateCell.font = { size: 9, italic: true, color: { argb: "FF94A3B8" } };
+  currentRow += 2;
+
+  const headerRow = sheet.getRow(currentRow);
+  ["#", "Chapter", "Lesson Name"].forEach((label, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = label;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4F46E5" }, // Indigo
+    };
+    cell.alignment = { vertical: "middle", horizontal: i === 0 ? "center" : "left" };
+  });
+  currentRow++;
+
+  let counter = 1;
+  commonLessons.forEach((item) => {
+    if (Array.isArray(item.lessons)) {
+      const chapterName = item.name || item.chapterName || "General";
+      item.lessons.forEach((lesson) => {
+        const row = sheet.getRow(currentRow);
+        row.getCell(1).value = counter;
+        row.getCell(2).value = chapterName;
+        row.getCell(3).value = lesson.name || lesson.lessonName || "Unnamed Lesson";
+        row.getCell(1).alignment = { horizontal: "center" };
+        currentRow++;
+        counter++;
+      });
+    } else {
+      const row = sheet.getRow(currentRow);
+      row.getCell(1).value = counter;
+      row.getCell(2).value = item.chapterName || item.chapter?.name || "General";
+      row.getCell(3).value = item.lessonName || item.name || "Unnamed Lesson";
+      row.getCell(1).alignment = { horizontal: "center" };
+      currentRow++;
+      counter++;
+    }
+  });
+
+  const fileName = sessionName
+    ? `${safeFileName(sessionName)}_Common_Lessons.xlsx`
+    : `Common_Lessons_Report.xlsx`;
+
+  await downloadWorkbook(workbook, fileName);
+};

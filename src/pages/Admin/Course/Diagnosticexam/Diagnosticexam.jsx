@@ -1,5 +1,7 @@
+
+
 import React, { useMemo, useState } from "react";
-import { useNavigate ,useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ReusableTable from "@/components/ReusableTable";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
@@ -10,7 +12,7 @@ import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 
 const Diagnosticexam = () => {
   const navigate = useNavigate();
-const { courseId } = useParams();
+  const { courseId } = useParams();
   const { data, loading, refetch, error } = useGet(`/api/admin/diagnosticExam/course/${courseId}`);
   const { deleteData, loading: deleteLoading } = useDelete();
   const { putData, loading: usePutLoading } = usePut();
@@ -30,13 +32,15 @@ const { courseId } = useParams();
       setSelectedRow(null);
       refetch();
     } catch (e) {
-        throw e
+      throw e
     }
   };
 
 
   const handleEdit = (row) => {
-    navigate(`/admin/courses/diagnosticexam/edit/${row.id}`);
+    navigate(`/admin/courses/diagnosticexam/edit/${row.id}`, {
+      state: { courseId },
+    });
   };
 
   const columns = [
@@ -75,10 +79,10 @@ const { courseId } = useParams();
         columns={columns}
         data={tableData}
         loading={loading || deleteLoading || usePutLoading}
-        onAddClick={() => navigate("/admin/courses/diagnosticexam/add" , { state: { courseId } })}
+        onAddClick={() => navigate("/admin/courses/diagnosticexam/add", { state: { courseId } })}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        
+
       />
 
       <ConfirmDeleteModal

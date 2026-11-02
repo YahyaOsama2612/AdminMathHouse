@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Select from "react-select";
 import api from "../api/api";
 
 const QuestionsTableSelect = ({
@@ -8,6 +9,8 @@ const QuestionsTableSelect = ({
   lessonId,
   name,
   maxQuestions,
+  lessons = [],
+  onLessonChange,
 }) => {
   const [questions, setQuestions] = useState([]);
   const [page, setPage] = useState(1);
@@ -19,10 +22,18 @@ const QuestionsTableSelect = ({
 
   const limit = 10;
 
+  // إعادة ضبط الصفحة إلى 1 عند تغير الـ lessonId
+  useEffect(() => {
+    setPage(1);
+  }, [lessonId]);
+
   // استدعاء البيانات عند تغير الصفحة، البحث، أو الفلاتر
   useEffect(() => {
     if (lessonId) {
       fetchQuestions();
+    } else {
+      setQuestions([]);
+      setTotalPages(1);
     }
   }, [page, search, difficulty, year, lessonId]);
 
@@ -32,27 +43,49 @@ const QuestionsTableSelect = ({
     }
   }, [maxQuestions, value]);
 
-  
+  const isLesson = !name || name === "lesson";
+
   const fetchQuestions = async () => {
+    if (!lessonId) return;
     try {
       setLoading(true);
 
-      const res = await api.get(`/api/admin/questions/${name}/${lessonId}`, {
-        params: {
-          page,
-          limit,
-          search,
-          difficulty, // إرسال الفلتر للسيرفر
-          year, // إرسال الفلتر للسيرفر
-        },
-      });
+      const endpoint = name
+        ? `/api/admin/questions/${name}/${lessonId}`
+        : `/api/admin/questions/lesson/${lessonId}`;
 
-      const responseData = res.data.data;
+      const params = {
+        page,
+        limit,
+        search,
+      };
 
-      setQuestions(responseData.data);
-      setTotalPages(responseData.pagination.totalPages);
+      // API get questions by lesson id does NOT accept difficulty and year params
+      if (!isLesson) {
+        if (difficulty) params.difficulty = difficulty;
+        if (year) params.year = year;
+      }
+
+      const res = await api.get(endpoint, { params });
+
+      const responseData = res.data?.data;
+
+      const questionsList =
+        responseData?.data ||
+        responseData?.questions ||
+        res.data?.questions ||
+        (Array.isArray(responseData) ? responseData : []) ||
+        [];
+
+      setQuestions(questionsList);
+      setTotalPages(
+        responseData?.pagination?.totalPages ||
+          res.data?.pagination?.totalPages ||
+          1,
+      );
     } catch (err) {
       console.error("Error fetching questions:", err);
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
@@ -125,10 +158,28 @@ const QuestionsTableSelect = ({
         )}
       </div>
 
-      {/* Filters Section (البحث مع الفلاتر الجديدة) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Filters Section (البحث مع الفلاتر) */}
+      <div
+        className={`grid grid-cols-1 ${
+          !isLesson
+            ? lessons && lessons.length > 0
+              ? "md:grid-cols-5"
+              : "md:grid-cols-4"
+            : lessons && lessons.length > 0
+            ? "md:grid-cols-3"
+            : "md:grid-cols-2"
+        } gap-4`}
+      >
         {/* Input Search */}
-        <div className="relative md:col-span-2">
+        <div
+          className={`relative ${
+            !isLesson
+              ? "md:col-span-2"
+              : lessons && lessons.length > 0
+              ? "md:col-span-2"
+              : "md:col-span-2"
+          }`}
+        >
           <input
             type="text"
             placeholder="Search question..."
@@ -154,36 +205,87 @@ const QuestionsTableSelect = ({
           </svg>
         </div>
 
-        {/* Difficulty Filter */}
-        <div>
-          <select
-            value={difficulty}
-            onChange={(e) => {
-              setPage(1);
-              setDifficulty(e.target.value);
-            }}
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600"
-          >
-            <option value="">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
+        {/* Lesson Filter if lessons passed */}
+        {lessons && lessons.length > 0 && (
+          <div>
+            <Select
+              options={lessons}
+              value={
+                lessons.find(
+                  (opt) => String(opt.value) === String(lessonId)
+                ) || null
+              }
+              onChange={(opt) => {
+                if (onLessonChange) {
+                  onLessonChange(opt ? opt.value : "");
+                }
+              }}
+              isClearable
+              isSearchable
+              placeholder="Select Lesson..."
+              className="text-sm font-medium"
+              classNamePrefix="select"
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  borderRadius: "0.75rem",
+                  borderColor: state.isFocused ? "#6366f1" : "#e2e8f0",
+                  backgroundColor: state.isFocused ? "#ffffff" : "#f8fafc",
+                  boxShadow: state.isFocused
+                    ? "0 0 0 2px rgba(99, 102, 241, 0.2)"
+                    : "none",
+                  minHeight: "42px",
+                  "&:hover": {
+                    borderColor: state.isFocused ? "#6366f1" : "#cbd5e1",
+                  },
+                }),
+                menu: (base) => ({
+                  ...base,
+                  zIndex: 50,
+                  borderRadius: "0.75rem",
+                  overflow: "hidden",
+                  boxShadow:
+                    "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                }),
+              }}
+            />
+          </div>
+        )}
 
-        {/* Year Filter */}
-        <div>
-          <input
-            type="number"
-            placeholder="Filter by Year (e.g. 2024)"
-            value={year}
-            onChange={(e) => {
-              setPage(1);
-              setYear(e.target.value);
-            }}
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
-          />
-        </div>
+        {/* Difficulty Filter - only for non-lesson endpoints */}
+        {!isLesson && (
+          <div>
+            <select
+              value={difficulty}
+              onChange={(e) => {
+                setPage(1);
+                setDifficulty(e.target.value);
+              }}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600"
+            >
+              <option value="">All Difficulties</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+        )}
+
+        {/* Year Filter - only for non-lesson endpoints */}
+        {!isLesson && (
+          <div>
+            <input
+              type="number"
+              placeholder="Filter by Year (e.g. 2024)"
+              value={year}
+              onChange={(e) => {
+                setPage(1);
+                setYear(e.target.value);
+              }}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
+            />
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -194,7 +296,7 @@ const QuestionsTableSelect = ({
               <th className="p-4 w-16 text-center">
                 <input
                   type="checkbox"
-                  disabled={loading || questions.length === 0}
+                  disabled={loading || !lessonId || questions.length === 0}
                   checked={isAllCurrentPageSelected}
                   onChange={handleSelectAllToggle}
                   className="w-4 h-4 accent-indigo-600 cursor-pointer disabled:opacity-40"
@@ -211,6 +313,12 @@ const QuestionsTableSelect = ({
               <tr>
                 <td colSpan="4" className="p-6 text-center text-slate-400">
                   Loading questions...
+                </td>
+              </tr>
+            ) : !lessonId ? (
+              <tr>
+                <td colSpan="4" className="p-6 text-center text-amber-600 font-medium">
+                  Please select a lesson to load and choose questions
                 </td>
               </tr>
             ) : questions.length === 0 ? (

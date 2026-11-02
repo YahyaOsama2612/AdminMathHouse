@@ -25,6 +25,35 @@ const AddExam = () => {
     "/api/admin/exams/selection-options",
   );
 
+  const { data: lessonsRes } = useGet(
+    courseId ? `/api/admin/session/course/${courseId}/lessons` : null,
+  );
+
+  const lessonOptions = useMemo(() => {
+    const rawList =
+      (Array.isArray(lessonsRes?.data) ? lessonsRes.data : null) ||
+      (Array.isArray(lessonsRes?.data?.data) ? lessonsRes.data.data : null) ||
+      lessonsRes?.data?.data?.lessons ||
+      lessonsRes?.data?.lessons ||
+      [];
+
+    const list = Array.isArray(rawList) ? rawList : [];
+
+    return list.map((item) => {
+      const lessonObj = item?.lesson || item;
+      return {
+        value: item?.value ?? lessonObj?.id ?? lessonObj?._id ?? item?.lessonId ?? item?.id,
+        label:
+          item?.label ??
+          lessonObj?.name ??
+          lessonObj?.title ??
+          item?.name ??
+          item?.title ??
+          `Lesson ${item?.value ?? lessonObj?.id ?? item?.id}`,
+      };
+    });
+  }, [lessonsRes]);
+
   const options = optionsRes?.data?.data;
 
   // ✅ memoized: قبل كده كانت بتتعمل من جديد كل render فالـ fields كلها تتعمل من جديد
@@ -162,11 +191,15 @@ const AddExam = () => {
         section: "Sections",
         // ✅ بنرجّع component ثابت بدل ما نكتب hooks جوه الـ render function
         render: (props) => (
-          <SectionsEditor {...props} sectionOptions={options?.sections || []} />
+          <SectionsEditor
+            {...props}
+            sectionOptions={options?.sections || []}
+            lessonOptions={lessonOptions}
+          />
         ),
       },
     ],
-    [options, years],
+    [options, years, lessonOptions],
   );
 
   const onSave = async (formData) => {
@@ -211,6 +244,7 @@ const AddExam = () => {
       sections: sections.map((s, i) => ({
         sectionId: s.sectionId,
         sectionOrder: i + 1,
+        ...(s.lessonId ? { lessonId: s.lessonId } : {}),
         duration: Number(s.duration),
         breakLimited: !!s.breakLimited,
         maxBreakDuration: s.breakLimited ? Number(s.maxBreakDuration) : null,

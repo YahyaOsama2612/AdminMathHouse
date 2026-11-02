@@ -10,6 +10,7 @@ import SearchStudents from "@/components/SearchStudents";
 import HierarchicalLessonSelector from "@/components/HierarchicalLessonSelector";
 import SessionExamSelect from "./SessionExamSelect";
 import ExamSessionCourseFields from "./ExamSessionCourseFields";
+import CommonLessonsReportView from "./CommonLessonsReportView";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -32,33 +33,6 @@ const parseLocalDate = (str) => {
   return new Date(y, m - 1, d);
 };
 
-// Rendered once per student in the attendance table. Memoized so typing in
-// unrelated form fields (name, links, etc.) doesn't re-render every row.
-const AttendanceRow = React.memo(function AttendanceRow({
-  student,
-  index,
-  columns,
-  completedLessonIds,
-}) {
-  return (
-    <tr className="border-t border-slate-100">
-      <td className="p-2 text-slate-500 sticky left-0 bg-white">{index + 1}</td>
-      <td className="p-2 font-medium text-slate-700 whitespace-nowrap sticky left-8 bg-white">
-        {student.studentName}
-      </td>
-      {columns.map((col) => (
-        <td key={col.id} className="p-2 text-center border-l border-slate-50">
-          {completedLessonIds?.has(col.id) ? (
-            <span className="text-emerald-500 font-bold">✓</span>
-          ) : (
-            <span className="text-slate-300 font-bold">✗</span>
-          )}
-        </td>
-      ))}
-    </tr>
-  );
-});
-
 const EditSessions = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -66,8 +40,8 @@ const EditSessions = () => {
   const { postData: postAttendance } = usePost(
     "/api/admin/session/students/attendance",
   );
-  const [attendanceData, setAttendanceData] = useState(null);
-  const [courseColumns, setCourseColumns] = useState([]);
+  const [commonLessonsData, setCommonLessonsData] = useState(null);
+  const [attendanceStudents, setAttendanceStudents] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
@@ -155,7 +129,11 @@ const EditSessions = () => {
 
   const isExamSession = formData.sessionRelationalType === "Exam";
 
-  const handleStudentsChange = (ids) => handleSelectChange("userIds", ids);
+  const handleStudentsChange = (ids) => {
+    handleSelectChange("userIds", ids);
+    setCommonLessonsData(null);
+    setAttendanceStudents([]);
+  };
 
   // 🔹 Sync database session data carefully to localized state hooks
   useEffect(() => {
@@ -307,8 +285,8 @@ const EditSessions = () => {
       sessionRelationalType: value,
       ...(value === "Exam" ? { lessonIds: [], lessonsFullDetails: [] } : {}),
     }));
-    setAttendanceData(null);
-    setCourseColumns([]);
+    setCommonLessonsData(null);
+    setAttendanceStudents([]);
     setErrors((prev) => ({ ...prev, examId: "", lessonIds: "" }));
     if (value === "Exam") setClearInitialLessons(true);
   };
@@ -354,47 +332,17 @@ const EditSessions = () => {
     try {
       setAttendanceLoading(true);
 
-      // Pull the full curriculum for this course (every chapter and every
-      // lesson under it), independent of who attended what, so the table
-      // always shows the complete set of lesson columns.
-      const chaptersRes = await api.get(
-        `/api/admin/session/select/chapter/${courseId}`,
-      );
-      const chapterList = chaptersRes.data?.data?.chapters || [];
-
-      const lessonResults = await Promise.all(
-        chapterList.map((chapter) =>
-          api.get(`/api/admin/session/select/lesson/${chapter.id}`),
-        ),
-      );
-
-      const orderedColumns = chapterList.flatMap((chapter, idx) => {
-        const lessons = lessonResults[idx]?.data?.data?.lessons || [];
-        return lessons.map((lesson) => ({
-          id: lesson.id,
-          name: lesson.name,
-          chapterId: chapter.id,
-          chapterName: chapter.name,
-        }));
-      });
-      setCourseColumns(orderedColumns);
-
       const res = await postAttendance(
         { studentIds: formData.userIds, courseId },
         "/api/admin/session/students/attendance",
+        "",
       );
 
-      const students = res?.data?.students || [];
-      const normalized = students.map((student) => ({
-        ...student,
-        studentName:
-          student.studentName ||
-          attendanceNameMap.get(student.studentId) ||
-          "Unnamed Student",
-        chapters: student.chapters || [],
-      }));
+      const common = res?.data?.commonLessons || res?.commonLessons || [];
+      const students = res?.data?.students || res?.students || [];
 
-      setAttendanceData(normalized);
+      setCommonLessonsData(common);
+      setAttendanceStudents(students);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -404,22 +352,6 @@ const EditSessions = () => {
       setAttendanceLoading(false);
     }
   };
-
-  // Which lessons each student has completed, built from the attendance
-  // response. Columns come from courseColumns (the full curriculum fetched
-  // for this course), not from this response, so every lesson always shows
-  // up even with zero attendance.
-  const attendanceByStudent = useMemo(() => {
-    const byStudent = {};
-    attendanceData?.forEach((student) => {
-      const completed = new Set();
-      student.chapters?.forEach((chapter) => {
-        chapter.lessons?.forEach((lesson) => completed.add(lesson.id));
-      });
-      byStudent[student.studentId] = completed;
-    });
-    return byStudent;
-  }, [attendanceData]);
 
   const formatTimeToHMS = (dateObj) => {
     if (!dateObj) return "";
@@ -1130,65 +1062,14 @@ const EditSessions = () => {
                 error={errors.userIds}
               />
 
-              {!isExamSession && attendanceData?.length > 0 && (
-                <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
-                  <p className="text-xs font-bold text-slate-500 px-3 pt-3">
-                    Student Attendance / Progress
-                  </p>
-                  <div className="overflow-x-auto mt-2">
-                    <table className="min-w-full text-xs border-collapse">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">
-                            #
-                          </th>
-                          <th className="p-2 text-left font-bold text-slate-600 whitespace-nowrap sticky left-8 bg-slate-50 z-10">
-                            Student Name
-                          </th>
-                          {courseColumns.map((col) => (
-                            <th
-                              key={col.id}
-                              className="p-2 text-center font-bold text-slate-600 whitespace-nowrap min-w-[115px] border-l border-slate-100"
-                            >
-                              {/* 🎯 FIX: Render the chapter name styled elegantly directly above the lesson name */}
-                              <div className="text-[10px] text-slate-400 font-normal leading-tight mb-0.5 uppercase tracking-wider">
-                                Ch: {col.chapterName || "General"}
-                              </div>
-                              <div className="text-xs text-slate-700 font-bold">
-                                {col.name}
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {courseColumns.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={2}
-                              className="p-4 text-center text-sm text-slate-400 italic"
-                            >
-                              No attendance data available yet for the selected
-                              students.
-                            </td>
-                          </tr>
-                        ) : (
-                          attendanceData.map((student, idx) => (
-                            <AttendanceRow
-                              key={student.studentId}
-                              student={student}
-                              index={idx}
-                              columns={courseColumns}
-                              completedLessonIds={
-                                attendanceByStudent[student.studentId]
-                              }
-                            />
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              {!isExamSession && (
+                <CommonLessonsReportView
+                  commonLessonsData={commonLessonsData}
+                  attendanceStudents={attendanceStudents}
+                  sessionName={formData.name}
+                  userIds={formData.userIds}
+                  attendanceNameMap={attendanceNameMap}
+                />
               )}
             </div>
 

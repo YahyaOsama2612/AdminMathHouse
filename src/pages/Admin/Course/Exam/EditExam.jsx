@@ -27,6 +27,39 @@ const EditExam = () => {
     error: errorExam,
   } = useGet(`/api/admin/exams/${id}`);
 
+  const courseId =
+    examRes?.data?.data?.course?.id ||
+    examRes?.data?.data?.courseId;
+
+  const { data: lessonsRes } = useGet(
+    courseId ? `/api/admin/session/course/${courseId}/lessons` : null,
+  );
+
+  const lessonOptions = useMemo(() => {
+    const rawList =
+      (Array.isArray(lessonsRes?.data) ? lessonsRes.data : null) ||
+      (Array.isArray(lessonsRes?.data?.data) ? lessonsRes.data.data : null) ||
+      lessonsRes?.data?.data?.lessons ||
+      lessonsRes?.data?.lessons ||
+      [];
+
+    const list = Array.isArray(rawList) ? rawList : [];
+
+    return list.map((item) => {
+      const lessonObj = item?.lesson || item;
+      return {
+        value: item?.value ?? lessonObj?.id ?? lessonObj?._id ?? item?.lessonId ?? item?.id,
+        label:
+          item?.label ??
+          lessonObj?.name ??
+          lessonObj?.title ??
+          item?.name ??
+          item?.title ??
+          `Lesson ${item?.value ?? lessonObj?.id ?? item?.id}`,
+      };
+    });
+  }, [lessonsRes]);
+
   const {
     data: optionsRes,
     loading: loadingOptions,
@@ -170,11 +203,15 @@ const EditExam = () => {
         section: "Sections",
         // ✅ بنرجّع component ثابت بدل ما نكتب hooks جوه الـ render function
         render: (props) => (
-          <SectionsEditor {...props} sectionOptions={options?.sections || []} />
+          <SectionsEditor
+            {...props}
+            sectionOptions={options?.sections || []}
+            lessonOptions={lessonOptions}
+          />
         ),
       },
     ],
-    [options, years],
+    [options, years, lessonOptions],
   );
 
   const initialData = useMemo(() => {
@@ -199,6 +236,7 @@ const EditExam = () => {
         return {
           sectionId: s.sectionId,
           sectionOrder: s.sectionOrder,
+          lessonId: s.lessonId || s.lesson?.id || null,
           // ✅ تحويل لرقم عشان لو الـ API رجّعها string مايحصلش concatenation
           duration: rawDuration === null ? null : Number(rawDuration),
           breakLimited: !!s.breakLimited,
@@ -269,6 +307,7 @@ const EditExam = () => {
       sections: sections.map((s, i) => ({
         sectionId: s.sectionId,
         sectionOrder: i + 1,
+        ...(s.lessonId ? { lessonId: s.lessonId } : {}),
         duration: Number(s.duration),
         breakLimited: !!s.breakLimited,
         maxBreakDuration: s.breakLimited ? Number(s.maxBreakDuration) : null,

@@ -19,6 +19,39 @@ const AddExam = () => {
     error: errorRawScores,
   } = useGet("/api/admin/diagnosticExam/selection");
 
+  const {
+    data: lessonsRes,
+    loading: loadingLessons,
+    error: errorLessons,
+  } = useGet(
+    courseId ? `/api/admin/session/course/${courseId}/lessons` : null,
+  );
+
+  const lessonOptions = useMemo(() => {
+    const rawList =
+      (Array.isArray(lessonsRes?.data) ? lessonsRes.data : null) ||
+      (Array.isArray(lessonsRes?.data?.data) ? lessonsRes.data.data : null) ||
+      lessonsRes?.data?.data?.lessons ||
+      lessonsRes?.data?.lessons ||
+      [];
+
+    const list = Array.isArray(rawList) ? rawList : [];
+
+    return list.map((item) => {
+      const lessonObj = item?.lesson || item;
+      return {
+        value: item?.value ?? lessonObj?.id ?? lessonObj?._id ?? item?.lessonId ?? item?.id,
+        label:
+          item?.label ??
+          lessonObj?.name ??
+          lessonObj?.title ??
+          item?.name ??
+          item?.title ??
+          `Lesson ${item?.value ?? lessonObj?.id ?? item?.id}`,
+      };
+    });
+  }, [lessonsRes]);
+
   const rawScoreOptions = useMemo(() => {
     return (
       rawScoresRes?.data?.data?.rawScores?.map((r) => ({
@@ -113,19 +146,25 @@ const AddExam = () => {
         fullWidth: true,
         required: true,
         section: "Questions",
-        render: ({ value, onChange, error, formData }) => (
+        render: ({ value, onChange, error, formData, setFormData }) => (
           <QuestionsTableSelect
-            name="course"
-            lessonId={courseId}
-            value={value}
+            name="lesson"
+            lessonId={formData?.lessonId}
+            value={value || []}
             onChange={onChange}
             error={error}
-            maxQuestions={Number(formData.numberOfQuestions) || 0}
+            maxQuestions={Number(formData?.numberOfQuestions) || 0}
+            lessons={lessonOptions}
+            onLessonChange={(newLessonId) => {
+              if (setFormData) {
+                setFormData((prev) => ({ ...prev, lessonId: newLessonId }));
+              }
+            }}
           />
         ),
       },
     ],
-    [rawScoreOptions],
+    [rawScoreOptions, lessonOptions, loadingLessons],
   );
 
   const initialFormValues = useMemo(
@@ -134,6 +173,7 @@ const AddExam = () => {
       description: "",
       duration: "",
       rawScoreId: "",
+      lessonId: "",
       numberOfQuestions: "",
       passScore: "",
       isActive: false,
@@ -145,6 +185,15 @@ const AddExam = () => {
 
   const onSave = async (formData) => {
     try {
+      if (!formData.lessonId) {
+        toast.error("Please select a lesson");
+        return;
+      }
+      if (!formData.questionIds || formData.questionIds.length === 0) {
+        toast.error("Please select at least one question");
+        return;
+      }
+
       const payload = {
         title: formData.title,
         description: formData.description || "",
@@ -156,6 +205,7 @@ const AddExam = () => {
         questionIds: formData.questionIds,
         calculators: formData.calculators,
         courseId: courseId,
+        lessonId: formData.lessonId,
       };
 
       await postData(
@@ -169,7 +219,7 @@ const AddExam = () => {
     }
   };
 
-  if (loadingRawScores) return <Loader />;
+  if (loadingRawScores || loadingLessons) return <Loader />;
   if (errorRawScores) return <Errorpage />;
 
   return (

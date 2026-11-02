@@ -37,6 +37,7 @@ const SectionsEditor = ({
     formData,
     setFieldValue,
     sectionOptions = [],
+    lessonOptions = [],
 }) => {
     const sections = value || [];
     const totalDuration = sumDurations(sections);
@@ -63,6 +64,7 @@ const SectionsEditor = ({
                 sectionId: "",
                 sectionOrder: sections.length + 1,
                 duration: null,
+                lessonId: "",
                 breakLimited: false,
                 maxBreakDuration: null,
                 questionIds: [],
@@ -191,8 +193,12 @@ const SectionsEditor = ({
 
                     <QuestionsTableSelect
                         value={section.questionIds}
-                        name="section"
-                        lessonId={section.sectionId}
+                        name={lessonOptions && lessonOptions.length > 0 ? "lesson" : "section"}
+                        lessonId={section.lessonId || section.sectionId}
+                        lessons={lessonOptions}
+                        onLessonChange={(newLessonId) =>
+                            updateSection(index, { lessonId: newLessonId })
+                        }
                         onChange={(ids) => updateSection(index, { questionIds: ids })}
                     />
                 </div>

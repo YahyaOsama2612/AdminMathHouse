@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
@@ -10,6 +11,7 @@ import QuestionsTableSelect from "../../../../components/QuestionsTableSelect";
 const EditDiagnosticexam = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     data: examRes,
@@ -20,6 +22,43 @@ const EditDiagnosticexam = () => {
   const { putData, loading: saving } = usePut(
     `/api/admin/diagnosticExam/${id}`,
   );
+
+  const courseId =
+    examRes?.data?.data?.course?.id ||
+    examRes?.data?.data?.courseId ||
+    location.state?.courseId;
+
+  const {
+    data: lessonsRes,
+    loading: loadingLessons,
+  } = useGet(
+    courseId ? `/api/admin/session/course/${courseId}/lessons` : null,
+  );
+
+  const lessonOptions = useMemo(() => {
+    const rawList =
+      (Array.isArray(lessonsRes?.data) ? lessonsRes.data : null) ||
+      (Array.isArray(lessonsRes?.data?.data) ? lessonsRes.data.data : null) ||
+      lessonsRes?.data?.data?.lessons ||
+      lessonsRes?.data?.lessons ||
+      [];
+
+    const list = Array.isArray(rawList) ? rawList : [];
+
+    return list.map((item) => {
+      const lessonObj = item?.lesson || item;
+      return {
+        value: item?.value ?? lessonObj?.id ?? lessonObj?._id ?? item?.lessonId ?? item?.id,
+        label:
+          item?.label ??
+          lessonObj?.name ??
+          lessonObj?.title ??
+          item?.name ??
+          item?.title ??
+          `Lesson ${item?.value ?? lessonObj?.id ?? item?.id}`,
+      };
+    });
+  }, [lessonsRes]);
 
   const rawScoreOptions = useMemo(() => {
     return (
@@ -52,6 +91,11 @@ const EditDiagnosticexam = () => {
       description: examData?.description || "",
       duration: examData?.duration || "",
       rawScoreId: examData?.rawScore?.id || examData?.rawScoreId || "",
+      lessonId:
+        examData?.lesson?.id ||
+        examData?.lessonId ||
+        examData?.lessons?.[0]?.id ||
+        "",
       numberOfQuestions: examData?.numberOfQuestions || "",
       passScore: examData?.passScore || "",
       isActive: examData?.isActive || false,
@@ -122,7 +166,6 @@ const EditDiagnosticexam = () => {
         label: "Calculator Types",
         type: "multipleSelect",
         required: true,
-       
         options: [
           { label: "3D", value: "3D" },
           { label: "four function", value: "four function" },
@@ -140,22 +183,42 @@ const EditDiagnosticexam = () => {
         fullWidth: true,
         required: true,
         section: "Questions",
-        render: ({ value, onChange, error }) => (
+        render: ({ value, onChange, error, formData, setFormData }) => (
           <QuestionsTableSelect
-            name="course"
-            lessonId={initialData.courseId}
+            name="lesson"
+            lessonId={formData?.lessonId || initialData.lessonId}
             value={value || []} // تأمين ألا تكون القيمة null أو undefined
             onChange={onChange}
             error={error}
+            maxQuestions={
+              Number(formData?.numberOfQuestions) ||
+              Number(initialData?.numberOfQuestions) ||
+              0
+            }
+            lessons={lessonOptions}
+            onLessonChange={(newLessonId) => {
+              if (setFormData) {
+                setFormData((prev) => ({ ...prev, lessonId: newLessonId }));
+              }
+            }}
           />
         ),
       },
     ],
-    [rawScoreOptions, initialData],
+    [rawScoreOptions, lessonOptions, loadingLessons, initialData],
   );
 
   const onSave = async (formData) => {
     try {
+      if (!formData.lessonId) {
+        toast.error("Please select a lesson");
+        return;
+      }
+      if (!formData.questionIds || formData.questionIds.length === 0) {
+        toast.error("Please select at least one question");
+        return;
+      }
+
       const payload = {
         title: formData.title,
         description: formData.description || "",
@@ -165,8 +228,9 @@ const EditDiagnosticexam = () => {
         passScore: Number(formData.passScore),
         isActive: formData.isActive,
         questionIds: formData.questionIds,
-        courseId: initialData.courseId,
+        courseId: initialData.courseId || courseId,
         calculators: formData.calculators,
+        lessonId: formData.lessonId,
       };
 
       await putData(
@@ -180,7 +244,7 @@ const EditDiagnosticexam = () => {
     }
   };
 
-  if (loadingExam || saving) return <Loader />;
+  if (loadingExam || (courseId && loadingLessons) || saving) return <Loader />;
   if (error) return <Errorpage />;
 
   return (
