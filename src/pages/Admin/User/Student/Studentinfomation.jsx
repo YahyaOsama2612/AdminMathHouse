@@ -1785,7 +1785,9 @@ const ExtraHomeworkSection = ({ studentId }) => {
                     {form.error && (
                       <p className="flex items-center gap-1.5 text-sm text-red-600">
                         <AlertCircle className="w-4 h-4 shrink-0" />
-                        {form.error}
+                        {typeof form.error === "object"
+                          ? form.error?.message || JSON.stringify(form.error)
+                          : String(form.error)}
                       </p>
                     )}
 

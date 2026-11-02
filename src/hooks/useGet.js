@@ -20,11 +20,17 @@ export default function useGet(url) {
       setData(res.data);
       setError(null);
     } catch (err) {
-      const errorMsg =
+      const rawError =
         err.response?.data?.error?.message ||
         err.response?.data?.message ||
+        err.response?.data?.error ||
         err.message ||
         "Request failed";
+
+      const errorMsg =
+        typeof rawError === "object" && rawError !== null
+          ? rawError.message || JSON.stringify(rawError)
+          : String(rawError);
 
       setError(errorMsg);
       toast.error(errorMsg);

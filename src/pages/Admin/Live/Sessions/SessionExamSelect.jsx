@@ -71,7 +71,13 @@ const SessionExamSelect = ({ value, onChange, error }) => {
         isClearable
         placeholder="Choose the exam for this session..."
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && (
+        <p className="text-xs text-red-500">
+          {typeof error === "object"
+            ? error.message || JSON.stringify(error)
+            : String(error)}
+        </p>
+      )}
       {examsError && (
         <p className="text-xs text-red-500">Could not load exams.</p>
       )}

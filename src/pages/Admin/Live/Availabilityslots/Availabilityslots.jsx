@@ -201,7 +201,13 @@ const SlotRow = ({ row, error, disabled, onChange, onDuplicate, onRemove }) => (
             />
             Active (students can choose this slot)
         </label>
-        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        {error && (
+            <p className="mt-2 text-xs text-red-600">
+                {typeof error === "object"
+                    ? error.message || JSON.stringify(error)
+                    : String(error)}
+            </p>
+        )}
     </div>
 );
 

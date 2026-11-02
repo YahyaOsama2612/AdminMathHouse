@@ -157,7 +157,9 @@ const AddExtraHomework = () => {
             />
             {error && (
               <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                {error}
+                {typeof error === "object"
+                  ? error.message || JSON.stringify(error)
+                  : String(error)}
               </p>
             )}
           </div>

@@ -14,8 +14,9 @@ import CommonLessonsReportView from "./CommonLessonsReportView";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, UserCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
+import ManualAttendanceModal from "./ManualAttendanceModal";
 
 // Timezone-safe date helpers (avoid toISOString(), which shifts the day in UTC+ zones)
 const toLocalDateString = (date) => {
@@ -43,6 +44,7 @@ const EditSessions = () => {
   const [commonLessonsData, setCommonLessonsData] = useState(null);
   const [attendanceStudents, setAttendanceStudents] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [openManualAttendance, setOpenManualAttendance] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
 
@@ -1044,16 +1046,26 @@ const EditSessions = () => {
                   )}
                 </label>
                 {!isExamSession && (
-                  <button
-                    type="button"
-                    onClick={handleGenerateAttendance}
-                    disabled={attendanceLoading || !formData.userIds?.length}
-                    className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all"
-                  >
-                    {attendanceLoading
-                      ? "Generating..."
-                      : "Generate Attendance"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenManualAttendance(true)}
+                      className="text-xs font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <UserCheck size={14} />
+                      Manual Attendance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAttendance}
+                      disabled={attendanceLoading || !formData.userIds?.length}
+                      className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                      {attendanceLoading
+                        ? "Generating..."
+                        : "Generate Attendance"}
+                    </button>
+                  </div>
                 )}
               </div>
               <SearchStudents
@@ -1208,6 +1220,12 @@ const EditSessions = () => {
           )}
         </div>
       </form>
+
+      <ManualAttendanceModal
+        open={openManualAttendance}
+        onClose={() => setOpenManualAttendance(false)}
+        initialSession={{ id, name: formData.name }}
+      />
     </div>
   );
 };

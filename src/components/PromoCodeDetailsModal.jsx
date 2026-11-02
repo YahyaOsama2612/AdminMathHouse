@@ -62,7 +62,9 @@ const PromoCodeDetailsModal = ({ open, onClose, promo, loading, error }) => {
             </div>
           ) : error ? (
             <p className="text-sm text-red-500 font-medium text-center py-8">
-              {error}
+              {typeof error === "object"
+                ? error.message || JSON.stringify(error)
+                : String(error)}
             </p>
           ) : promo ? (
             <div className="space-y-6">

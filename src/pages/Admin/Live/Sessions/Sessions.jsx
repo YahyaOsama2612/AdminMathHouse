@@ -6,7 +6,8 @@ import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-import { FileText, Star, X } from "lucide-react";
+import { FileText, Star, X, UserCheck } from "lucide-react";
+import ManualAttendanceModal from "./ManualAttendanceModal";
 
 const Sessions = () => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const Sessions = () => {
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedSessionPdfs, setSelectedSessionPdfs] = useState(null);
+  const [openManualAttendance, setOpenManualAttendance] = useState(false);
+  const [manualAttendanceSession, setManualAttendanceSession] = useState(null);
 
   const handleDelete = (row) => {
     setSelectedRow(row);
@@ -138,8 +141,20 @@ const Sessions = () => {
           <>
             <button
               type="button"
+              onClick={() => {
+                setManualAttendanceSession(row);
+                setOpenManualAttendance(true);
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-emerald-500/30 text-emerald-600 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+              title="Manual Attendance"
+            >
+              <UserCheck size={13} />
+              Attendance
+            </button>
+            <button
+              type="button"
               onClick={() => setSelectedSessionPdfs(row)}
-              className="px-3 py-1.5 rounded-lg border border-one/20 text-one text-xs font-semibold hover:bg-one hover:text-white transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-one/20 text-one text-xs font-semibold hover:bg-one hover:text-white transition-colors cursor-pointer"
               title="View session PDFs"
             >
               View
@@ -147,14 +162,26 @@ const Sessions = () => {
             <button
               type="button"
               onClick={() => navigate(`/admin/live/sessions/${row.id}/ratings`)}
-              className="group p-2 rounded-lg transition-all duration-200 hover:bg-amber-500 hover:scale-105"
+              className="group p-2 rounded-lg transition-all duration-200 hover:bg-amber-500 hover:scale-105 cursor-pointer"
               title="Session Ratings"
             >
               <Star className="w-4 h-4 text-amber-500 transition-colors duration-200 group-hover:text-white" />
             </button>
           </>
         )}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setManualAttendanceSession(null);
+            setOpenManualAttendance(true);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+        >
+          <UserCheck size={15} />
+          Manual Attendance
+        </button>
+      </ReusableTable>
 
       {selectedSessionPdfs && (
         <div
@@ -271,6 +298,17 @@ const Sessions = () => {
         onConfirm={confirmDelete}
         title="Delete Session"
         description={`Are you sure you want to delete "${selectedRow?.name}"?`}
+      />
+
+      <ManualAttendanceModal
+        open={openManualAttendance}
+        onClose={() => {
+          setOpenManualAttendance(false);
+          setManualAttendanceSession(null);
+        }}
+        initialSession={manualAttendanceSession}
+        allSessions={data?.data?.sessions || []}
+        onSuccess={() => refetch()}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import Login from "../Auth/Login";
 import LoginDrive from "../Auth/LoginDrive";
 import SaveRoute from "../Auth/SaveRoute";
 import AdminLayout from "../Layout/AdminLayout";
+import Errorpage from "../components/Errorpage";
 import Home from "../pages/Home/Home";
 import Filter from "../pages/Admin/Filter/Filter";
 
@@ -162,6 +163,7 @@ const router = createBrowserRouter([
 
   {
     path: "/admin/*",
+    errorElement: <Errorpage />,
     element: (
       <SaveRoute allowedRole="admin">
         <AdminLayout />

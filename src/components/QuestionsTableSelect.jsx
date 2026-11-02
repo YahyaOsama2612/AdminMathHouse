@@ -393,7 +393,13 @@ const QuestionsTableSelect = ({
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500 font-medium">
+          {typeof error === "object"
+            ? error.message || JSON.stringify(error)
+            : String(error)}
+        </p>
+      )}
     </div>
   );
 };

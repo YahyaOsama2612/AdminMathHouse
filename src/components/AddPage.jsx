@@ -709,7 +709,11 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
 
                         {errors[field.name] && (
                           <p className="text-xs text-red-500 font-medium flex items-center gap-1 mt-1">
-                            <AlertCircle size={14} /> {errors[field.name]}
+                            <AlertCircle size={14} />{" "}
+                            {typeof errors[field.name] === "object"
+                              ? errors[field.name]?.message ||
+                                JSON.stringify(errors[field.name])
+                              : String(errors[field.name])}
                           </p>
                         )}
                       </div>
@@ -720,9 +724,13 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         <Info size={12} /> {field.helperText}
                       </p>
                     )}
-                    {errors[field.name] && (
+                    {field.type !== "custom" && errors[field.name] && (
                       <p className="text-xs text-red-500 font-medium flex items-center gap-1 justify-start">
-                        <AlertCircle size={14} /> {errors[field.name]}
+                        <AlertCircle size={14} />{" "}
+                        {typeof errors[field.name] === "object"
+                          ? errors[field.name]?.message ||
+                            JSON.stringify(errors[field.name])
+                          : String(errors[field.name])}
                       </p>
                     )}
                   </div>

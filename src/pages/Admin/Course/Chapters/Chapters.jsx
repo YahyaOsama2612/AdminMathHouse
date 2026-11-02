@@ -112,7 +112,9 @@ const Chapters = () => {
       ? semesterRes?.data?.data[0]
       : semesterRes?.data?.data) ||
     semesterRes?.data?.semester ||
-    semesterRes?.data;
+    (semesterRes?.data && typeof semesterRes?.data === "object" && semesterRes?.data?.name
+      ? semesterRes?.data
+      : null);
 
   // الحصول على معلومات الـ semester من semesterRes أو أول chapter أو location.state
   const semester =
@@ -144,7 +146,9 @@ const Chapters = () => {
   const fetchedCourse =
     courseRes?.data?.course ||
     courseRes?.data?.data ||
-    courseRes?.data;
+    (courseRes?.data && typeof courseRes?.data === "object" && courseRes?.data?.name
+      ? courseRes?.data
+      : null);
 
   // الحصول على معلومات الـ course من courseRes أو semester أو أول chapter أو location.state
   const course =
