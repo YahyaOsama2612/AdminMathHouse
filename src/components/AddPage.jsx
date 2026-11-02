@@ -213,9 +213,11 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                       <input
                         type={field.type}
                         name={field.name}
-                        value={formData[field.name] || ""}
+                        value={formData[field.name] !== undefined && formData[field.name] !== null ? formData[field.name] : ""}
                         placeholder={field.placeholder}
-                        className={`p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${errors[field.name] ? "border-red-400" : "border-slate-200 focus:border-one"}`}
+                        disabled={field.disabled}
+                        readOnly={field.readOnly}
+                        className={`p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${errors[field.name] ? "border-red-400" : "border-slate-200 focus:border-one"} ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
                     )}
@@ -225,15 +227,17 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         min={0}
                         type={field.type}
                         name={field.name}
-                        value={formData[field.name] || ""}
+                        value={formData[field.name] !== undefined && formData[field.name] !== null ? formData[field.name] : ""}
                         placeholder={field.placeholder}
+                        disabled={field.disabled}
+                        readOnly={field.readOnly}
                         className={`
       appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none 
       no-spinner p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${
         errors[field.name]
           ? "border-red-400"
           : "border-slate-200 focus:border-one"
-      }`}
+      } ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
                     )}
@@ -243,15 +247,17 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         step="any" // هنا
                         type="number" // type لازم يكون "number"
                         name={field.name}
-                        value={formData[field.name] || ""}
+                        value={formData[field.name] !== undefined && formData[field.name] !== null ? formData[field.name] : ""}
                         placeholder={field.placeholder}
+                        disabled={field.disabled}
+                        readOnly={field.readOnly}
                         className={`
       appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none 
       no-spinner p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${
         errors[field.name]
           ? "border-red-400"
           : "border-slate-200 focus:border-one"
-      }`}
+      } ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
                     )}
@@ -719,9 +725,9 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                       </div>
                     )}
                     {/* Helper Text & Errors */}
-                    {field.helperText && !errors[field.name] && (
+                    {(field.helperText || field.help) && !errors[field.name] && (
                       <p className="text-[11px] text-slate-400 flex items-center gap-1 justify-start">
-                        <Info size={12} /> {field.helperText}
+                        <Info size={12} /> {field.helperText || field.help}
                       </p>
                     )}
                     {field.type !== "custom" && errors[field.name] && (

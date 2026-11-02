@@ -36,29 +36,44 @@ const SectionsEditor = ({
     onChange,
     formData,
     setFieldValue,
+    setFormData,
     sectionOptions = [],
     lessonOptions = [],
 }) => {
     const sections = value || [];
     const totalDuration = sumDurations(sections);
 
+    // Keep duration synchronized in parent form immediately
+    const syncDuration = (dur) => {
+        if (setFormData) {
+            setFormData((prev) =>
+                prev.duration === dur ? prev : { ...prev, duration: dur }
+            );
+        } else if (setFieldValue) {
+            setFieldValue("duration", dur);
+        } else if (formData) {
+            formData.duration = dur;
+        }
+    };
+
     // مزامنة الـ Total Duration في الـ General Information
     useEffect(() => {
-        if (setFieldValue) {
-            setFieldValue("duration", totalDuration);
-        } else if (formData) {
-            formData.duration = totalDuration;
-        }
+        syncDuration(totalDuration);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [totalDuration]);
 
     // Immutable update: نسخة جديدة من الـ section بدل ما نعدّل الـ object القديم
     const updateSection = (index, patch) => {
-        onChange(sections.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+        const nextSections = sections.map((s, i) =>
+            i === index ? { ...s, ...patch } : s
+        );
+        const newTotal = sumDurations(nextSections);
+        onChange(nextSections);
+        syncDuration(newTotal);
     };
 
     const addSection = () => {
-        onChange([
+        const nextSections = [
             ...sections,
             {
                 sectionId: "",
@@ -69,16 +84,20 @@ const SectionsEditor = ({
                 maxBreakDuration: null,
                 questionIds: [],
             },
-        ]);
+        ];
+        const newTotal = sumDurations(nextSections);
+        onChange(nextSections);
+        syncDuration(newTotal);
     };
 
     const removeSection = (index) => {
-        onChange(
-            sections
-                .filter((_, i) => i !== index)
-                // إعادة ترقيم الـ sectionOrder بعد الحذف
-                .map((s, i) => ({ ...s, sectionOrder: i + 1 })),
-        );
+        const nextSections = sections
+            .filter((_, i) => i !== index)
+            // إعادة ترقيم الـ sectionOrder بعد الحذف
+            .map((s, i) => ({ ...s, sectionOrder: i + 1 }));
+        const newTotal = sumDurations(nextSections);
+        onChange(nextSections);
+        syncDuration(newTotal);
     };
 
     return (
