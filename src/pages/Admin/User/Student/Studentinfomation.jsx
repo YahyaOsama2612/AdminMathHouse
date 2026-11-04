@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { toast } from "react-hot-toast";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Mail,
   Phone,
@@ -27,12 +27,14 @@ import {
   MessageSquare,
   Pencil,
   Save,
+  Trash2,
 } from "lucide-react";
 import api from "@/api/api";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import {
   exportLessonProgressReport,
   exportExamReport,
@@ -43,10 +45,17 @@ const StudentInformation = () => {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [walletOverride, setWalletOverride] = useState(null);
   const { id } = useParams();
+  const navigate = useNavigate();
 
-  const { data: response, loading, error } = useGet(`/api/admin/student/${id}`);
-  const { data: quizResponse } = useGet(`/api/admin/reports/${id}/quizzes`);
-  const { data: examResponse } = useGet(`/api/admin/reports/${id}/exams`);
+  const { data: response, loading, error } = useGet(
+    id ? `/api/admin/student/${id}` : null,
+  );
+  const { data: quizResponse } = useGet(
+    id ? `/api/admin/reports/${id}/quizzes` : null,
+  );
+  const { data: examResponse } = useGet(
+    id ? `/api/admin/reports/${id}/exams` : null,
+  );
 
   const student = response?.data?.data;
   const quizzes = quizResponse?.data?.data || [];
@@ -190,6 +199,20 @@ const StudentInformation = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Available Times & Notes */}
+      <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <AvailableTimesCard
+          student={student}
+          studentName={`${student?.firstname || ""} ${student?.lastname || ""}`.trim()}
+          onEdit={() => navigate("/admin/live/availability-plans")}
+        />
+        <StudentNotesCard
+          studentId={id || student?.id}
+          student={student}
+          plan={student?.availabilityPlans?.[0]}
+        />
       </div>
 
       {/* Courses, Packages, Quiz & Exam Reports */}
@@ -455,8 +478,8 @@ const CoursesSection = ({ courses }) => {
               {course.status && (
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold shrink-0 ${course.status === "active"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-gray-200 text-gray-500"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-gray-200 text-gray-500"
                     }`}
                 >
                   {course.status}
@@ -776,8 +799,8 @@ const QuizReportsSection = ({
                   <div className="flex items-center gap-3 shrink-0 ml-4">
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${quiz.status === "absent"
-                          ? "bg-red-100 text-red-600"
-                          : "bg-green-100 text-green-600"
+                        ? "bg-red-100 text-red-600"
+                        : "bg-green-100 text-green-600"
                         }`}
                     >
                       {quiz.status}
@@ -1181,10 +1204,10 @@ const ExamReportsSection = ({ exams, studentName, grade }) => {
                   <div className="flex items-center gap-3 shrink-0 ml-4">
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${exam.status === "absent"
-                          ? "bg-red-100 text-red-600"
-                          : passed
-                            ? "bg-green-100 text-green-600"
-                            : "bg-amber-100 text-amber-600"
+                        ? "bg-red-100 text-red-600"
+                        : passed
+                          ? "bg-green-100 text-green-600"
+                          : "bg-amber-100 text-amber-600"
                         }`}
                     >
                       {exam.status}
@@ -1818,6 +1841,646 @@ const ExtraHomeworkSection = ({ studentId }) => {
         </div>
       )}
     </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* Available Times Card (matching HTML design)                         */
+/* ------------------------------------------------------------------ */
+
+const DAYS = [
+  "Saturday",
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+];
+
+const SRC_META = {
+  live: ["Sent by the student", "text-green-700"],
+  teacher: ["Shared by the teacher", "text-green-700"],
+  admin: ["Set by admin", "text-blue-700"],
+  sample: ["Sample times", "text-gray-400"],
+  missing: ["Not set yet", "text-red-600"],
+};
+
+const parseTimeToMinutes = (t) => {
+  if (typeof t === "number") return t;
+  if (!t || typeof t !== "string") return 0;
+  const match = t.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return 0;
+  const h = parseInt(match[1], 10) || 0;
+  const m = parseInt(match[2], 10) || 0;
+  return h * 60 + m;
+};
+
+const formatMinuteTime = (m) => {
+  let h = Math.floor(m / 60);
+  const mm = m % 60;
+  const ap = h >= 12 && h < 24 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}${mm ? ":" + String(mm).padStart(2, "0") : ""} ${ap}`;
+};
+
+const formatHours = (h) => (h % 1 ? h.toFixed(1) : h) + "h";
+
+const AvailableTimesCard = ({ student, studentName, onEdit }) => {
+  const slots = useMemo(() => {
+    const list =
+      student?.availabilitySlots ||
+      student?.availabilityPlans?.[0]?.slots ||
+      student?.slots ||
+      [];
+    return Array.isArray(list) ? list : [];
+  }, [student]);
+
+  const activePlan = student?.availabilityPlans?.[0] || null;
+
+  // Build days map: { Saturday: [[startM, endM]], Sunday: ... }
+  const daysMap = useMemo(() => {
+    const map = Object.fromEntries(DAYS.map((d) => [d, []]));
+    slots.forEach((s) => {
+      const dayName = DAYS.find(
+        (d) => d.toLowerCase() === String(s.dayOfWeek || "").trim().toLowerCase(),
+      );
+      if (dayName && s.timeFrom && s.timeTo) {
+        const start = parseTimeToMinutes(s.timeFrom);
+        const end = parseTimeToMinutes(s.timeTo);
+        map[dayName].push([start, end]);
+      }
+    });
+    DAYS.forEach((d) => {
+      map[d].sort((a, b) => a[0] - b[0]);
+    });
+    return map;
+  }, [slots]);
+
+  const totalHours = useMemo(
+    () =>
+      DAYS.reduce(
+        (acc, d) =>
+          acc +
+          (daysMap[d] || []).reduce(
+            (x, r) => x + Math.max(0, r[1] - r[0]) / 60,
+            0,
+          ),
+        0,
+      ),
+    [daysMap],
+  );
+
+  const activeDaysCount = useMemo(
+    () => DAYS.filter((d) => (daysMap[d] || []).length > 0).length,
+    [daysMap],
+  );
+
+  const srcKey = useMemo(() => {
+    if (!slots.length) return "missing";
+    if (slots.some((s) => s.adminSlotId)) return "admin";
+    return "live";
+  }, [slots]);
+
+  const [srcLabel, srcColor] = SRC_META[srcKey] || SRC_META.missing;
+
+  const timestamp = useMemo(() => {
+    const rawDate =
+      activePlan?.createdAt ||
+      activePlan?.proposedAt ||
+      slots[0]?.createdAt ||
+      null;
+    if (!rawDate) return "";
+    try {
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return "";
+    }
+  }, [activePlan, slots]);
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col justify-between">
+      <div>
+        <div className="flex flex-wrap items-start gap-2 mb-4">
+          <div className="min-w-0">
+            <h2 className="font-bold text-gray-900">Available times</h2>
+            <p className={`text-xs ${srcColor} font-semibold`}>
+              {srcLabel}
+              {timestamp ? ` · ${timestamp}` : ""}
+            </p>
+          </div>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="ml-auto h-9 px-3 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-[#7D0A0A] hover:text-[#7D0A0A] transition-colors flex items-center gap-1.5"
+            >
+              <span>🕒</span>
+              <span>Edit times</span>
+            </button>
+          )}
+        </div>
+
+        {/* 3 stat tiles */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="bg-gray-50 rounded-xl px-3 py-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Days / week
+            </p>
+            <p className="text-lg font-extrabold text-gray-900 tabular-nums">
+              {activeDaysCount}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-xl px-3 py-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Hours / week
+            </p>
+            <p className="text-lg font-extrabold text-gray-900 tabular-nums">
+              {formatHours(totalHours)}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-xl px-3 py-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              Avg / day
+            </p>
+            <p className="text-lg font-extrabold text-gray-900 tabular-nums">
+              {activeDaysCount
+                ? formatHours(
+                  Math.round((totalHours / activeDaysCount) * 10) / 10,
+                )
+                : "—"}
+            </p>
+          </div>
+        </div>
+
+        {/* one row per day: name · time chips · hours */}
+        <ul className="divide-y divide-gray-50">
+          {DAYS.map((d) => {
+            const r = daysMap[d] || [];
+            const dh = r.reduce((x, y) => x + Math.max(0, y[1] - y[0]) / 60, 0);
+            return (
+              <li
+                key={d}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
+              >
+                <span
+                  className={`w-24 text-sm font-bold ${r.length ? "text-gray-900" : "text-gray-400"
+                    }`}
+                >
+                  {d}
+                </span>
+                <span className="flex-1 flex flex-wrap gap-1 min-w-0">
+                  {r.length ? (
+                    r.map((x, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs font-semibold px-2 py-1 rounded-md bg-red-50 text-[#7D0A0A] whitespace-nowrap"
+                      >
+                        {formatMinuteTime(x[0])} – {formatMinuteTime(x[1])}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-400">Not available</span>
+                  )}
+                </span>
+                <span
+                  className={`text-xs font-bold tabular-nums ${r.length ? "text-gray-700" : "text-gray-300"
+                    }`}
+                >
+                  {r.length ? formatHours(dh) : "—"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* footer note, only for sample / missing */}
+      {srcKey === "sample" ? (
+        <p className="text-[11px] text-gray-400 mt-3">
+          These are sample times
+          {studentName
+            ? ` — use Edit times to set ${studentName}’s real times`
+            : ""}.
+        </p>
+      ) : srcKey === "missing" ? (
+        <p className="text-[11px] text-red-600 mt-3">
+          No times yet{onEdit ? " — use Edit times to add them" : ""}.
+        </p>
+      ) : null}
+    </section>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* Notes Card (matching uploaded HTML design)                          */
+/* ------------------------------------------------------------------ */
+
+const NOTE_TAGS = {
+  general: ["General", "bg-gray-100 text-gray-700"],
+  academic: ["Academic", "bg-blue-50 text-blue-700"],
+  payment: ["Payment", "bg-green-50 text-green-700"],
+  behaviour: ["Behaviour", "bg-amber-50 text-amber-800"],
+  follow: ["Follow up", "bg-red-50 text-[#7D0A0A]"],
+};
+
+const resolveTagKey = (note) => {
+  if (note?.tag && NOTE_TAGS[note.tag.toLowerCase()]) {
+    return note.tag.toLowerCase();
+  }
+  const title = String(note?.title || "").toLowerCase();
+  for (const [k, [label]] of Object.entries(NOTE_TAGS)) {
+    if (
+      title === k ||
+      title === label.toLowerCase() ||
+      title.includes(k) ||
+      title.includes(label.toLowerCase())
+    ) {
+      return k;
+    }
+  }
+  return "general";
+};
+
+const formatNoteAt = (dateVal) => {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return String(dateVal);
+  }
+};
+
+const StudentNotesCard = ({ studentId, student, plan }) => {
+  const {
+    data: notesRes,
+    loading: loadingNotes,
+    error: notesError,
+    refetch: refetchNotes,
+  } = useGet(studentId ? `/api/admin/notes/${studentId}` : null);
+
+  const [text, setText] = useState("");
+  const [selectedTag, setSelectedTag] = useState("general");
+  const [submitting, setSubmitting] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteToDelete, setNoteToDelete] = useState(null);
+
+  // Local map to track pinned notes
+  const [pinnedMap, setPinnedMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pinned_notes_${studentId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const rawList = useMemo(() => {
+    const d = notesRes?.data?.data ?? notesRes?.data ?? notesRes;
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.notes)) return d.notes;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d?.data)) return d.data;
+    return [];
+  }, [notesRes]);
+
+  const normalizedList = useMemo(() => {
+    return rawList.map((n, idx) => {
+      const id = String(n?.id || n?._id || `note-${idx}`);
+      let noteText = "";
+      if (Array.isArray(n?.content)) {
+        noteText = n.content.join("\n");
+      } else if (typeof n?.content === "string") {
+        try {
+          const parsed = JSON.parse(n.content);
+          noteText = Array.isArray(parsed) ? parsed.join("\n") : n.content;
+        } catch {
+          noteText = n.content;
+        }
+      } else {
+        noteText = n?.text || n?.note || "";
+      }
+
+      const tagKey = resolveTagKey(n);
+      const isPinned =
+        pinnedMap[id] !== undefined
+          ? Boolean(pinnedMap[id])
+          : Boolean(n?.pin || n?.isPinned);
+
+      const by =
+        n?.by ||
+        n?.createdBy?.name ||
+        n?.creator?.name ||
+        n?.admin?.name ||
+        n?.adminName ||
+        "Super Admin";
+
+      const at = formatNoteAt(n?.createdAt || n?.at || n?.date);
+
+      return {
+        id,
+        text: noteText,
+        tag: tagKey,
+        at,
+        by,
+        pin: isPinned,
+        raw: n,
+      };
+    });
+  }, [rawList, pinnedMap]);
+
+  const sortedList = useMemo(() => {
+    return normalizedList.slice().sort((a, b) => {
+      const pinA = a.pin ? 1 : 0;
+      const pinB = b.pin ? 1 : 0;
+      if (pinB !== pinA) return pinB - pinA;
+      return String(b.at || "").localeCompare(String(a.at || ""));
+    });
+  }, [normalizedList]);
+
+  const togglePin = (noteId) => {
+    setPinnedMap((prev) => {
+      const next = { ...prev, [noteId]: !prev[noteId] };
+      try {
+        localStorage.setItem(`pinned_notes_${studentId}`, JSON.stringify(next));
+      } catch { }
+      return next;
+    });
+  };
+
+  const handleAddOrUpdate = async () => {
+    const cleanText = text.trim();
+    if (!cleanText) {
+      toast.error("Write the note first");
+      return;
+    }
+
+    const tagLabel = NOTE_TAGS[selectedTag]?.[0] || "General";
+    const contentArray = cleanText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    try {
+      setSubmitting(true);
+      if (editingNoteId) {
+        await api.put(`/api/admin/notes/${studentId}/${editingNoteId}`, {
+          title: tagLabel,
+          content: contentArray.length > 0 ? contentArray : [cleanText],
+          tag: selectedTag,
+        });
+        toast.success("Note updated");
+        setEditingNoteId(null);
+      } else {
+        await api.post(`/api/admin/notes/${studentId}`, {
+          studentId,
+          title: tagLabel,
+          content: contentArray.length > 0 ? contentArray : [cleanText],
+          tag: selectedTag,
+        });
+        toast.success("Note added");
+      }
+      setText("");
+      setSelectedTag("general");
+      refetchNotes();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to save note. Please try again.";
+      toast.error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStartEdit = (n) => {
+    setEditingNoteId(n.id);
+    setText(n.text || "");
+    setSelectedTag(n.tag || "general");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setText("");
+    setSelectedTag("general");
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!noteToDelete) return;
+    try {
+      await api.delete(`/api/admin/notes/${studentId}/${noteToDelete.id}`);
+      toast.success("Note deleted");
+      setNoteToDelete(null);
+      refetchNotes();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to delete note. Please try again.";
+      toast.error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    }
+  };
+
+  const planNotes = plan?.notes;
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col justify-between">
+      <div>
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="font-bold text-gray-900">Notes</h2>
+          <span className="text-xs text-gray-400">
+            {sortedList.length} · only admins see them
+          </span>
+        </div>
+
+        {/* Composer */}
+        <label className="block">
+          <span className="sr-only">New note</span>
+          <textarea
+            rows={3}
+            maxLength={600}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Write a note… (Ctrl + Enter to add)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleAddOrUpdate();
+              }
+            }}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-y focus:outline-none focus:border-[#7d0a0a] focus:ring-2 focus:ring-[#7d0a0a]/10 transition-all"
+          />
+        </label>
+
+        {/* Tag pills + Add button */}
+        <div
+          className="flex flex-wrap items-center gap-1.5 mt-2"
+          role="group"
+          aria-label="Note type"
+        >
+          {Object.entries(NOTE_TAGS).map(([k, [l, tone]]) => (
+            <button
+              key={k}
+              type="button"
+              data-tag={k}
+              aria-pressed={selectedTag === k}
+              onClick={() => setSelectedTag(k)}
+              className={`h-7 px-2.5 rounded-full text-[11px] font-bold ring-[#7d0a0a]/40 transition-all ${tone} ${selectedTag === k ? "ring-2" : ""
+                }`}
+            >
+              {l}
+            </button>
+          ))}
+
+          <div className="ml-auto flex items-center gap-2">
+            {editingNoteId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="h-9 px-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleAddOrUpdate}
+              disabled={submitting}
+              className="h-9 px-4 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-50"
+              style={{ background: "#7d0a0a" }}
+            >
+              {submitting
+                ? "Saving..."
+                : editingNoteId
+                  ? "Update note"
+                  : "Add note"}
+            </button>
+          </div>
+        </div>
+
+        {/* Note list */}
+        {loadingNotes ? (
+          <div className="py-8 flex justify-center">
+            <Loader />
+          </div>
+        ) : notesError ? (
+          <div className="p-4 mt-3 bg-red-50 rounded-xl text-red-600 text-xs font-medium flex items-center justify-between">
+            <span>Failed to load notes.</span>
+            <button
+              type="button"
+              onClick={refetchNotes}
+              className="underline font-bold text-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <ul className="mt-4 space-y-2 max-h-[420px] overflow-y-auto">
+            {sortedList.length > 0 ? (
+              sortedList.map((n) => {
+                const [l, tone] = NOTE_TAGS[n.tag] || NOTE_TAGS.general;
+                return (
+                  <li
+                    key={n.id}
+                    className={`rounded-xl border ${n.pin
+                        ? "border-amber-200 bg-amber-50/40"
+                        : "border-gray-100"
+                      } px-3 py-2.5 transition-colors`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tone}`}
+                      >
+                        {l}
+                      </span>
+                      {n.pin && (
+                        <span className="text-[10px] font-bold text-amber-700">
+                          📌 Pinned
+                        </span>
+                      )}
+                      <span className="ml-auto flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(n)}
+                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-sm shrink-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Edit note"
+                          aria-label="Edit note"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => togglePin(n.id)}
+                          className={`w-8 h-8 rounded-lg inline-flex items-center justify-center text-sm shrink-0 transition-colors ${n.pin
+                              ? "text-amber-700 hover:bg-amber-100"
+                              : "text-gray-400 hover:bg-gray-100"
+                            }`}
+                          title={n.pin ? "Unpin note" : "Pin note"}
+                          aria-label={n.pin ? "Unpin note" : "Pin note"}
+                        >
+                          📌
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNoteToDelete(n)}
+                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-sm shrink-0 text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete note"
+                          aria-label="Delete note"
+                        >
+                          🗑
+                        </button>
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                      {n.text}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      {n.by ? `${n.by} · ` : ""}
+                      {n.at}
+                    </p>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="text-sm text-gray-400 py-4 text-center">
+                No notes yet.
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+
+      {/* Plan request note if available */}
+      {planNotes && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/30 px-3 py-2 text-xs">
+            <span className="font-bold text-amber-900 block mb-0.5">
+              Availability Plan Request ({plan.status || "Pending"}):
+            </span>
+            <p className="text-amber-800 whitespace-pre-wrap break-words">
+              {planNotes}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        open={Boolean(noteToDelete)}
+        onClose={() => setNoteToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Note"
+        description="Are you sure you want to delete this note? This action cannot be undone."
+      />
+    </section>
   );
 };
 

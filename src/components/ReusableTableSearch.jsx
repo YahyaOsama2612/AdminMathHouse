@@ -21,8 +21,8 @@ const ReusableTableSearch = ({
   totalPages = 1,
   totalResults = 0,
   rowsPerPage = 10,
-  onPageChange,
-  onRowsPerPageChange,
+  onPageChange = () => {},
+  onRowsPerPageChange = () => {},
 children,
   // Search & Filter Props
   searchTerm = "",
@@ -210,7 +210,7 @@ children,
 
           <select 
             value={rowsPerPage}
-            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
+            onChange={(e) => onRowsPerPageChange?.(Number(e.target.value))}
             className="bg-card border border-border rounded p-1.5 text-sm outline-none focus:ring-2 focus:ring-one cursor-pointer"
           >
             {[10, 20, 50, 100].map(size => (
@@ -229,7 +229,9 @@ children,
               value={currentPage}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
-                if (val >= 1 && val <= totalPages) onPageChange(val);
+                if (val >= 1 && (totalPages ? val <= totalPages : true)) {
+                  onPageChange?.(val);
+                }
               }}
               className="w-12 text-center border border-border rounded bg-card py-1 font-bold outline-none focus:ring-1 focus:ring-one"
             />
@@ -239,7 +241,7 @@ children,
           <div className="flex gap-1">
             <button
               disabled={currentPage <= 1}
-              onClick={() => onPageChange(currentPage - 1)}
+              onClick={() => onPageChange?.(currentPage - 1)}
               className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -247,7 +249,7 @@ children,
 
             <button
               disabled={currentPage >= totalPages || totalPages === 0}
-              onClick={() => onPageChange(currentPage + 1)}
+              onClick={() => onPageChange?.(currentPage + 1)}
               className="p-2 border border-border rounded bg-card hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >
               <ChevronRight className="w-4 h-4" />

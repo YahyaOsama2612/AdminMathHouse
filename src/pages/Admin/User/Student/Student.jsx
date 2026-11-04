@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReusableTableSearch from "@/components/ReusableTableSearch";
 import useGet from "@/hooks/useGet";
@@ -18,6 +18,7 @@ const Student = () => {
     course: "",
   });
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   // 2. حالات الـ State المؤقتة (للـ Inputs فقط)
   const [tempFilters, setTempFilters] = useState({
@@ -27,9 +28,30 @@ const Student = () => {
     course: "",
   });
 
+  // 🔹 جلب خيارات الفلاتر (categories و grades)
+  const { data: selectData } = useGet("/api/admin/student/select");
+
+  const categoriesOptions = useMemo(() => {
+    return (
+      selectData?.data?.data?.categories?.map((cat) => ({
+        value: cat.id,
+        label: cat.name,
+      })) || []
+    );
+  }, [selectData]);
+
+  const gradesOptions = useMemo(() => {
+    return (
+      selectData?.data?.data?.grades?.map((g) => ({
+        value: g.id,
+        label: g.name,
+      })) || []
+    );
+  }, [selectData]);
+
   // 🔹 جلب الداتا من الـ API
   const { data, loading, error, refetch } = useGet(
-    `/api/admin/student?search=${query.search}&grade=${query.grade}&category=${query.category}&course=${query.course}&page=${page}`,
+    `/api/admin/student?search=${query.search}&grade=${query.grade}&category=${query.category}&course=${query.course}&page=${page}&limit=${limit}`,
   );
   const { deleteData, loading: deleteLoading } = useDelete();
 
@@ -102,22 +124,72 @@ const Student = () => {
     return (
       data?.data?.data?.map((student) => ({
         id: student.id,
-        name: `${student.firstname} ${student.lastname}`,
+        name: student.name || `${student.firstname || ""} ${student.lastname || ""}`.trim(),
         nickname: student.nickname,
         email: student.email,
         grade: student.grade?.name,
-        parentphone: student.parentPhone,
+        parentphone: student.parentPhone || student.parentphone,
         raw: student,
       })) || []
     );
   }, [data]);
 
+  // حساب معلومات الترقيم (Pagination)
+  const pagination = data?.data?.pagination || data?.pagination || {};
+  const serverTotalPages =
+    pagination.totalPages ||
+    pagination.last_page ||
+    pagination.pages ||
+    data?.data?.totalPages ||
+    data?.data?.last_page ||
+    data?.data?.pages ||
+    data?.totalPages ||
+    data?.last_page;
+
+  const serverTotal =
+    pagination.total ??
+    pagination.totalCount ??
+    data?.data?.total ??
+    data?.data?.totalCount ??
+    data?.total ??
+    data?.totalCount;
+
+  const totalPages = useMemo(() => {
+    if (serverTotalPages) return Math.max(1, Number(serverTotalPages));
+    if (serverTotal != null && !isNaN(serverTotal)) {
+      return Math.max(1, Math.ceil(Number(serverTotal) / limit));
+    }
+    // في حال عدم إرجاع بيانات ترقيم من السيرفر:
+    // إذا كانت الصفحة الحالية ممتلئة بالكامل (10 عناصر)، فهناك صفحة تالية على الأقل
+    if (tableData.length >= limit) {
+      return page + 1;
+    }
+    return Math.max(page, 1);
+  }, [serverTotalPages, serverTotal, limit, tableData.length, page]);
+
+  const totalResults = useMemo(() => {
+    if (serverTotal != null && !isNaN(serverTotal)) {
+      return Number(serverTotal);
+    }
+    if (tableData.length >= limit) {
+      return `${(page - 1) * limit + tableData.length}+`;
+    }
+    return (page - 1) * limit + tableData.length;
+  }, [serverTotal, tableData.length, limit, page]);
+
+  // إذا كانت الصفحة فارغة بعد الحذف وكان رقم الصفحة > 1، نرجع صفحة للخلف
+  useEffect(() => {
+    if (!loading && data && tableData.length === 0 && page > 1) {
+      setPage((prev) => Math.max(1, prev - 1));
+    }
+  }, [loading, data, tableData.length, page]);
+
   const handleEdit = (row) => {
     navigate(`/admin/users/students/edit/${row.id}`);
   };
 
-  if (loading) return <Loader />;
-  if (error) return <Errorpage />;
+  if (loading && !data) return <Loader />;
+  if (error && !data) return <Errorpage />;
 
   return (
     <div className="p-6" onKeyDown={handleKeyDown}>
@@ -138,8 +210,8 @@ const Student = () => {
         }
 
         filters={[
-          { key: "grade", label: "Grade", options: [] }, // يمكنك ملء الخيارات هنا
-          { key: "category", label: "Category", options: [] },
+          { key: "grade", label: "Grade", options: gradesOptions },
+          { key: "category", label: "Category", options: categoriesOptions },
           { key: "course", label: "Course", options: [] },
         ]}
         onAddClick={() => navigate("/admin/users/students/add")}
@@ -147,15 +219,20 @@ const Student = () => {
         onDelete={handleDelete}
         // Pagination
         currentPage={page}
-        totalPages={data?.data?.last_page || 1}
-        totalResults={data?.data?.total || 0}
-        onPageChange={setPage}
+        totalPages={totalPages}
+        totalResults={totalResults}
+        rowsPerPage={limit}
+        onPageChange={(newPage) => setPage(newPage)}
+        onRowsPerPageChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
       >
         {/* زر الـ Submit */}
         <button
           type="button"
           onClick={handleSearchSubmit}
-          className="bg-one text-white px-5 py-2 rounded-lg font-bold hover:bg-one/90 transition-all text-sm"
+          className="bg-one text-white px-5 py-2 rounded-lg font-bold hover:bg-one/90 transition-all text-sm cursor-pointer"
         >
           Submit
         </button>

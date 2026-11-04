@@ -1,14 +1,39 @@
 import React from 'react';
 import styled from 'styled-components';
+import { useRouteError } from 'react-router-dom';
 
-const Errorpage = () => {
+const Errorpage = ({ error }) => {
+  const routeError = useRouteError();
+
+  const rawMessage =
+    error?.message ||
+    (typeof error === 'string' ? error : null) ||
+    routeError?.message ||
+    routeError?.statusText ||
+    routeError?.data?.message ||
+    (typeof routeError === 'string' ? routeError : null) ||
+    'Something went wrong while fetching data. Please check your internet connection or try again.';
+
+  const isAuthError =
+    typeof rawMessage === 'string' &&
+    (rawMessage.toLowerCase().includes('unauthorized') ||
+      rawMessage.toLowerCase().includes('token') ||
+      rawMessage.toLowerCase().includes('jwt') ||
+      rawMessage.toLowerCase().includes('401'));
+
+  const handleLoginRedirect = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    window.location.href = '/';
+  };
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
         
         <StyledWrapper>
           <div className="flex justify-center mb-4">
-            <div className="error-icon">⚠️</div>
+            <div className="error-icon">{isAuthError ? '🔒' : '⚠️'}</div>
           </div>
 
           <div className="loader">
@@ -31,27 +56,39 @@ const Errorpage = () => {
 
         <div className="mt-6 text-center">
           <h1 className="text-2xl font-bold text-red-600">
-            API Request Failed
+            {isAuthError ? 'Session Expired' : 'API Request Failed'}
           </h1>
           <p className="mt-2 text-sm text-gray-500 leading-relaxed">
-            Something went wrong while fetching data.  
-            Please check your internet connection or try again.
+            {isAuthError
+              ? 'Your session has expired or you are unauthorized. Please log in again to continue.'
+              : String(rawMessage)}
           </p>
 
           <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all duration-300"
-            >
-              Retry
-            </button>
+            {isAuthError ? (
+              <button
+                onClick={handleLoginRedirect}
+                className="px-6 py-2.5 rounded-lg bg-[#7D0A0A] hover:bg-[#5C0707] text-white font-bold transition-all duration-300 shadow-md"
+              >
+                Log In Again
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all duration-300"
+                >
+                  Retry
+                </button>
 
-            <button
-              onClick={() => window.history.back()}
-              className="px-6 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-all duration-300"
-            >
-              Go Back
-            </button>
+                <button
+                  onClick={() => window.history.back()}
+                  className="px-6 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-all duration-300"
+                >
+                  Go Back
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

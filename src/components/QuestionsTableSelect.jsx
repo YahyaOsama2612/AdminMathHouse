@@ -2,6 +2,17 @@ import React, { useEffect, useState } from "react";
 import Select from "react-select";
 import api from "../api/api";
 
+const MONTH_OPTIONS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from(
+  { length: currentYear - 2000 + 1 },
+  (_, i) => currentYear - i
+);
+
 const QuestionsTableSelect = ({
   value = [],
   onChange,
@@ -16,8 +27,10 @@ const QuestionsTableSelect = ({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [difficulty, setDifficulty] = useState(""); // فلتر الصعوبة
   const [year, setYear] = useState(""); // فلتر السنة
+  const [month, setMonth] = useState(""); // فلتر الشهر
   const [loading, setLoading] = useState(false);
 
   const limit = 10;
@@ -27,6 +40,14 @@ const QuestionsTableSelect = ({
     setPage(1);
   }, [lessonId]);
 
+  // تأخير البحث لتجنب كثرة الطلبات أثناء الكتابة
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // استدعاء البيانات عند تغير الصفحة، البحث، أو الفلاتر
   useEffect(() => {
     if (lessonId) {
@@ -35,7 +56,7 @@ const QuestionsTableSelect = ({
       setQuestions([]);
       setTotalPages(1);
     }
-  }, [page, search, difficulty, year, lessonId]);
+  }, [page, debouncedSearch, difficulty, year, month, lessonId]);
 
   useEffect(() => {
     if (maxQuestions > 0 && value.length > maxQuestions) {
@@ -57,14 +78,12 @@ const QuestionsTableSelect = ({
       const params = {
         page,
         limit,
-        search,
       };
 
-      // API get questions by lesson id does NOT accept difficulty and year params
-      if (!isLesson) {
-        if (difficulty) params.difficulty = difficulty;
-        if (year) params.year = year;
-      }
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (difficulty) params.difficulty = difficulty;
+      if (year) params.year = year;
+      if (month) params.month = month;
 
       const res = await api.get(endpoint, { params });
 
@@ -81,6 +100,11 @@ const QuestionsTableSelect = ({
       setTotalPages(
         responseData?.pagination?.totalPages ||
           res.data?.pagination?.totalPages ||
+          (responseData?.pagination?.total
+            ? Math.ceil(responseData.pagination.total / limit)
+            : questionsList.length >= limit
+            ? page + 1
+            : Math.max(page, 1)) ||
           1,
       );
     } catch (err) {
@@ -160,26 +184,12 @@ const QuestionsTableSelect = ({
 
       {/* Filters Section (البحث مع الفلاتر) */}
       <div
-        className={`grid grid-cols-1 ${
-          !isLesson
-            ? lessons && lessons.length > 0
-              ? "md:grid-cols-5"
-              : "md:grid-cols-4"
-            : lessons && lessons.length > 0
-            ? "md:grid-cols-3"
-            : "md:grid-cols-2"
+        className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 ${
+          lessons && lessons.length > 0 ? "lg:grid-cols-5" : "lg:grid-cols-4"
         } gap-4`}
       >
         {/* Input Search */}
-        <div
-          className={`relative ${
-            !isLesson
-              ? "md:col-span-2"
-              : lessons && lessons.length > 0
-              ? "md:col-span-2"
-              : "md:col-span-2"
-          }`}
-        >
+        <div className="relative">
           <input
             type="text"
             placeholder="Search question..."
@@ -252,40 +262,65 @@ const QuestionsTableSelect = ({
           </div>
         )}
 
-        {/* Difficulty Filter - only for non-lesson endpoints */}
-        {!isLesson && (
-          <div>
-            <select
-              value={difficulty}
-              onChange={(e) => {
-                setPage(1);
-                setDifficulty(e.target.value);
-              }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600"
-            >
-              <option value="">All Difficulties</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-        )}
+        {/* Difficulty Filter */}
+        <div>
+          <select
+            value={difficulty}
+            onChange={(e) => {
+              setPage(1);
+              setDifficulty(e.target.value);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+          >
+            <option value="">All Difficulties</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
 
-        {/* Year Filter - only for non-lesson endpoints */}
-        {!isLesson && (
-          <div>
-            <input
-              type="number"
-              placeholder="Filter by Year (e.g. 2024)"
-              value={year}
-              onChange={(e) => {
-                setPage(1);
-                setYear(e.target.value);
-              }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
-            />
-          </div>
-        )}
+        {/* Year Filter */}
+        <div>
+          <select
+            value={year}
+            onChange={(e) => {
+              setPage(1);
+              setYear(e.target.value);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+          >
+            <option value="">All Years</option>
+            {YEAR_OPTIONS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Month Filter */}
+        <div>
+          <select
+            value={month}
+            onChange={(e) => {
+              setPage(1);
+              setMonth(e.target.value);
+            }}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+          >
+            <option value="">All Months</option>
+            {MONTH_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Table */}
@@ -305,25 +340,26 @@ const QuestionsTableSelect = ({
               <th className="p-4 text-left">Question</th>
               <th className="p-4 text-left">Difficulty</th>
               <th className="p-4 text-left">Year</th>
+              <th className="p-4 text-left">Month</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan="4" className="p-6 text-center text-slate-400">
+                <td colSpan="5" className="p-6 text-center text-slate-400">
                   Loading questions...
                 </td>
               </tr>
             ) : !lessonId ? (
               <tr>
-                <td colSpan="4" className="p-6 text-center text-amber-600 font-medium">
+                <td colSpan="5" className="p-6 text-center text-amber-600 font-medium">
                   Please select a lesson to load and choose questions
                 </td>
               </tr>
             ) : questions.length === 0 ? (
               <tr>
-                <td colSpan="4" className="p-6 text-center text-slate-400">
+                <td colSpan="5" className="p-6 text-center text-slate-400">
                   No questions found
                 </td>
               </tr>
@@ -355,11 +391,13 @@ const QuestionsTableSelect = ({
 
                   <td className="p-4">
                     <span className="px-2 py-1 text-xs bg-slate-100 rounded-md capitalize">
-                      {q.difficulty}
+                      {q.difficulty || "—"}
                     </span>
                   </td>
 
-                  <td className="p-4 text-slate-500">{q.year}</td>
+                  <td className="p-4 text-slate-500">{q.year || "—"}</td>
+
+                  <td className="p-4 text-slate-500">{q.month || "—"}</td>
                 </tr>
               ))
             )}
