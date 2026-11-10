@@ -45,9 +45,9 @@ const Sessions = () => {
   // "11:30:00" -> "11:30 AM"
   const formatUTCTimeToLocal = (timeStr) => {
     if (!timeStr) return "-";
-    const [h, m] = timeStr.split(":").map((v) => parseInt(v, 10));
-    const hours24 = h || 0;
-    const minutes = m || 0;
+    const [h, m] = String(timeStr).split(":").map((v) => parseInt(v, 10));
+    const hours24 = isNaN(h) ? 0 : h;
+    const minutes = isNaN(m) ? 0 : m;
     const period = hours24 >= 12 ? "PM" : "AM";
     const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
     return `${String(hours12).padStart(2, "0")}:${String(minutes).padStart(
@@ -56,55 +56,174 @@ const Sessions = () => {
     )} ${period}`;
   };
 
-  const columns = [
-    { header: "Name", key: "name" },
-    // { header: "Category", key: "categoryName",filterable: true, filterType: 'select' },
-    // { header: "Course", key: "courseName",filterable: true, filterType: 'select' },
-    // { header: "Lesson", key: "lessonName" ,filterable: true, filterType: 'select'},
-    { header: "Type", key: "type", filterable: true, filterType: "select" },
-    {
-      header: "Group",
-      key: "groupName",
-      filterable: true,
-      filterType: "select",
-    },
-    {
-      header: "Teacher",
-      key: "teacherName",
-      filterable: true,
-      filterType: "select",
-    },
-    {
-      header: "Date",
-      key: "sessionDate",
-      filterable: true,
-      filterType: "select",
-    },
-    { header: "From", key: "timeFrom" },
-    { header: "To", key: "timeTo" },
-  ];
+  const getSessionType = (s) => {
+    if (s.sessionRelationalType) return s.sessionRelationalType;
+    if (s.type) return s.type;
+    if (s.scheduleType === "once") return "Once";
+    if (s.scheduleType === "recurring") return "Recurring";
+    return "-";
+  };
+
+  const getGroupName = (s) => {
+    if (Array.isArray(s.groups) && s.groups.length > 0) {
+      const names = s.groups
+        .map((g) => (typeof g === "string" ? g : g?.name || g?.groupName))
+        .filter(Boolean);
+      if (names.length > 0) return names.join(", ");
+    }
+    if (s.groups && typeof s.groups === "object" && s.groups.name) {
+      return s.groups.name;
+    }
+    if (s.group && typeof s.group === "object" && s.group.name) {
+      return s.group.name;
+    }
+    if (s.groupName) return s.groupName;
+    if (s.group_name) return s.group_name;
+    return "-";
+  };
+
+  const getTeacherName = (s) => {
+    if (s.teacher?.name) return s.teacher.name;
+    if (s.teacher?.firstname || s.teacher?.lastname) {
+      return `${s.teacher.firstname || ""} ${s.teacher.lastname || ""}`.trim();
+    }
+    if (s.teacherName) return s.teacherName;
+    if (s.teacher_name) return s.teacher_name;
+    return "-";
+  };
+
+  const formatSessionDate = (s) => {
+    if (s.sessionDate) {
+      const str = String(s.sessionDate);
+      const match = str.match(/^\d{4}-\d{2}-\d{2}/);
+      if (match) return match[0];
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? str : d.toISOString().split("T")[0];
+    }
+    if (s.startDate && s.endDate) {
+      const start = String(s.startDate).slice(0, 10);
+      const end = String(s.endDate).slice(0, 10);
+      return `${start} to ${end}`;
+    }
+    if (s.startDate) return String(s.startDate).slice(0, 10);
+    if (Array.isArray(s.recurringDays) && s.recurringDays.length > 0) {
+      const days = s.recurringDays
+        .map((d) => (typeof d === "string" ? d : d.dayOfWeek))
+        .filter(Boolean)
+        .join(", ");
+      if (days) return `Recurring (${days})`;
+    }
+    return "-";
+  };
+
+  const getCategoryName = (s) => {
+    if (s.categoryName) return s.categoryName;
+    if (s.category?.name) return s.category.name;
+    if (s.examCategory?.name) return s.examCategory.name;
+    if (Array.isArray(s.lessons) && s.lessons[0]?.category?.name) {
+      return s.lessons[0].category.name;
+    }
+    if (Array.isArray(s.lessons) && s.lessons[0]?.course?.category?.name) {
+      return s.lessons[0].course.category.name;
+    }
+    return "-";
+  };
+
+  const getCourseName = (s) => {
+    if (s.courseName) return s.courseName;
+    if (s.course?.name) return s.course.name;
+    if (s.examCourse?.name) return s.examCourse.name;
+    if (Array.isArray(s.lessons) && s.lessons[0]?.course?.name) {
+      return s.lessons[0].course.name;
+    }
+    return "-";
+  };
+
+  const getLessonName = (s) => {
+    if (s.lessonName) return s.lessonName;
+    if (s.lesson?.name) return s.lesson.name;
+    if (Array.isArray(s.lessons) && s.lessons.length > 0) {
+      return (
+        s.lessons
+          .map((l) => l.name || l.lessonName)
+          .filter(Boolean)
+          .join(", ") || "-"
+      );
+    }
+    return "-";
+  };
+
+  const hasCategories = useMemo(() => {
+    return (
+      data?.data?.sessions?.some((s) => getCategoryName(s) !== "-") || false
+    );
+  }, [data]);
+
+  const hasCourses = useMemo(() => {
+    return data?.data?.sessions?.some((s) => getCourseName(s) !== "-") || false;
+  }, [data]);
+
+  const columns = useMemo(() => {
+    return [
+      { header: "Name", key: "name", filterable: true },
+      ...(hasCategories
+        ? [
+            {
+              header: "Category",
+              key: "categoryName",
+              filterable: true,
+              filterType: "select",
+            },
+          ]
+        : []),
+      ...(hasCourses
+        ? [
+            {
+              header: "Course",
+              key: "courseName",
+              filterable: true,
+              filterType: "select",
+            },
+          ]
+        : []),
+      { header: "Type", key: "type", filterable: true, filterType: "select" },
+      {
+        header: "Group",
+        key: "groupName",
+        filterable: true,
+        filterType: "select",
+      },
+      {
+        header: "Teacher",
+        key: "teacherName",
+        filterable: true,
+        filterType: "select",
+      },
+      {
+        header: "Date",
+        key: "sessionDate",
+        filterable: true,
+        filterType: "select",
+      },
+      { header: "From", key: "timeFrom" },
+      { header: "To", key: "timeTo" },
+    ];
+  }, [hasCategories, hasCourses]);
 
   const tableData = useMemo(() => {
     return (
       data?.data?.sessions?.map((s) => ({
         id: s.id,
-        name: s.name,
-        // الحقول دي مش موجودة في الـ JSON الحالي، لو ضفتها في الـ API هتظهر تلقائياً
-        categoryName: s.categoryName || "-",
-        courseName: s.courseName || "-",
-        lessonName: s.lessonName || "-",
+        name: s.name || "-",
+        categoryName: getCategoryName(s),
+        courseName: getCourseName(s),
+        lessonName: getLessonName(s),
 
-        type: s.type,
+        type: getSessionType(s),
+        groupName: getGroupName(s),
+        teacherName: getTeacherName(s),
 
-        // ✅ التعديل هنا: الوصول للاسم من جوه الـ groups object
-        groupName: s.groups?.name || "-",
-
-        // ✅ التعديل هنا: الوصول للاسم من جوه الـ teacher object
-        teacherName: s.teacher?.name || "-",
-
-        sessionDate: s.sessionDate
-          ? new Date(s.sessionDate).toLocaleDateString()
-          : "-",
+        sessionDate: formatSessionDate(s),
         timeFrom: formatUTCTimeToLocal(s.timeFrom),
         timeTo: formatUTCTimeToLocal(s.timeTo),
         sessionRelationalType: s.sessionRelationalType,

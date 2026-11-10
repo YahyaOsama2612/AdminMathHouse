@@ -7,41 +7,53 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  X,
+  RotateCcw,
+  HardDrive,
 } from "lucide-react";
 import TruncatedText from "./TruncatedText";
-
-// استيراد أيقونة مناسبة للـ Drive
-import { HardDrive } from "lucide-react"; 
 
 // --- Custom Searchable Select Component ---
 const SearchableSelect = ({
   value,
   onChange,
-  options,
+  options = [],
   placeholder = "All",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef(null);
 
-  // إغلاق القائمة المنسدلة عند الضغط في أي مكان خارجها
+  // إغلاق القائمة المنسدلة عند الضغط في أي مكان خارجها أو الضغط على Escape
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   // فلترة الخيارات
-  const filteredOptions = options.filter((opt) =>
-    String(opt).toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredOptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((opt) =>
+      String(opt).toLowerCase().includes(q),
+    );
+  }, [options, searchQuery]);
 
   return (
-    // التعديل هنا: خلينا الـ z-index يتغير بناءً على حالة الـ isOpen عشان يظهر فوق الكل
     <div
       className={`relative w-full ${isOpen ? "z-50" : "z-10"}`}
       ref={dropdownRef}
@@ -49,16 +61,35 @@ const SearchableSelect = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:ring-1 focus:ring-one cursor-pointer transition-colors"
+        className={`w-full flex justify-between items-center p-2 border rounded-lg bg-card text-sm outline-none focus:ring-1 focus:ring-one cursor-pointer transition-colors ${
+          value
+            ? "border-one text-one font-medium bg-one/5"
+            : "border-border text-foreground hover:border-border/80"
+        }`}
       >
-        <span className="truncate">{value || placeholder}</span>
-        <ChevronDown
-          className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
-        />
+        <span className="truncate pr-1">{value || placeholder}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          {value && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+                setSearchQuery("");
+              }}
+              className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Clear"
+            >
+              <X className="w-3.5 h-3.5" />
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
+        </div>
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute left-0 right-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-xl overflow-hidden min-w-[180px]">
           {/* مربع البحث */}
           <div className="p-2 border-b border-border bg-muted/30">
             <div className="relative">
@@ -70,12 +101,13 @@ const SearchableSelect = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
+                autoFocus
               />
             </div>
           </div>
 
           {/* الخيارات */}
-          <ul className="py-1 overflow-y-auto max-h-48 custom-scrollbar bg-card">
+          <ul className="py-1 overflow-y-auto max-h-56 custom-scrollbar bg-card">
             <li
               className={`px-3 py-2 text-sm cursor-pointer hover:bg-one/10 transition-colors ${!value ? "bg-one/5 text-one font-bold" : ""}`}
               onClick={() => {
@@ -142,11 +174,39 @@ const ReusableTable = ({
     setCurrentPage(1);
   };
 
+  const clearAllFilters = () => {
+    setColumnFilters({});
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
+
+  const activeFiltersCount = useMemo(() => {
+    const columnCount = Object.values(columnFilters).filter(
+      (v) => v !== null && v !== undefined && String(v).trim() !== "",
+    ).length;
+    return columnCount + (searchTerm.trim() ? 1 : 0);
+  }, [columnFilters, searchTerm]);
+
   const getUniqueValues = (key) => {
-    const values = data
-      .map((item) => String(item[key] || "").trim())
-      .filter(Boolean);
-    return [...new Set(values)];
+    const values = [];
+    data.forEach((item) => {
+      const raw = item[key];
+      if (raw == null || raw === "" || raw === "-") return;
+      const str = String(raw).trim();
+      if (!str || str === "-") return;
+
+      if (str.includes(",")) {
+        str.split(",").forEach((p) => {
+          const trimmed = p.trim();
+          if (trimmed && trimmed !== "-") values.push(trimmed);
+        });
+      } else {
+        values.push(str);
+      }
+    });
+    return [...new Set(values)].sort((a, b) =>
+      a.localeCompare(undefined, { numeric: true, sensitivity: "base" }),
+    );
   };
 
     // دالة للتعامل مع الانتقال للـ Drive الديناميكي في تبويب جديد
@@ -160,27 +220,41 @@ const ReusableTable = ({
   };
 
   const filteredData = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
     return data.filter((row) => {
-      const matchesGlobalSearch = columns.some((col) =>
-        String(row[col.key] || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()),
-      );
+      const matchesGlobalSearch =
+        !term ||
+        columns.some((col) =>
+          String(row[col.key] ?? "")
+            .toLowerCase()
+            .includes(term),
+        );
+
+      if (!matchesGlobalSearch) return false;
 
       const matchesColumnFilters = columns.every((col) => {
-        if (!col.filterable || !columnFilters[col.key]) return true;
+        if (!col.filterable) return true;
+        const rawFilter = columnFilters[col.key];
+        if (rawFilter == null || String(rawFilter).trim() === "") return true;
 
-        const cellValue = String(row[col.key] || "").toLowerCase();
-        const filterValue = columnFilters[col.key].toLowerCase();
+        const cellValue = String(row[col.key] ?? "").trim().toLowerCase();
+        const filterValue = String(rawFilter).trim().toLowerCase();
 
         if (col.filterType === "select") {
-          return cellValue === filterValue;
+          if (cellValue === filterValue) return true;
+          // Support multiple items in comma-separated list
+          if (cellValue.includes(",")) {
+            const parts = cellValue.split(",").map((p) => p.trim());
+            return parts.includes(filterValue);
+          }
+          return false;
         }
 
         return cellValue.includes(filterValue);
       });
 
-      return matchesGlobalSearch && matchesColumnFilters;
+      return matchesColumnFilters;
     });
   }, [data, columns, searchTerm, columnFilters]);
 
@@ -211,19 +285,32 @@ const ReusableTable = ({
             <input
               type="text"
               placeholder="Search all..."
-              className="w-full p-2 pl-10 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-one outline-none transition-all text-sm"
+              className="w-full p-2 pl-10 pr-8 border border-border rounded-lg bg-card text-foreground focus:ring-2 focus:ring-one outline-none transition-all text-sm"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setCurrentPage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {titleAdd && (
             <button
               onClick={onAddClick}
-              className="w-full md:w-auto bg-one hover:bg-one/90 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+              className="w-full md:w-auto bg-one hover:bg-one/90 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add {titleAdd}
             </button>
@@ -233,7 +320,7 @@ const ReusableTable = ({
             <button
               type="button"
               onClick={handleGoToDrive}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm"
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm cursor-pointer"
             >
               <HardDrive size={18} />
               <span>Go to Drive</span>
@@ -246,13 +333,41 @@ const ReusableTable = ({
 
       {/* قسم الفلاتر أعلى الجدول */}
       {hasFilters && (
-        <div className="p-4 bg-muted/10 border border-border rounded-xl shadow-sm">
+        <div className="p-4 bg-muted/10 border border-border rounded-xl shadow-sm space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Filters
+              </span>
+              {activeFiltersCount > 0 && (
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-one text-white rounded-full">
+                  {activeFiltersCount} active
+                </span>
+              )}
+            </div>
+
+            {activeFiltersCount > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Reset all filters and search"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Clear All Filters
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {columns
               .filter((col) => col.filterable)
               .map((col, index) => (
-                // التعديل هنا: شيلنا الـ z-10 الثابتة عشان متعملش حظر للـ Select اللي هيفتح
-                <div key={index} className="flex flex-col gap-1.5">
+                <div
+                  key={index}
+                  className="flex flex-col gap-1.5 relative"
+                  style={{ zIndex: col.filterType === "select" ? 30 - index : undefined }}
+                >
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     {col.header}
                   </label>
@@ -265,15 +380,27 @@ const ReusableTable = ({
                       placeholder="All"
                     />
                   ) : (
-                    <input
-                      type="text"
-                      placeholder={`Search ${col.header}...`}
-                      className="w-full p-2 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors"
-                      value={columnFilters[col.key] || ""}
-                      onChange={(e) =>
-                        handleColumnFilterChange(col.key, e.target.value)
-                      }
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={`Search ${col.header}...`}
+                        className="w-full p-2 pr-7 border border-border rounded-lg bg-card text-foreground text-sm outline-none focus:border-one focus:ring-1 focus:ring-one transition-colors"
+                        value={columnFilters[col.key] || ""}
+                        onChange={(e) =>
+                          handleColumnFilterChange(col.key, e.target.value)
+                        }
+                      />
+                      {columnFilters[col.key] && (
+                        <button
+                          type="button"
+                          onClick={() => handleColumnFilterChange(col.key, "")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          title="Clear filter"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
