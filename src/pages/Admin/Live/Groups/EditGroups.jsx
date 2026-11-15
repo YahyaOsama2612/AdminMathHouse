@@ -1,82 +1,19 @@
-import React, { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { SkelRows } from "@/components/admin/kit";
 import Errorpage from "@/components/Errorpage";
-import SearchStudents from "../../../../components/SearchStudents";
+import GroupForm from "./parts/GroupForm";
 
 const EditGroups = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { putData } = usePut(`/api/admin/groups/${id}`);
+  const { data: groupRes, loading, error } = useGet(`/api/admin/groups/${id}`);
 
-  const { putData, loading: saving } = usePut(`/api/admin/groups/${id}`);
-
-  // 🔹 Get group data
-  const {
-    data: groupRes,
-    loading: loadingOne,
-    error: errorOne,
-  } = useGet(`/api/admin/groups/${id}`);
-
-  // 🔹 Get select options
-  const {
-    data: selectData,
-    loading: loadingSelect,
-    error: errorSelect,
-  } = useGet("/api/admin/groups/select");
-
-  const teacherOptions = useMemo(
-    () => selectData?.data?.teachers || [],
-    [selectData],
-  );
-
-  const studentOptions = useMemo(
-    () => selectData?.data?.students || [],
-    [selectData],
-  );
-
-  const dayOptions = [
-    { value: "Sun", label: "Sunday" },
-    { value: "Mon", label: "Monday" },
-    { value: "Tue", label: "Tuesday" },
-    { value: "Wed", label: "Wednesday" },
-    { value: "Thu", label: "Thursday" },
-    { value: "Fri", label: "Friday" },
-    { value: "Sat", label: "Saturday" },
-  ];
-
-  const fields = useMemo(
-    () => [
-      {
-        name: "name",
-        label: "Group Name",
-        type: "text",
-        required: true,
-        section: "General Information",
-        helperText: "Enter group name",
-      },
-
-      {
-        name: "isActive",
-        label: "Active",
-        type: "switch",
-        section: "General Information",
-      },
-      {
-        name: "studentIds",
-        label: "Students",
-        fullWidth: true,
-        type: "custom",
-
-        render: ({ value, onChange, error }) => (
-          <SearchStudents value={value} onChange={onChange} error={error} />
-        ),
-      },
-    ],
-    [teacherOptions, studentOptions],
-  );
+  const group = groupRes?.data;
+  const known = useMemo(() => (group?.students || []).map((s) => ({ id: s.id, name: s.name, nickname: s.nickname })), [group]);
 
   const onSave = async (formData) => {
     const payload = {
@@ -84,38 +21,20 @@ const EditGroups = () => {
       studentIds: formData.studentIds || [],
       isActive: formData.isActive ?? true,
     };
-    try {
-      await putData(
-        payload,
-        `/api/admin/groups/${id}`,
-        "Group updated successfully",
-      );
-      navigate(-1);
-    } catch (e) {
-      throw e;
-    }
+    await putData(payload, `/api/admin/groups/${id}`, "Group updated successfully");
+    navigate(-1);
   };
 
-  if (loadingOne || loadingSelect || saving) return <Loader />;
-  if (errorOne || errorSelect) return <Errorpage />;
-
-  const group = groupRes?.data || {};
+  if (error) return <Errorpage />;
+  if (loading || !group) return <div><div className="skel h-10 w-64 mb-4" /><SkelRows n={6} /></div>;
 
   return (
-    <AddPage
-      title="Edit Group"
-      fields={fields}
+    <GroupForm
+      key={group.id}
+      initial={{ name: group.name || "", isActive: group.isActive ?? true, studentIds: group.students?.map((s) => s.id) || [] }}
+      knownStudents={known}
       onSave={onSave}
       onCancel={() => navigate(-1)}
-      initialData={{
-        name: group.name || "",
-        teacherId: group.teacherId || "",
-        days: group.days || [], // ✅ دلوقتي Array جاهزة
-        timeFrom: group.timeFrom || "",
-        timeTo: group.timeTo || "",
-        studentIds: group.students?.map((s) => s.id) || [],
-        isActive: group.isActive ?? true,
-      }}
     />
   );
 };

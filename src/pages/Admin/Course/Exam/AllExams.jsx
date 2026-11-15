@@ -6,6 +6,7 @@ import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
+import { Pill } from "@/components/admin/kit";
 
 const AllExams = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const AllExams = () => {
     {
       header: "Exam",
       key: "title",
+      render: (v) => <span className="font-bold text-gray-800">{v}</span>,
     },
     {
       header: "Category",
@@ -81,6 +83,7 @@ const AllExams = () => {
     {
       header: "Status",
       key: "status",
+      render: (v) => <Pill tone={v === "Active" ? "green" : "gray"}>{v}</Pill>,
     },
   ];
 

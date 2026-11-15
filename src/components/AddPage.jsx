@@ -7,6 +7,31 @@ import Select from "react-select";
 import toast from "react-hot-toast";
 import { FaPlusSquare } from "react-icons/fa";
 
+/* react-select in the MathPortal admin design (white field, grey border, maroon focus and chips) */
+const SELECT_STYLES = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 42,
+    backgroundColor: "#fff",
+    borderRadius: "0.75rem",
+    borderColor: state.isFocused ? "#7d0a0a" : "#e5e7eb",
+    boxShadow: state.isFocused ? "0 0 0 3px rgba(125,10,10,.1)" : "none",
+    fontSize: "0.875rem",
+    "&:hover": { borderColor: state.isFocused ? "#7d0a0a" : "#d1d5db" },
+  }),
+  option: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    backgroundColor: state.isSelected ? "#7d0a0a" : state.isFocused ? "#fdf2f2" : "#fff",
+    color: state.isSelected ? "#fff" : "#1f2937",
+  }),
+  menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden", zIndex: 40 }),
+  multiValue: (base) => ({ ...base, backgroundColor: "#fdf2f2", borderRadius: "0.5rem" }),
+  multiValueLabel: (base) => ({ ...base, color: "#7d0a0a", fontWeight: 600 }),
+  multiValueRemove: (base) => ({ ...base, color: "#7d0a0a", ":hover": { backgroundColor: "#7d0a0a", color: "#fff" } }),
+  placeholder: (base) => ({ ...base, color: "#9ca3af" }),
+};
+
 const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -136,20 +161,19 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
   }, {});
 
   return (
-    <div className=" md:p-1 bg-[#f8fafc] min-h-screen text-left" dir="ltr">
-      {/* Header */}
-      <div className=" mx-auto mb-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
-            {title}
-          </h1>
+    <div className="text-left" dir="ltr">
+      {/* Header (design: small section label, title, ← Back) */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{/^edit/i.test(String(title)) ? "Edit" : "New"}</p>
+          <h1 className="font-bold text-2xl text-gray-900 truncate">{title}</h1>
         </div>
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="flex items-center w-fit gap-2 px-4 py-2 bg-white
-           border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+          className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-one hover:border-one shrink-0 flex items-center gap-1.5"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
           <span>Back</span>
         </button>
       </div>
@@ -168,20 +192,18 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
             setIsSubmitting(false);
           }
         }}
-        className=" mx-auto space-y-2"
+        className="space-y-4"
       >
         {Object.entries(sections).map(([sectionTitle, sectionFields]) => (
           <div
             key={sectionTitle}
-            className="bg-white rounded-2xl shadow-sm border border-slate-100 "
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm"
           >
-            <div className="px-8 py-4 bg-slate-50/50 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-700">
-                {sectionTitle}
-              </h2>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-800">{sectionTitle}</h3>
             </div>
 
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6 text-left">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4 text-left">
               {sectionFields.map((field) => {
                 if (
                   typeof field.hidden === "function" &&
@@ -194,7 +216,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                     key={field.name}
                     className={`flex flex-col gap-1.5 ${field.fullWidth ? "col-span-1 md:col-span-2 lg:col-span-3" : ""}`}
                   >
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-1 justify-start">
+                    <label className="text-sm font-bold text-gray-700 flex items-center gap-1 justify-start">
                       {field.label}
                       {field.required && (
                         <span className="text-red-500">*</span>
@@ -217,7 +239,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         placeholder={field.placeholder}
                         disabled={field.disabled}
                         readOnly={field.readOnly}
-                        className={`p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${errors[field.name] ? "border-red-400" : "border-slate-200 focus:border-one"} ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
+                        className={`px-3 py-2.5 text-sm rounded-xl border bg-white focus:ring-2 focus:ring-one/10 outline-none transition-all ${errors[field.name] ? "border-red-400" : "border-gray-200 focus:border-one"} ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
                     )}
@@ -233,10 +255,10 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         readOnly={field.readOnly}
                         className={`
       appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none 
-      no-spinner p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${
+      no-spinner px-3 py-2.5 text-sm rounded-xl border bg-white focus:ring-2 focus:ring-one/10 outline-none transition-all ${
         errors[field.name]
           ? "border-red-400"
-          : "border-slate-200 focus:border-one"
+          : "border-gray-200 focus:border-one"
       } ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
@@ -253,10 +275,10 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         readOnly={field.readOnly}
                         className={`
       appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none 
-      no-spinner p-3 rounded-xl border bg-slate-50/30 focus:ring-4 focus:ring-one/10 outline-none transition-all ${
+      no-spinner px-3 py-2.5 text-sm rounded-xl border bg-white focus:ring-2 focus:ring-one/10 outline-none transition-all ${
         errors[field.name]
           ? "border-red-400"
-          : "border-slate-200 focus:border-one"
+          : "border-gray-200 focus:border-one"
       } ${field.disabled || field.readOnly ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                         onChange={handleChange}
                       />
@@ -290,38 +312,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         }}
                         className="basic-multi-select"
                         classNamePrefix="select"
-                        styles={{
-                          control: (provided) => ({
-                            ...provided,
-                            backgroundColor: "var(--color-two)", // خلفية الصندوق
-                            borderColor: "var(--color-one)", // لون الحدود
-                            borderRadius: "0.75rem",
-                            padding: "0.25rem",
-                          }),
-                          option: (provided, state) => ({
-                            ...provided,
-                            backgroundColor: state.isFocused
-                              ? "var(--color-three)" // عند المرور بالماوس
-                              : "var(--color-two)", // الخلفية العادية
-                            color: "var(--color-one)", // لون النص
-                          }),
-                          multiValue: (provided) => ({
-                            ...provided,
-                            backgroundColor: "var(--color-four)", // خلفية القيمة المختارة
-                          }),
-                          multiValueLabel: (provided) => ({
-                            ...provided,
-                            color: "var(--color-two)", // نص القيمة المختارة
-                          }),
-                          multiValueRemove: (provided) => ({
-                            ...provided,
-                            color: "var(--color-two)", // لون علامة الإزالة
-                            ":hover": {
-                              backgroundColor: "var(--color-one)",
-                              color: "var(--color-two)",
-                            },
-                          }),
-                        }}
+                        styles={SELECT_STYLES}
                       />
                     )}
 
@@ -353,7 +344,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         placeholderText={
                           field.placeholder || "Select date & time"
                         }
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 focus:border-one focus:ring-4 focus:ring-one/10 outline-none"
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:border-one focus:ring-2 focus:ring-one/10 outline-none"
                       />
                     )}
                     {field.type === "time" && (
@@ -382,7 +373,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         timeFormat="HH:mm"
                         dateFormat="HH:mm"
                         placeholderText={field.placeholder || "Select time"}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 focus:border-one focus:ring-4 focus:ring-one/10 outline-none"
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:border-one focus:ring-2 focus:ring-one/10 outline-none"
                       />
                     )}
 
@@ -402,7 +393,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         dateFormat="yyyy-MM-dd"
                         minDate={new Date()}
                         placeholderText={field.placeholder}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 focus:border-one focus:ring-4 focus:ring-one/10 outline-none"
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:border-one focus:ring-2 focus:ring-one/10 outline-none"
                       />
                     )}
                     {field.type === "date" && (
@@ -421,12 +412,13 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                         }
                         dateFormat="yyyy-MM-dd"
                         placeholderText={field.placeholder}
-                        className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 focus:border-one focus:ring-4 focus:ring-one/10 outline-none"
+                        className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:border-one focus:ring-2 focus:ring-one/10 outline-none"
                       />
                     )}
 
                     {field.type === "select" && (
                       <Select
+                        styles={SELECT_STYLES}
                         options={field.options}
                         value={
                           field.options?.find(
@@ -461,7 +453,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                     )}
                     {field.type === "file" && (
                       <div
-                        className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-one bg-one/5" : "border-slate-200 hover:border-one/50"}`}
+                        className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-one bg-one/5" : "border-gray-200 hover:border-one/50"}`}
                       >
                         <input
                           accept="image/png, image/jpeg, image/jpg, image/webp"
@@ -495,7 +487,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
 
                     {field.type === "pdf" && (
                       <div
-                        className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-red-500 bg-red-50" : "border-slate-200 hover:border-red-300"}`}
+                        className={`relative group border-2 border-dashed rounded-xl p-4 transition-all ${previews[field.name] ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-red-300"}`}
                       >
                         <input
                           accept="application/pdf"
@@ -562,7 +554,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                                 type="text"
                                 value={val}
                                 placeholder={`Enter Option ${orderLabel}`}
-                                className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50/30 focus:border-one focus:ring-4 focus:ring-one/10 outline-none transition-all"
+                                className="flex-1 px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white focus:border-one focus:ring-2 focus:ring-one/10 outline-none transition-all"
                                 onChange={(e) => {
                                   const newValues = [
                                     ...(formData[field.name] || []),
@@ -648,7 +640,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
                           className={`relative flex-1 group border-2 border-dashed rounded-xl p-4 transition-all ${
                             previews[field.name]
                               ? "border-one bg-one/5"
-                              : "border-slate-200 hover:border-one/50"
+                              : "border-gray-200 hover:border-one/50"
                           }`}
                         >
                           <input
@@ -747,19 +739,19 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
         ))}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-4 pb-12">
+        <div className="sticky bottom-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-white/95 backdrop-blur border-t border-gray-100 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={handleCancel}
             disabled={isSubmitting}
-            className="px-8 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 flex items-center gap-3"
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-one hover:bg-[#5a0707] shadow-lg transition-all disabled:opacity-70 flex items-center gap-2"
           >
             {isSubmitting ? (
               <>
@@ -768,7 +760,7 @@ const AddPage = ({ title, fields, onSave, onCancel, initialData }) => {
               </>
             ) : (
               <>
-                <Save size={20} />
+                <Save size={16} />
                 <span>Save Changes</span>
               </>
             )}

@@ -4,7 +4,7 @@ import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-import SearchStudents from "../../../../components/SearchStudents";
+import StudentPicker from "@/pages/Admin/Live/Groups/parts/StudentPicker";
 const AddParent = () => {
   const navigate = useNavigate();
   const { postData, loading: saving } = usePost("/api/admin/parent");
@@ -49,14 +49,10 @@ const AddParent = () => {
         fullWidth: true,
           type: "custom",
 
+        // 20 per page, search by name / nickname / email / phone; ticked students show as removable chips.
         render: ({ value, onChange, error }) => (
-    <SearchStudents
-      value={value}
-      onChange={onChange}
-      error={error}
-      limit={3}
-    />
-  )
+          <StudentPicker value={value || []} onChange={(ids) => onChange(ids)} error={error} />
+        ),
       },
     ],
     []

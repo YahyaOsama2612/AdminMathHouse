@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import Select from "react-select";
 import useGet from "@/hooks/useGet";
+import { SELECT_STYLES } from "./parts/formKit";
 
 const ExamSessionCourseFields = ({
   categoryId,
@@ -58,9 +59,9 @@ const ExamSessionCourseFields = ({
   );
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-bold text-slate-700">Category</label>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label className="a-lbl-f">Category</label>
         <Select
           options={categoryOptions}
           value={
@@ -74,17 +75,16 @@ const ExamSessionCourseFields = ({
           isLoading={categoriesLoading}
           isDisabled={categoriesLoading || Boolean(categoriesError)}
           isClearable
-          placeholder="Select category..."
+          placeholder="Select category…"
+          styles={SELECT_STYLES}
         />
         {categoriesError && (
-          <p className="text-xs text-red-500">Could not load categories.</p>
+          <p className="text-xs font-semibold text-red-600 mt-1">Could not load categories.</p>
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-bold text-slate-700">
-          Subcategory
-        </label>
+      <div>
+        <label className="a-lbl-f">Subcategory</label>
         <Select
           options={subCategoryOptions}
           value={
@@ -100,15 +100,16 @@ const ExamSessionCourseFields = ({
             !categoryId || subCategoriesLoading || Boolean(subCategoriesError)
           }
           isClearable
-          placeholder="Select subcategory..."
+          placeholder="Select subcategory…"
+          styles={SELECT_STYLES}
         />
         {subCategoriesError && (
-          <p className="text-xs text-red-500">Could not load subcategories.</p>
+          <p className="text-xs font-semibold text-red-600 mt-1">Could not load subcategories.</p>
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-bold text-slate-700">Course</label>
+      <div>
+        <label className="a-lbl-f">Course</label>
         <Select
           options={courseOptions}
           value={
@@ -120,10 +121,11 @@ const ExamSessionCourseFields = ({
           isLoading={coursesLoading}
           isDisabled={!subCategoryId || coursesLoading || Boolean(coursesError)}
           isClearable
-          placeholder="Select course..."
+          placeholder="Select course…"
+          styles={SELECT_STYLES}
         />
         {coursesError && (
-          <p className="text-xs text-red-500">Could not load courses.</p>
+          <p className="text-xs font-semibold text-red-600 mt-1">Could not load courses.</p>
         )}
       </div>
     </div>

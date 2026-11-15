@@ -1,9 +1,8 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 
 const AddCategory = () => {
@@ -99,14 +98,14 @@ const AddCategory = () => {
         "/api/admin/category",
         "Category added successfully",
       );
-      navigate("/admin/courses/categories");
+      navigate("/admin/courses/categories/manage");
     } catch (error) {
       throw error;
     }
   };
 
   if (loadingCats) {
-    return <Loader />;
+    return <FormSkeleton />;
   }
 
   if (error) {
@@ -114,11 +113,12 @@ const AddCategory = () => {
   }
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[{ label: "Courses & content", to: "/admin/courses/categories" }, { label: "Categories", to: "/admin/courses/categories/manage" }, { label: "Add category" }]}
       title="Add Category"
       fields={fields}
       onSave={onSave}
-      onCancel={() => navigate("/admin/courses/categories")}
+      onCancel={() => navigate("/admin/courses/categories/manage")}
       initialData={initialFormValues}
     />
   );

@@ -1,55 +1,39 @@
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReusableTable from "@/components/ReusableTable";
+import { ChevronRight, ClipboardCheck, ClipboardList, DollarSign, FileText, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import useGet from "@/hooks/useGet";
-import React, { useMemo, useState } from "react";
-import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
-import NavChild from "@/components/NavChild";
-import Loader from "@/components/Loader";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import Errorpage from "@/components/Errorpage";
-import usePost from "@/hooks/usePost";
-import { MdGridView } from "react-icons/md";
-import IconButton from "@/components/IconButton";
-import { MdAttachMoney } from "react-icons/md";
-import PricePlansModal from "@/components/PricePlansModal";
-import { Users, ClipboardList, DollarSign } from "lucide-react";
+import { Modal } from "@/components/admin/kit";
+import { Avatars, Chip, EmptyBox, HeroCard, IconBtn, PageSkeleton, PlansModal, Thumb, plural } from "../parts/catalog";
+
+/* Courses of one category (MathPortal "Categories" design: course cards).
+   Endpoints: GET /api/admin/courses/category/:categoryId, GET /api/admin/category/:categoryId,
+              GET /api/admin/teacher, DELETE /api/admin/courses/:id
+   A card opens courses/semester/:id (courses with semesters) or courses/chapters/:id. */
 
 const Courses = () => {
   const navigate = useNavigate();
   const { categoryId } = useParams();
 
-  const { data, loading, refetch, error } = useGet(
-    `/api/admin/courses/category/${categoryId}`,
-  );
-
-  const {
-    data: categoryRes,
-    loading: loadingOne,
-    error: errorOne,
-  } = useGet(`/api/admin/category/${categoryId}`);
-
+  const { data, loading, refetch, error } = useGet(`/api/admin/courses/category/${categoryId}`);
+  const { data: categoryRes, loading: loadingOne, error: errorOne } = useGet(`/api/admin/category/${categoryId}`);
   const category = categoryRes?.data?.data || {};
 
   const [optionPopup, setOptionPopup] = useState({ open: false, row: null });
+  const [pricePopup, setPricePopup] = useState({ open: false, row: null });
 
-  // prices popup
-  const [pricePopup, setPricePopup] = useState({
-    open: false,
-    row: null,
-  });
-
-  const { data: teachersData, loading: teachersLoading } =
-    useGet("/api/admin/teacher");
-
+  const { data: teachersData } = useGet("/api/admin/teacher");
   const teachers = teachersData?.data?.teacher || [];
 
   const { deleteData, loading: deleteLoading } = useDelete();
-  const { postData, loading: addTeacherLoading } = usePost();
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [openTeacherModal, setOpenTeacherModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [q, setQ] = useState("");
+  const [sem, setSem] = useState("all");
 
   const handleDelete = (row) => {
     setSelectedRow(row);
@@ -63,67 +47,6 @@ const Courses = () => {
     refetch();
   };
 
-  const handleRemoveTeacher = async (courseId, teacherId) => {
-    await deleteData(`/api/admin/courses/${courseId}/teachers/${teacherId}`);
-
-    setSelectedRow((prev) => ({
-      ...prev,
-      teachers: prev.teachers.filter((t) => t.teacherId !== teacherId),
-    }));
-
-    refetch();
-  };
-
-  const handleAddTeacher = async (courseId, teacherId) => {
-    await postData(
-      { teacherId },
-      `/api/admin/courses/${courseId}/teachers`,
-      "Teacher added successfully",
-    );
-
-    const addedTeacher = teachers.find((t) => t.id === teacherId);
-
-    if (addedTeacher) {
-      setSelectedRow((prev) => ({
-        ...prev,
-        teachers: [
-          ...(prev.teachers || []),
-          {
-            teacherId: addedTeacher.id,
-            name: addedTeacher.name,
-            email: addedTeacher.email,
-            avatar: addedTeacher.avatar,
-          },
-        ],
-      }));
-    }
-
-    setSelectedTeacherId("");
-    refetch();
-  };
-
-  const columns = [
-    {
-      header: "Image",
-      key: "image",
-      render: (value) => (
-        <img
-          src={value || "/placeholder.png"}
-          className="w-12 h-12 object-cover rounded-md"
-        />
-      ),
-    },
-    { header: "Name", key: "name" },
-    { header: "Description", key: "description" },
-    {
-      header: "Semester",
-      key: "isHaveSemester",
-      filterable: true,
-      filterType: "select",
-    },
-  ];
-
-  // UPDATED: include prices
   const tableData = useMemo(() => {
     return (
       data?.data?.data?.map((course) => ({
@@ -134,7 +57,8 @@ const Courses = () => {
         duration: course.duration,
         isHaveSemester: course.isHaveSemester,
         prices: course.prices || [],
-        teachers: course.teachers,
+        teachers: course.teachers || [],
+        semesters: course.semesters || [],
         raw: course,
       })) || []
     );
@@ -144,96 +68,137 @@ const Courses = () => {
     navigate(`/admin/courses/courses/edit/${row.id}`);
   };
 
-  const assignedTeacherIds =
-    selectedRow?.teachers?.map((t) => t.teacherId) || [];
-
-  const availableTeachers = teachers.filter(
-    (teacher) => !assignedTeacherIds.includes(teacher.id),
-  );
+  const openCourse = (row) => {
+    navigate(row.isHaveSemester ? `/admin/courses/semester/${row.id}` : `/admin/courses/chapters/${row.id}`, {
+      state: { courseId: row.id, courseName: row.name },
+    });
+  };
 
   const courseTeachers = useMemo(() => {
     if (!selectedRow) return [];
-
-    return teachers.filter((teacher) =>
-      teacher.courses?.some((course) => course.id === selectedRow.id),
-    );
+    return teachers.filter((teacher) => teacher.courses?.some((course) => course.id === selectedRow.id));
   }, [teachers, selectedRow]);
 
-  if (loading || loadingOne) return <Loader />;
+  const needle = q.trim().toLowerCase();
+  const shown = tableData.filter(
+    (c) =>
+      (!needle || `${c.name} ${c.description || ""} ${c.teachers.map((t) => t.name).join(" ")}`.toLowerCase().includes(needle)) &&
+      (sem === "all" || (sem === "yes" ? !!c.isHaveSemester : !c.isHaveSemester)),
+  );
+  const filtered = !!needle || sem !== "all";
+
+  const teacherCount = new Set(tableData.flatMap((c) => c.teachers.map((t) => t.teacherId))).size;
+  const noPlan = tableData.filter((c) => !c.prices.length).length;
+  const ancestors = [...(category.ancestors || [])].reverse();
+
   if (error || errorOne) return <Errorpage />;
+  if (!data || !categoryRes) return <PageSkeleton />;
 
   return (
     <div>
-      <ReusableTable
-        title={`Courses | ${category.name}`}
-        titleAdd="Course"
-        columns={columns}
-        data={tableData}
-        loading={loading || deleteLoading}
-        onAddClick={() =>
-          navigate(`/admin/courses/courses/add`, {
-            state: { categoryId },
-          })
+      <HeroCard
+        crumbs={[
+          { label: "Categories", to: "/admin/courses/categories" },
+          ...ancestors.map((a) => ({ label: a.name, to: "/admin/courses/categories" })),
+          { label: category.name || "Courses" },
+        ]}
+        thumb={<Thumb src={category.image} name={category.name || "?"} size={56} />}
+        kicker={`Category${ancestors.length ? ` · ${ancestors[ancestors.length - 1].name}` : ""}`}
+        title={category.name || "Courses"}
+        desc={category.description}
+        actions={
+          <button type="button" onClick={() => navigate(`/admin/courses/courses/add`, { state: { categoryId } })} className="a-btn primary">
+            <Plus size={16} /> Add course
+          </button>
         }
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        extraActions={(row) => (
-          <div className="flex gap-2">
-            {/* Semester / Chapters */}
-            {row.isHaveSemester ? (
-              <NavChild
-                route={`/admin/courses/semester/${row.id}`}
-                state={{ courseId: row.id, courseName: row.name }}
-              />
-            ) : (
-              <NavChild
-                route={`/admin/courses/chapters/${row.id}`}
-                state={{ courseId: row.id, courseName: row.name }}
-              />
-            )}
+        stats={[
+          { label: "Courses", value: tableData.length },
+          { label: "With semesters", value: tableData.filter((c) => c.isHaveSemester).length },
+          { label: "Teachers", value: teacherCount },
+          { label: "No price plan", value: noPlan, color: noPlan ? "#b45309" : "#15803d" },
+        ]}
+      />
 
-            {/* Teachers */}
-            <button
-              onClick={() => {
-                setSelectedRow(row);
-                setSelectedTeacherId("");
-                setOpenTeacherModal(true);
-              }}
-              className="p-2 rounded-lg hover:bg-slate-100 transition"
-              title="Teachers"
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses or teachers…" className="a-inp h-10 py-0 pl-9" />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[["all", "All"], ["yes", "With semesters"], ["no", "No semesters"]].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setSem(v)} className={`a-chip ${sem === v ? "on" : ""}`}>{l}</button>
+          ))}
+        </div>
+        <span className="text-xs text-gray-500 ml-auto">
+          {plural(shown.length, "course")}
+          {filtered && (
+            <>
+              {" · "}
+              <button type="button" onClick={() => { setQ(""); setSem("all"); }} className="font-bold text-one hover:underline">Clear filters</button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {!tableData.length ? (
+        <EmptyBox title="No courses yet" text="Add the first course to this category.">
+          <button type="button" onClick={() => navigate(`/admin/courses/courses/add`, { state: { categoryId } })} className="a-btn primary mt-4">
+            <Plus size={16} /> Add course
+          </button>
+        </EmptyBox>
+      ) : !shown.length ? (
+        <EmptyBox title="No courses match" text="Try another search or filter." />
+      ) : (
+        <div className={`grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 ${deleteLoading ? "opacity-60 pointer-events-none" : ""}`}>
+          {shown.map((row) => (
+            <div
+              key={row.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openCourse(row)}
+              onKeyDown={(e) => e.key === "Enter" && openCourse(row)}
+              className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-[#7d0a0a]/40 hover:shadow-md transition cursor-pointer flex flex-col gap-3"
             >
-              <Users className="w-5 h-5 text-red-900" />
-            </button>
+              <div className="flex items-start gap-3">
+                <Thumb src={row.image} name={row.name} size={44} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-gray-900 leading-snug break-words">{row.name}</p>
+                  <p className="text-xs text-gray-500 line-clamp-2">{row.description || "No description"}</p>
+                </div>
+              </div>
 
-            {/* Exams */}
-            <button
-              onClick={() => setOptionPopup({ open: true, row })}
-              className="p-2 rounded-lg hover:bg-slate-100 transition"
-              title="Exams"
-            >
-              <ClipboardList className="w-5 h-5 text-red-900" />
-            </button>
+              <div className="flex flex-wrap gap-1">
+                {row.isHaveSemester ? <Chip tone="blue">Semesters · {row.semesters.length}</Chip> : <Chip tone="faint">No semesters</Chip>}
+                {row.prices.length ? <Chip tone="green">{plural(row.prices.length, "price plan")}</Chip> : <Chip tone="amber">No price plan</Chip>}
+              </div>
 
-            {/* Prices */}
-            <button
-              onClick={() => setPricePopup({ open: true, row })}
-              className="p-2 rounded-lg hover:bg-slate-100 transition"
-              title="Price Plans"
-            >
-              <DollarSign className="w-5 h-5 text-red-900" />
-            </button>
-          </div>
-        )}
-      >
-        <IconButton
-          icon={MdGridView}
-          color="bg-one"
-          navigateTo={`/admin/courses/categories`}
-          name="Categories"
-        />
-      </ReusableTable>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <IconBtn title={`Exams & diagnostics for ${row.name}`} onClick={() => setOptionPopup({ open: true, row })}><ClipboardList size={15} /></IconBtn>
+                <IconBtn title={`Price plans of ${row.name}`} onClick={() => setPricePopup({ open: true, row })}><DollarSign size={15} /></IconBtn>
+                <IconBtn title={`Edit ${row.name}`} onClick={() => handleEdit(row)}><Pencil size={15} /></IconBtn>
+                <IconBtn title={`Delete ${row.name}`} danger onClick={() => handleDelete(row)}><Trash2 size={15} /></IconBtn>
+              </div>
 
-      {/* DELETE MODAL */}
+              <div className="flex items-center justify-between gap-3 mt-auto pt-2 border-t border-gray-50">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setOpenTeacherModal(true); }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 rounded-lg hover:bg-gray-100 px-1.5 py-0.5 -ml-1.5"
+                  title="Course teachers"
+                >
+                  {row.teachers.length ? <Avatars people={row.teachers} /> : <Users size={15} className="text-gray-400" />}
+                  <span className="text-xs text-gray-500">{plural(row.teachers.length, "teacher")}</span>
+                </button>
+                <span className="text-xs font-bold text-one flex items-center gap-0.5 opacity-70 group-hover:opacity-100">
+                  {row.isHaveSemester ? "Semesters" : "Chapters"} <ChevronRight size={14} />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <ConfirmDeleteModal
         open={openDeleteModal}
         onClose={() => setOpenDeleteModal(false)}
@@ -242,156 +207,74 @@ const Courses = () => {
         description={`Are you sure you want to delete "${selectedRow?.name}" ?`}
       />
 
-      <PricePlansModal
-        open={pricePopup.open}
-        row={pricePopup.row}
-        onClose={() => setPricePopup({ open: false, row: null })}
-      />
+      <PlansModal open={pricePopup.open} row={pricePopup.row} onClose={() => setPricePopup({ open: false, row: null })} />
 
       {optionPopup.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg">
-            <div className="flex flex-col p-1.5 bg-white rounded-xl border border-slate-100 shadow-lg min-w-[220px]">
-              {/* Exam Button */}
-              <button
-                onClick={() =>
-                  navigate(`/admin/courses/exam/${optionPopup.row.id}`)
-                }
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-lg transition-colors text-left"
-              >
-                <svg
-                  className="w-4 h-4 opacity-70"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span>
-                  Exam for{" "}
-                  <span className="font-semibold text-slate-900 group-hover:text-indigo-600">
-                    {optionPopup.row?.name}
-                  </span>
-                </span>
-              </button>
-
-              {/* Diagnostic Exam Button */}
-              <button
-                onClick={() =>
-                  navigate(
-                    `/admin/courses/diagnosticexam/${optionPopup.row.id}`,
-                  )
-                }
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-lg transition-colors text-left"
-              >
-                <svg
-                  className="w-4 h-4 opacity-70"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
-                <span>
-                  Diagnostic Exam for{" "}
-                  <span className="font-semibold text-slate-900">
-                    {optionPopup.row?.name}
-                  </span>
-                </span>
-              </button>
-            </div>
-
+        <Modal
+          title="Exams & diagnostics"
+          onClose={() => setOptionPopup({ open: false, row: null })}
+          actions={<button type="button" onClick={() => setOptionPopup({ open: false, row: null })} className="a-btn">Close</button>}
+        >
+          <p className="text-xs text-gray-400 -mt-1 mb-3">{optionPopup.row?.name}</p>
+          <div className="space-y-2">
             <button
-              className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
-              onClick={() => setOptionPopup({ open: false, row: null })}
+              type="button"
+              onClick={() => navigate(`/admin/courses/exam/${optionPopup.row.id}`)}
+              className="w-full flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-left hover:border-[#7d0a0a]/40 hover:bg-red-50/40"
             >
-              close
+              <span className="w-9 h-9 rounded-lg bg-red-50 text-one flex items-center justify-center shrink-0"><FileText size={17} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-gray-900">Exams</span>
+                <span className="block text-xs text-gray-400">Exam for {optionPopup.row?.name}</span>
+              </span>
+              <ChevronRight size={16} className="text-gray-300" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/courses/diagnosticexam/${optionPopup.row.id}`)}
+              className="w-full flex items-center gap-3 rounded-xl border border-gray-100 px-4 py-3 text-left hover:border-[#7d0a0a]/40 hover:bg-red-50/40"
+            >
+              <span className="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-gray-900">Diagnostic exams</span>
+                <span className="block text-xs text-gray-400">Diagnostic exam for {optionPopup.row?.name}</span>
+              </span>
+              <ChevronRight size={16} className="text-gray-300" />
             </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {openTeacherModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b">
-              <div>
-                <h2 className="text-xl font-bold">Course Teachers</h2>
-                <p className="text-sm text-slate-500">{selectedRow?.name}</p>
-              </div>
-
-              <button
-                onClick={() => setOpenTeacherModal(false)}
-                className="text-slate-500 hover:text-red-600 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="max-h-[500px] overflow-y-auto p-6">
-              {courseTeachers.length === 0 ? (
-                <div className="text-center py-10 text-slate-500">
-                  No teachers assigned to this course.
+        <Modal
+          title="Course teachers"
+          wide
+          onClose={() => setOpenTeacherModal(false)}
+          actions={<button type="button" onClick={() => setOpenTeacherModal(false)} className="a-btn primary">Close</button>}
+        >
+          <p className="text-xs text-gray-400 -mt-1 mb-3">{selectedRow?.name}</p>
+          {courseTeachers.length === 0 ? (
+            <p className="text-center py-8 text-gray-400">No teachers assigned to this course.</p>
+          ) : (
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {courseTeachers.map((teacher) => (
+                <div key={teacher.id} className="flex items-center gap-3 rounded-xl border border-gray-100 p-3">
+                  {teacher.avatar ? (
+                    <img src={teacher.avatar} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 bg-gray-100" />
+                  ) : (
+                    <span className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-extrabold text-white shrink-0 bg-one">
+                      {String(teacher.name || "?").trim().split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900">{teacher.name}</p>
+                    <p className="text-xs text-gray-500 break-all">{[teacher.email, teacher.phoneNumber].filter(Boolean).join(" · ")}</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {courseTeachers.map((teacher) => (
-                    <div
-                      key={teacher.id}
-                      className="flex items-center gap-4 border rounded-xl p-4 hover:bg-slate-50"
-                    >
-                      <img
-                        src={
-                          teacher.avatar ||
-                          "https://ui-avatars.com/api/?name=" +
-                            encodeURIComponent(teacher.name)
-                        }
-                        alt={teacher.name}
-                        className="w-14 h-14 rounded-full object-cover"
-                      />
-
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-slate-800">
-                          {teacher.name}
-                        </h3>
-
-                        <p className="text-sm text-slate-500">
-                          {teacher.email}
-                        </p>
-
-                        <p className="text-sm text-slate-500">
-                          {teacher.phoneNumber}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
-
-            {/* Footer */}
-            <div className="border-t px-6 py-4 flex justify-end">
-              <button
-                onClick={() => setOpenTeacherModal(false)}
-                className="px-5 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

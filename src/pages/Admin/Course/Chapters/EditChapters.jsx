@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 
@@ -184,6 +183,7 @@ const EditChapters = () => {
 
       pricePlans:
         data?.prices?.map((p) => ({
+          id: p.id, // keep the plan id so enrolments that use it stay linked
           label: p.durationLabel,
           days: p.durationDays,
           priceEgp: p.priceEgp,
@@ -256,6 +256,7 @@ const EditChapters = () => {
 
     // convert pricePlans → backend format
     payload.pricePlans = formData.pricePlans.map((p) => ({
+      id: p.id,
       label: p.label,
       days: Number(p.days),
       priceEgp: Number(p.priceEgp),
@@ -275,15 +276,34 @@ const EditChapters = () => {
   };
 
   // LOADING
-  if (loadingChapter || loadingTeachers || loadingCourses || loadingSemesters)
-    return <Loader />;
+  // semesters reload when the course is changed in the form; keep the form mounted while they do
+  if (loadingChapter || loadingTeachers || loadingCourses || (loadingSemesters && !semestersRes))
+    return <FormSkeleton />;
 
   if (error || errorTeachers || errorCourses || errorSemesters)
     return <Errorpage />;
 
   // UI
+  const ch = chapterRes?.data;
+
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        ch?.category?.id && { label: ch.category.name || "Courses", to: `/admin/courses/courses/${ch.category.id}` },
+        ch?.course?.id && {
+          label: ch.course.name || "Course",
+          to: ch?.semester?.id ? `/admin/courses/semester/${ch.course.id}` : `/admin/courses/chapters/${ch.course.id}`,
+          state: { courseId: ch.course.id, courseName: ch.course.name },
+        },
+        ch?.semester?.id && {
+          label: ch.semester.name || "Semester",
+          to: `/admin/courses/chapters/semester/${ch.semester.id}`,
+          state: { courseId: ch?.course?.id, semesterId: ch.semester.id, semesterName: ch.semester.name, courseName: ch?.course?.name },
+        },
+        ch?.chapter?.id && { label: ch.chapter.name || "Chapter", to: `/admin/courses/lessons/${ch.chapter.id}` },
+        { label: "Edit chapter" },
+      ]}
       title="Edit Chapter"
       fields={fields}
       onSave={onSave}

@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
 import { toast } from "react-hot-toast";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 
@@ -153,11 +152,18 @@ const AddCourses = () => {
     navigate(`/admin/courses/courses/${formData.categoryId}`);
   };
 
-  if (loadingTeachers || loadingCats) return <Loader />;
+  if (loadingTeachers || loadingCats) return <FormSkeleton />;
   if (error || errorTeachers) return <Errorpage />;
 
+  const categoryName = categoryOptions.find((c) => c.value === categoryId)?.label;
+
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        categoryId && { label: categoryName || "Courses", to: `/admin/courses/courses/${categoryId}` },
+        { label: "Add course" },
+      ]}
       title="Add Course"
       fields={fields}
       onSave={onSave}

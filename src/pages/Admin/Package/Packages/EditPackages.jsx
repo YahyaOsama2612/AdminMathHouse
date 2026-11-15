@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { API_URL } from "@/api/api";
 import { useNavigate, useParams } from "react-router-dom";
 import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
@@ -42,7 +43,7 @@ const EditPackages = () => {
       setLoadingCourses(true);
       try {
         const res = await axios.get(
-          `https://bcknd.mathshouse.net/api/admin/package/courses/${selectedCategoryId}`,
+          `${API_URL}/api/admin/package/courses/${selectedCategoryId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },

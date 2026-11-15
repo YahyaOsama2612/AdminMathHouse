@@ -8,43 +8,9 @@ import usePost from "@/hooks/usePost";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import TipTapMathEditor from "../../../../components/TipTapMathEditor";
+import { AddMethodButton, DrivePickerField, LetterPicker, MethodCard, OcrButton } from "./parts/qb";
 import DrivePicker from "../../../../components/Drivepicker";
 
-// Reusable Drive picker field UI
-const DrivePickerField = ({ value, allowedTypes, onOpen, onClear }) => (
-  <div className="flex flex-col gap-2 w-full">
-    {value ? (
-      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-        <span className="text-lg">
-          {allowedTypes[0] === "video"
-            ? "🎬"
-            : allowedTypes[0] === "pdf"
-              ? "📕"
-              : "🖼️"}
-        </span>
-        <span className="flex-1 text-sm text-slate-700 truncate">
-          {value.split("/").pop()}
-        </span>
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-xs text-red-500 hover:text-red-700 font-semibold shrink-0"
-        >
-          Remove
-        </button>
-      </div>
-    ) : (
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-slate-500 hover:text-indigo-600 transition-all text-sm font-medium"
-      >
-        <span>📂</span>
-        <span>Select from Drive</span>
-      </button>
-    )}
-  </div>
-);
 
 const EditQuestions = () => {
   const { id } = useParams();
@@ -165,21 +131,11 @@ const EditQuestions = () => {
         section: "General Information",
         fullWidth: true,
         actionButton: ({ formData, setFormData }) => (
-          <button
-            type="button"
+          <OcrButton
             onClick={() => handleOCR(formData.image, setFormData)}
             disabled={ocrLoading || !formData.image}
-            className="w-full md:w-auto h-full px-8 py-4 bg-one text-white rounded-xl hover:bg-one/80 disabled:opacity-50 flex items-center justify-center gap-2 transition-all font-bold shadow-sm"
-          >
-            {ocrLoading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Extracting...</span>
-              </>
-            ) : (
-              <>📄 Extract Text</>
-            )}
-          </button>
+            loading={ocrLoading}
+          />
         ),
       },
       {
@@ -306,21 +262,7 @@ const EditQuestions = () => {
           const letters = Array.from({ length: count }, (_, i) =>
             String.fromCharCode(65 + i),
           );
-          return (
-            <div className="flex flex-wrap gap-3">
-              {letters.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => onChange(l)}
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold transition-all border-2
-                  ${value === l ? "bg-one text-white border-one shadow-lg scale-110" : "bg-white text-slate-500 border-slate-200"}`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          );
+          return <LetterPicker letters={letters} value={value} onChange={onChange} />;
         },
       },
 
@@ -399,28 +341,15 @@ const EditQuestions = () => {
           };
 
           return (
-            <div className="flex flex-col gap-6 w-full">
+            <div className="flex flex-col gap-3 w-full">
               {methods.map((method, index) => (
-                <div
+                <MethodCard
                   key={index}
-                  className="border border-slate-200 rounded-2xl p-4 flex flex-col gap-4 bg-slate-50/40"
+                  index={index}
+                  canRemove={methods.length > 1}
+                  onRemove={() => removeMethod(index)}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-600">
-                      Method {index + 1}
-                    </span>
-                    {methods.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeMethod(index)}
-                        className="text-xs text-red-500 hover:text-red-700 font-semibold"
-                      >
-                        🗑 Remove Method
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <DrivePickerField
                       value={method.answerImage}
                       allowedTypes={["image"]}
@@ -463,8 +392,8 @@ const EditQuestions = () => {
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-500 mb-1 block">
-                      Answer Text / Explanation
+                    <label className="text-[11px] font-bold text-gray-500 mb-1 block">
+                      Explanation
                     </label>
                     <TipTapMathEditor
                       value={method.answerText}
@@ -473,16 +402,10 @@ const EditQuestions = () => {
                       }
                     />
                   </div>
-                </div>
+                </MethodCard>
               ))}
 
-              <button
-                type="button"
-                onClick={addMethod}
-                className="self-start flex items-center gap-2 px-4 py-2 bg-one/10 text-one font-bold rounded-xl hover:bg-one/20 transition-all text-sm"
-              >
-                ➕ Add Another Method
-              </button>
+              <AddMethodButton onClick={addMethod} />
             </div>
           );
         },

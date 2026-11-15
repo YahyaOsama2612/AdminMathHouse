@@ -253,7 +253,7 @@ const AddExam = () => {
     };
 
     await postData(payload, "/api/admin/exams", "Exam created successfully");
-    navigate(`/admin/course/exams/${courseId}`);
+    navigate(`/admin/courses/exam/${courseId}`);
   };
 
   if (loading) return <Loader />;
@@ -264,7 +264,7 @@ const AddExam = () => {
         title="Add Exam"
         fields={fields}
         onSave={onSave}
-        onCancel={() => navigate(`/admin/course/exams/${courseId}`)}
+        onCancel={() => navigate(`/admin/courses/exam/${courseId}`)}
         initialData={{
           examType: "",
           title: "",

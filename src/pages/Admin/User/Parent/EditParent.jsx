@@ -6,8 +6,7 @@ import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-// 1. استيراد مكون البحث عن الطلاب هنا
-import SearchStudents from "../../../../components/SearchStudents";
+import StudentPicker from "@/pages/Admin/Live/Groups/parts/StudentPicker";
 
 const EditParent = () => {
   const navigate = useNavigate();
@@ -15,6 +14,9 @@ const EditParent = () => {
 
   const { data: parentRes, loading, error } = useGet(`/api/admin/parent/${id}`);
   const { putData, loading: saving } = usePut(`/api/admin/parent/${id}`);
+  const parent = parentRes?.data?.data;
+  // Students already linked to this parent (GET /api/admin/parent/:id → students [{ id, name, nickname, email }])
+  const linked = useMemo(() => parent?.students || [], [parent]);
 
   const fields = useMemo(
     () => [
@@ -50,22 +52,17 @@ const EditParent = () => {
         section: "Contact Information",
       },
       {
-        // 2. إضافة جدول اختيار الطلاب بنفس الإعدادات والـ Limit
+        // Already-linked students start ticked and show by name; saving keeps exactly the ticked ones.
         name: "studentIds",
         label: "Students",
         fullWidth: true,
         type: "custom",
         render: ({ value, onChange, error }) => (
-          <SearchStudents
-            value={value}
-            onChange={onChange}
-            error={error}
-            limit={3}
-          />
+          <StudentPicker value={value || []} onChange={(ids) => onChange(ids)} known={linked} error={error} />
         ),
       },
     ],
-    [],
+    [linked],
   );
 
   const onSave = async (formData) => {
@@ -101,10 +98,6 @@ const EditParent = () => {
     return <Errorpage />;
   }
 
-  const parent = parentRes?.data?.data;
-
-  // ملاحظة: تأكد من شكل الـ API عندك، إذا كان يرجع الطلاب كـ Object كاملة أو IDs مباشرة.
-  // السطر بالأسفل يفترض أن الـ API يرجع مصفوفة من الـ IDs أو كائنات بداخلها id.
   const currentStudents =
     parent?.students?.map((student) => student._id || student.id) ||
     parent?.studentIds ||

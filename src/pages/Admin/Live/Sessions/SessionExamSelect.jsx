@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import Select from "react-select";
 import useGet from "@/hooks/useGet";
+import { FileText } from "lucide-react";
+import { FieldError, SELECT_STYLES } from "./parts/formKit";
 
 const EXAM_TYPES = ["static", "adaptive", "extra", "trail"];
 
@@ -54,64 +56,32 @@ const SessionExamSelect = ({ value, onChange, error }) => {
   const answersPdf = selectedExam?.session_answers_pdf;
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-bold text-slate-700">
-        Select Exam <span className="text-red-500">*</span>
-      </label>
+    <div>
+      <label className="a-lbl-f">Exam <span className="text-red-500">*</span></label>
       <Select
         options={options}
-        value={
-          options.find(
-            (option) => String(option.value) === String(value),
-          ) || null
-        }
+        value={options.find((option) => String(option.value) === String(value)) || null}
         onChange={(option) => onChange(option?.value || "")}
         isLoading={examsLoading}
         isDisabled={examsLoading || Boolean(examsError)}
         isClearable
-        placeholder="Choose the exam for this session..."
+        placeholder="Choose the exam for this session…"
+        styles={SELECT_STYLES}
       />
-      {error && (
-        <p className="text-xs text-red-500">
-          {typeof error === "object"
-            ? error.message || JSON.stringify(error)
-            : String(error)}
-        </p>
-      )}
-      {examsError && (
-        <p className="text-xs text-red-500">Could not load exams.</p>
-      )}
-      {value && selectedExamError && (
-        <p className="text-xs text-red-500">Could not load the selected exam.</p>
-      )}
-      {value && selectedExamLoading && (
-        <p className="text-xs text-slate-400">Loading exam PDFs...</p>
-      )}
+      <FieldError msg={error} />
+      {examsError && <p className="text-xs font-semibold text-red-600 mt-1">Could not load exams.</p>}
+      {value && selectedExamError && <p className="text-xs font-semibold text-red-600 mt-1">Could not load the selected exam.</p>}
+      {value && selectedExamLoading && <div className="skel h-9 mt-2"></div>}
       {value && !selectedExamLoading && !selectedExamError && (
-        <div className="flex flex-wrap gap-4 text-sm">
-          {sessionPdf ? (
-            <a
-              href={sessionPdf}
-              target="_blank"
-              rel="noreferrer"
-              className="text-one underline"
-            >
-              View Session PDF
-            </a>
-          ) : (
-            <span className="text-slate-400">No session PDF on this exam</span>
-          )}
-          {answersPdf ? (
-            <a
-              href={answersPdf}
-              target="_blank"
-              rel="noreferrer"
-              className="text-one underline"
-            >
-              View Answers PDF
-            </a>
-          ) : (
-            <span className="text-slate-400">No answers PDF on this exam</span>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {[["Session PDF", sessionPdf], ["Answers PDF", answersPdf]].map(([label, url]) =>
+            url ? (
+              <a key={label} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-one hover:bg-red-50/50">
+                <FileText size={14} /> View {label}
+              </a>
+            ) : (
+              <span key={label} className="inline-flex items-center rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-400">No {label.toLowerCase()} on this exam</span>
+            ),
           )}
         </div>
       )}

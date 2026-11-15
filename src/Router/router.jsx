@@ -6,6 +6,7 @@ import AdminLayout from "../Layout/AdminLayout";
 import Errorpage from "../components/Errorpage";
 import Home from "../pages/Home/Home";
 import Filter from "../pages/Admin/Filter/Filter";
+import CourseFilter from "../pages/Admin/Filter/CourseFilter";
 
 import Admin from "../pages/Admin/Admins/Admin/Admin";
 import AddAdmin from "../pages/Admin/Admins/Admin/AddAdmin";
@@ -21,6 +22,7 @@ import EditStudent from "../pages/Admin/User/Student/EditStudent";
 import Attend from "../pages/Admin/User/Student/Attend";
 import UserPackage from "../pages/Admin/User/Package/userpackage";
 import StudentInformation from "../pages/Admin/User/Student/Studentinfomation";
+import CatalogHome from "../pages/Admin/Course/Category/CatalogHome";
 import Category from "../pages/Admin/Course/Category/Category";
 import AddCategory from "../pages/Admin/Course/Category/AddCategory";
 import EditCategory from "../pages/Admin/Course/Category/EditCategory";
@@ -86,6 +88,25 @@ import EditSessions from "../pages/Admin/Live/Sessions/EditSessions";
 import SessionRatings from "../pages/Admin/Live/SessionRatings/SessionRatings";
 import AvailabilityPlans from "../pages/Admin/Live/AvailabilityPlans/AvailabilityPlans";
 import AvailabilitySlots from "../pages/Admin/Live/Availabilityslots/Availabilityslots";
+import Cancellation from "../pages/Admin/Live/Cancellation/Cancellation";
+import TeacherHub from "../pages/Admin/Live/Teacher/TeacherHub";
+import PlannerHub from "../pages/Admin/Live/Planner/PlannerHub";
+import FinReconciliation, { AccountsChannels } from "../pages/Admin/Finance/Reconciliation";
+import FinUnmatched from "../pages/Admin/Finance/Unmatched";
+import FinAdjustments from "../pages/Admin/Finance/Adjustments";
+import FinRefunds from "../pages/Admin/Finance/Refunds";
+import FinExpenses from "../pages/Admin/Finance/Expenses";
+import FinTeacherSettlements from "../pages/Admin/Finance/TeacherSettlements";
+import FinMonthEnd from "../pages/Admin/Finance/MonthEnd";
+import StoreCourses from "../pages/Admin/Store/StoreCourses";
+import StorePackages from "../pages/Admin/Store/StorePackages";
+import StorePrices from "../pages/Admin/Store/StorePrices";
+import ReportsStudents from "../pages/Admin/Reports/ReportsStudents";
+import ReportsCourses from "../pages/Admin/Reports/ReportsCourses";
+import ReportsTeachers from "../pages/Admin/Reports/ReportsTeachers";
+import ReportsRates from "../pages/Admin/Reports/ReportsRates";
+import ReportsPayments from "../pages/Admin/Reports/ReportsPayments";
+import ReportsHomework from "../pages/Admin/Reports/ReportsHomework";
 
 import Popup from "../pages/Admin/Marketing/Popup/Popup";
 import AddPopup from "../pages/Admin/Marketing/Popup/AddPopup";
@@ -127,6 +148,7 @@ import PaymentRecharge from "../pages/Admin/Payments/PaymentRecharge/PaymentRech
 import PaymentPackage from "../pages/Admin/Payments/PaymentPackage/PaymentPackage";
 import DriveLayout from "../Layout/DriveLayout";
 import PaymentContent from "../pages/Admin/Payments/PaymentContent/PaymentContent";
+import ReceiptsHub from "../pages/Admin/Payments/ReceiptsHub";
 
 // ✅ استيراد مكونات الواجب الإضافي
 import ExtraHomework from "../pages/Admin/Homework/ExtraHomework";
@@ -205,7 +227,8 @@ const router = createBrowserRouter([
       { path: "settings/examcode/add", element: <Addexamcode /> },
       { path: "settings/examcode/edit/:id", element: <Editexamcode /> },
 
-      { path: "courses/categories", element: <Category /> },
+      { path: "courses/categories", element: <CatalogHome /> },
+      { path: "courses/categories/manage", element: <Category /> },
       { path: "courses/categories/add", element: <AddCategory /> },
       { path: "courses/categories/edit/:id", element: <EditCategory /> },
 
@@ -264,6 +287,26 @@ const router = createBrowserRouter([
       { path: "live/sessions/:sessionId/ratings", element: <SessionRatings /> },
       { path: "live/availability-plans", element: <AvailabilityPlans /> },
       { path: "live/availability-slots", element: <AvailabilitySlots /> },
+      { path: "settings/time-slots", element: <AvailabilitySlots /> },
+      { path: "live/cancellation", element: <Cancellation /> },
+      { path: "live/teacher", element: <TeacherHub /> },
+      { path: "live/planner", element: <PlannerHub /> },
+      { path: "payment/reconciliation", element: <FinReconciliation /> },
+      { path: "payment/unmatched", element: <FinUnmatched /> },
+      { path: "payment/adjustments", element: <FinAdjustments /> },
+      { path: "payment/refunds", element: <FinRefunds /> },
+      { path: "payment/expenses", element: <FinExpenses /> },
+      { path: "payment/teacher-settlements", element: <FinTeacherSettlements /> },
+      { path: "payment/month-end", element: <FinMonthEnd /> },
+      { path: "store/courses", element: <StoreCourses /> },
+      { path: "store/packages", element: <StorePackages /> },
+      { path: "settings/store-prices", element: <StorePrices /> },
+      { path: "reports/students", element: <ReportsStudents /> },
+      { path: "reports/courses", element: <ReportsCourses /> },
+      { path: "reports/teachers", element: <ReportsTeachers /> },
+      { path: "reports/rates", element: <ReportsRates /> },
+      { path: "reports/payments", element: <ReportsPayments /> },
+      { path: "reports/extra-homework", element: <ReportsHomework /> },
 
       { path: "marketing/popup", element: <Popup /> },
       { path: "marketing/popup/add", element: <AddPopup /> },
@@ -300,22 +343,26 @@ const router = createBrowserRouter([
       },
 
       { path: "courses/grade", element: <Grade /> },
+      { path: "settings/grade", element: <Grade /> },
+      { path: "settings/grade/add", element: <AddGrade /> },
+      { path: "settings/grade/edit/:id", element: <EditGrade /> },
       { path: "courses/grade/add", element: <AddGrade /> },
       { path: "courses/grade/edit/:id", element: <EditGrade /> },
 
-      { path: "filter", element: <Filter /> },
+      { path: "filter", element: <CourseFilter /> },
+      { path: "filter/tables", element: <Filter /> },
 
-      { path: "payment/paymentrecharge", element: <PaymentRecharge /> },
-      { path: "payment/paymentpackage", element: <PaymentPackage /> },
+      { path: "payment/paymentrecharge", element: <ReceiptsHub /> },
+      { path: "payment/paymentpackage", element: <ReceiptsHub /> },
 
-      { path: "payment/payment-method", element: <PaymentMethod /> },
+      { path: "payment/payment-method", element: <AccountsChannels methods={<PaymentMethod headless />} /> },
       { path: "payment/payment-method/add", element: <AddPaymentMethod /> },
       {
         path: "payment/payment-method/edit/:id",
         element: <EditPaymentMethod />,
       },
 
-      { path: "payment/payment-content", element: <PaymentContent /> },
+      { path: "payment/payment-content", element: <ReceiptsHub /> },
 
       // ✅ مسارات الواجب الإضافي
       { path: "extra-homework", element: <ExtraHomework /> },

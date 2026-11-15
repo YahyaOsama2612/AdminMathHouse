@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 import PdfUploadField, {
@@ -132,6 +131,7 @@ const EditLessons = () => {
         : null,
       pricePlans:
         lessonRes?.data?.prices?.map((p) => ({
+          id: p.id, // keep the plan id so enrolments that use it stay linked
           label: p.durationLabel,
           days: p.durationDays,
           priceEgp: p.priceEgp,
@@ -143,6 +143,15 @@ const EditLessons = () => {
     }),
     [lessonRes],
   );
+
+  // File → Base64 (a newly picked lesson image)
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const onSave = async (formData) => {
     let imageBase64 = formData.image;
@@ -205,15 +214,33 @@ const EditLessons = () => {
   };
 
   if (loadingLesson || loadingTeachers) {
-    return <Loader />;
+    return <FormSkeleton />;
   }
 
   if (error || errorTeachers) {
     return <Errorpage />;
   }
 
+  const ls = lessonRes?.data;
+
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        ls?.category?.id && { label: ls.category.name || "Courses", to: `/admin/courses/courses/${ls.category.id}` },
+        ls?.course?.id && {
+          label: ls.course.name || "Course",
+          to: ls?.semester?.id ? `/admin/courses/semester/${ls.course.id}` : `/admin/courses/chapters/${ls.course.id}`,
+          state: { courseId: ls.course.id, courseName: ls.course.name },
+        },
+        ls?.semester?.id && {
+          label: ls.semester.name || "Semester",
+          to: `/admin/courses/chapters/semester/${ls.semester.id}`,
+          state: { courseId: ls?.course?.id, semesterId: ls.semester.id, semesterName: ls.semester.name, courseName: ls?.course?.name },
+        },
+        ls?.chapter?.id && { label: ls.chapter.name || "Chapter", to: `/admin/courses/lessons/${ls.chapter.id}` },
+        { label: ls?.lesson?.name ? `Edit ${ls.lesson.name}` : "Edit lesson" },
+      ]}
       key={lessonRes?.data?.lesson?.id || "loading"}
       title="Edit Lesson"
       fields={fields}

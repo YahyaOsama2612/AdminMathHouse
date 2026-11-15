@@ -159,10 +159,10 @@ const QuestionsTableSelect = ({
   };
 
   return (
-    <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+    <div className="w-full bg-white p-5 rounded-xl shadow-sm border border-gray-100 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="px-3 py-1 text-xs font-medium bg-indigo-50 text-indigo-600 rounded-full">
+        <span className="px-3 py-1 text-xs font-medium bg-red-50 text-one rounded-full font-bold">
           {value.length} Selected
         </span>
 
@@ -174,7 +174,7 @@ const QuestionsTableSelect = ({
             className={`px-4 py-1.5 text-xs font-semibold rounded-lg border transition ${
               isAllCurrentPageSelected
                 ? "bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100"
-                : "bg-indigo-600 text-white border-transparent hover:bg-indigo-700"
+                : "bg-one text-white border-transparent hover:brightness-110"
             }`}
           >
             {isAllCurrentPageSelected ? "Deselect Page" : "Add All From Page"}
@@ -198,7 +198,7 @@ const QuestionsTableSelect = ({
               setPage(1);
               setSearch(e.target.value);
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm"
+            className="a-inp !pl-10"
           />
           <svg
             className="absolute left-3 top-3 w-4 h-4 text-slate-400"
@@ -239,14 +239,14 @@ const QuestionsTableSelect = ({
                 control: (base, state) => ({
                   ...base,
                   borderRadius: "0.75rem",
-                  borderColor: state.isFocused ? "#6366f1" : "#e2e8f0",
+                  borderColor: state.isFocused ? "#7d0a0a" : "#e5e7eb",
                   backgroundColor: state.isFocused ? "#ffffff" : "#f8fafc",
                   boxShadow: state.isFocused
-                    ? "0 0 0 2px rgba(99, 102, 241, 0.2)"
+                    ? "0 0 0 2px rgba(125, 10, 10, 0.15)"
                     : "none",
                   minHeight: "42px",
                   "&:hover": {
-                    borderColor: state.isFocused ? "#6366f1" : "#cbd5e1",
+                    borderColor: state.isFocused ? "#7d0a0a" : "#cbd5e1",
                   },
                 }),
                 menu: (base) => ({
@@ -270,7 +270,7 @@ const QuestionsTableSelect = ({
               setPage(1);
               setDifficulty(e.target.value);
             }}
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+            className="a-inp cursor-pointer"
           >
             <option value="">All Difficulties</option>
             <option value="A">A</option>
@@ -292,7 +292,7 @@ const QuestionsTableSelect = ({
               setPage(1);
               setYear(e.target.value);
             }}
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+            className="a-inp cursor-pointer"
           >
             <option value="">All Years</option>
             {YEAR_OPTIONS.map((y) => (
@@ -311,7 +311,7 @@ const QuestionsTableSelect = ({
               setPage(1);
               setMonth(e.target.value);
             }}
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm text-slate-600 cursor-pointer"
+            className="a-inp cursor-pointer"
           >
             <option value="">All Months</option>
             {MONTH_OPTIONS.map((m) => (
@@ -324,9 +324,9 @@ const QuestionsTableSelect = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="overflow-x-auto rounded-xl border border-gray-100">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
+          <thead className="bg-gray-50 text-gray-400 text-[11px] font-extrabold uppercase tracking-wider">
             <tr>
               <th className="p-4 w-16 text-center">
                 <input
@@ -334,7 +334,7 @@ const QuestionsTableSelect = ({
                   disabled={loading || !lessonId || questions.length === 0}
                   checked={isAllCurrentPageSelected}
                   onChange={handleSelectAllToggle}
-                  className="w-4 h-4 accent-indigo-600 cursor-pointer disabled:opacity-40"
+                  className="w-4 h-4 accent-[#7d0a0a] cursor-pointer disabled:opacity-40"
                 />
               </th>
               <th className="p-4 text-left">Question</th>
@@ -368,7 +368,7 @@ const QuestionsTableSelect = ({
                 <tr
                   key={q.id}
                   className={`transition hover:bg-slate-50 ${
-                    isChecked(q.id) ? "bg-indigo-50" : ""
+                    isChecked(q.id) ? "bg-red-50/60" : ""
                   }`}
                 >
                   <td className="p-4 text-center">
@@ -381,7 +381,7 @@ const QuestionsTableSelect = ({
                         value.length >= maxQuestions
                       }
                       onChange={() => toggleSelect(q.id)}
-                      className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                      className="w-4 h-4 accent-[#7d0a0a] cursor-pointer"
                     />
                   </td>
 
@@ -411,7 +411,7 @@ const QuestionsTableSelect = ({
           type="button"
           disabled={page === 1}
           onClick={() => setPage((prev) => prev - 1)}
-          className="px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg disabled:opacity-40 transition"
+          className="a-btn disabled:opacity-40"
         >
           ← Previous
         </button>
@@ -425,7 +425,7 @@ const QuestionsTableSelect = ({
           type="button"
           disabled={page === totalPages}
           onClick={() => setPage((prev) => prev + 1)}
-          className="px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg disabled:opacity-40 transition"
+          className="a-btn disabled:opacity-40"
         >
           Next →
         </button>

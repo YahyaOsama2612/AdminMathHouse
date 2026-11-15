@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
 import { toast } from "react-hot-toast";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 
@@ -135,6 +134,7 @@ const EditCourses = () => {
       isHaveSemester: formData.isHaveSemester,
 
       pricePlans: formData.pricePlans.map((p) => ({
+        id: p.id,
         label: p.label,
         days: Number(p.days),
         priceEgp: Number(p.priceEgp),
@@ -156,13 +156,25 @@ const EditCourses = () => {
     navigate(-1);
   };
 
-  if (loadingOne || loadingTeachers || loadingCats) return <Loader />;
+  if (loadingOne || loadingTeachers || loadingCats) return <FormSkeleton />;
   if (errorOne || errorTeachers || error) return <Errorpage />;
 
   const course = courseRes?.data;
 
+  const categoryName = categoryOptions.find((c) => c.value === course?.categoryId)?.label;
+
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        course?.categoryId && { label: categoryName || "Courses", to: `/admin/courses/courses/${course.categoryId}` },
+        course?.id && {
+          label: course.name || "Course",
+          to: course.isHaveSemester ? `/admin/courses/semester/${course.id}` : `/admin/courses/chapters/${course.id}`,
+          state: { courseId: course.id, courseName: course.name },
+        },
+        { label: "Edit course" },
+      ]}
       title="Edit Course"
       fields={fields}
       onSave={onSave}
@@ -178,6 +190,7 @@ const EditCourses = () => {
         // ✅ أهم جزء (mapping)
         pricePlans:
           course?.prices?.map((p) => ({
+            id: p.id, // keep the plan id so enrolments that use it stay linked
             label: p.durationLabel,
             days: p.durationDays,
             priceEgp: p.priceEgp,

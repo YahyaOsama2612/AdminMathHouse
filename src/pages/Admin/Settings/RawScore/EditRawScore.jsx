@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
-import Errorpage from "@/components/Errorpage";
+import { FormSkeleton, LoadError } from "../settingsKit";
+import RawScoreForm from "./RawScoreForm";
 
 const EditRawScore = () => {
   const navigate = useNavigate();
@@ -14,78 +13,21 @@ const EditRawScore = () => {
     data: coursesRes,
     loading: loadingCourses,
     error: errorC,
+    refetch: refetchCourses,
   } = useGet("/api/admin/teacher/selectionCourses");
 
   const {
     data: rawRes,
     loading: loadingOne,
     error,
+    refetch,
   } = useGet(`/api/admin/rawScore/${id}`);
 
-  const { putData, loading: saving } = usePut(`/api/admin/rawScore/${id}`);
+  const { putData } = usePut(`/api/admin/rawScore/${id}`);
 
-  const courseOptions = useMemo(() => {
-    return (
-      coursesRes?.data?.courses?.map((c) => ({
-        value: c.id,
-        label: c.name,
-      })) || []
-    );
-  }, [coursesRes]);
-
-  const fields = useMemo(
-    () => [
-      {
-        name: "name",
-        label: "Rule Name",
-        type: "text",
-        required: true,
-        placeholder: "Enter raw score rule name",
-        section: "General Information",
-      },
-      {
-        name: "courseId",
-        label: "Course",
-        type: "select",
-        required: true,
-        options: courseOptions,
-        section: "General Information",
-      },
-      {
-        name: "score",
-        label: "Score",
-        type: "number",
-        required: true,
-        placeholder: "Enter total score (e.g. 100)",
-        section: "General Information",
-        min: 0,
-      },
-      {
-        name: "questionsCount", // الحقل الجديد لعدد الأسئلة
-        label: "Questions Count",
-        type: "number",
-        required: true,
-        placeholder: "Enter number of questions",
-        section: "General Information",
-        min: 1,
-      },
-      {
-        name: "giftingScore",
-        label: "Gifting Score",
-        type: "number",
-        required: true,
-        placeholder: "Enter gifting score",
-        section: "General Information",
-        min: 0,
-      },
-      {
-        name: "is_giftingScore",
-        label: "Include Gifting Score?",
-        type: "switch",
-        section: "General Information",
-      },
-    ],
-    [courseOptions],
+  const courseOptions = useMemo(
+    () => coursesRes?.data?.courses?.map((c) => ({ value: c.id, label: c.name })) || [],
+    [coursesRes],
   );
 
   const onSave = async (formData) => {
@@ -93,38 +35,42 @@ const EditRawScore = () => {
       name: formData.name,
       courseId: formData.courseId,
       score: Number(formData.score),
-      questionsCount: Number(formData.questionsCount), // إرسال التعديل للـ API
+      questionsCount: Number(formData.questionsCount),
       is_giftingScore: Boolean(formData.is_giftingScore),
       giftingScore: Number(formData.giftingScore),
     };
 
-    await putData(
-      payload,
-      `/api/admin/rawScore/${id}`,
-      "Raw score updated successfully",
-    );
+    await putData(payload, `/api/admin/rawScore/${id}`, "Raw score updated successfully");
     navigate("/admin/settings/rawscore");
   };
 
-  if (loadingCourses || loadingOne) return <Loader />;
-  if (errorC || error) return <Errorpage />;
+  if (loadingCourses || loadingOne || ((!coursesRes || !rawRes) && !errorC && !error)) return <FormSkeleton />;
+  if (errorC || error)
+    return (
+      <LoadError
+        text="Could not load this raw score."
+        onRetry={() => {
+          refetch();
+          refetchCourses();
+        }}
+      />
+    );
 
   const raw = rawRes?.data?.rawScore;
 
   return (
-    <AddPage
-      title="Edit Raw Score Rule"
-      fields={fields}
-      onSave={onSave}
-      onCancel={() => navigate("/admin/settings/rawscore")}
-      initialData={{
+    <RawScoreForm
+      key={raw?.id || id}
+      initial={{
         name: raw?.name || "",
         courseId: raw?.courseId || "",
         score: raw?.score || "",
-        questionsCount: raw?.questionsCount || "", // عرض القيمة الراجع من الـ API عند التعديل
+        questionsCount: raw?.questionsCount || "",
         is_giftingScore: raw?.is_giftingScore || false,
         giftingScore: raw?.giftingScore || 0,
       }}
+      courseOptions={courseOptions}
+      onSave={onSave}
     />
   );
 };

@@ -1,20 +1,23 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReusableTable from "@/components/ReusableTable";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
-import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
+import { Pill } from "@/components/admin/kit";
+import { CourseExamHead } from "../Questions/parts/qb";
 
+/* Course → Exams (MathPortal question-bank design).
+   GET /api/admin/exams/course/:courseId ({ exams: { static, adaptive } }), DELETE /api/admin/exams/:id. */
+
+const TYPE_TONE = { static: "blue", adaptive: "purple", extra: "amber", trail: "gray" };
 
 const Exam = () => {
   const navigate = useNavigate();
-  const {courseId} = useParams();
+  const { courseId } = useParams();
   const { data, loading, refetch, error } = useGet(`/api/admin/exams/course/${courseId}`);
   const { deleteData, loading: deleteLoading } = useDelete();
-  const { putData, loading: usePutLoading } = usePut();
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -32,36 +35,20 @@ const Exam = () => {
       setSelectedRow(null);
       refetch();
     } catch (e) {
-        throw e
+      throw e;
     }
   };
 
-  const handleEdit = (row) => {
-    navigate(`/admin/courses/exam/edit/${row.id}`);
-  };
+  const handleEdit = (row) => navigate(`/admin/courses/exam/edit/${row.id}`);
+  const goAdd = () => navigate("/admin/courses/exam/add", { state: { courseId } });
 
-  const columns = [
-    { header: "Title", key: "title" },
-    { header: "Course", key: "courseName" },
-    { header: "Code", key: "codeName" },
-    { header: "Description", key: "description" },
-    { header: "Duration (min)", key: "duration" },
-    { header: "Total Score", key: "totalScore" },
-    { header: "Pass Score", key: "passScore" },
-    { header: "Type", key: "examType" },
-    { header: "Year", key: "year" },
-    { header: "Month", key: "Month" },
-  ];
+  const groups = data?.data?.data?.exams || {};
+  const counts = { all: (groups.static || []).length + (groups.adaptive || []).length, static: (groups.static || []).length, adaptive: (groups.adaptive || []).length };
 
   const tableData = useMemo(() => {
-    let exams = [
-      ...(data?.data?.data?.exams?.static || []),
-      ...(data?.data?.data?.exams?.adaptive || []),
-    ];
-
-    if (filterType === "static") exams = data?.data?.data?.exams?.static || [];
-    if (filterType === "adaptive") exams = data?.data?.data?.exams?.adaptive || [];
-
+    let exams = [...(groups.static || []), ...(groups.adaptive || [])];
+    if (filterType === "static") exams = groups.static || [];
+    if (filterType === "adaptive") exams = groups.adaptive || [];
     return exams.map((exam) => ({
       id: exam.id,
       title: exam.title,
@@ -79,56 +66,84 @@ const Exam = () => {
     }));
   }, [data, filterType]);
 
-  if (loading) return <Loader />;
   if (error) return <Errorpage />;
+
+  const courseName = [...(groups.static || []), ...(groups.adaptive || [])].find((e) => e.courseName)?.courseName;
 
   return (
     <div>
-      {/* أزرار الفلترة */}
-      <div className="flex gap-2 justify-center  mb-4">
-        <button
-          className={`px-4 py-2  w-full ${
-            filterType === "all" ? "bg-one text-white rounded-2xl " : "bg-gray-200"
-          }`}
-          onClick={() => setFilterType("all")}
-        >
-          All
-        </button>
-        <button
-          className={`px-4 py-2   w-full ${
-            filterType === "static" ? "bg-one text-white rounded-2xl "  : "bg-gray-200"
-          }`}
-          onClick={() => setFilterType("static")}
-        >
-          Static
-        </button>
-        <button
-          className={`px-4 py-2  w-full ${
-            filterType === "adaptive" ? "bg-one text-white rounded-2xl " : "bg-gray-200"
-          }`}
-          onClick={() => setFilterType("adaptive")}
-        >
-          Adaptive
-        </button>
+      <CourseExamHead
+        courseId={courseId}
+        courseName={courseName}
+        mode="exams"
+        count={data ? counts.all : null}
+        actions={<button onClick={goAdd} className="a-btn primary"><Plus className="w-4 h-4" /> New exam</button>}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="inline-flex flex-wrap gap-1 bg-gray-100 rounded-xl p-1" role="tablist" aria-label="Exam type">
+          {[["all", "All"], ["static", "Static"], ["adaptive", "Adaptive"]].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setFilterType(v)} aria-pressed={filterType === v}
+              className={`h-8 px-3 rounded-lg text-xs font-bold ${filterType === v ? "bg-white text-one shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+              {l} <span className="ml-0.5 text-gray-400 font-semibold">{counts[v]}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <ReusableTable
-        title="Exams"
-        titleAdd="Exam"
-        columns={columns}
-        data={tableData}
-        loading={loading || deleteLoading || usePutLoading}
-        onAddClick={() => navigate("/admin/courses/exam/add", { state: { courseId } })}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      {loading && !data ? (
+        <div className="a-card p-4 space-y-2">{[1, 2, 3].map((i) => <div key={i} className="skel h-12"></div>)}</div>
+      ) : tableData.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-14 text-center px-4">
+          <p className="font-bold text-gray-700">{filterType === "all" ? "No exams yet" : `No ${filterType} exams`}</p>
+          <p className="text-sm text-gray-400">Pick questions from this course’s lessons and group them into timed sections.</p>
+          <button onClick={goAdd} className="a-btn primary mt-4"><Plus className="w-4 h-4" /> New exam</button>
+        </div>
+      ) : (
+        <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-opacity ${loading || deleteLoading ? "opacity-60 pointer-events-none" : ""}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  {["Title", "Type", "Exam code", "Date", "Duration", "Pass / total", "Status"].map((h) => <th key={h} className="a-th">{h}</th>)}
+                  <th className="a-th text-right" data-keep>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableData.map((e) => (
+                  <tr key={e.id} className="a-tr">
+                    <td className="a-td min-w-[200px]">
+                      <button onClick={() => handleEdit(e)} className="text-left">
+                        <span className="block font-bold text-gray-800 hover:text-one">{e.title}</span>
+                        {e.description && <span className="block text-xs text-gray-400 line-clamp-1">{e.description}</span>}
+                      </button>
+                    </td>
+                    <td className="a-td"><Pill tone={TYPE_TONE[String(e.examType).toLowerCase()]}>{e.examType ? String(e.examType).charAt(0).toUpperCase() + String(e.examType).slice(1) : "—"}</Pill></td>
+                    <td className="a-td whitespace-nowrap">{e.codeName || "—"}</td>
+                    <td className="a-td whitespace-nowrap">{[e.Month, e.year].filter(Boolean).join(" ") || "—"}</td>
+                    <td className="a-td whitespace-nowrap">{e.duration ? `${e.duration} min` : "—"}</td>
+                    <td className="a-td tabular-nums whitespace-nowrap">{e.passScore ?? "—"} / {e.totalScore ?? "—"}</td>
+                    <td className="a-td"><Pill tone={e.isActive ? "green" : "gray"}>{e.isActive ? "Active" : "Inactive"}</Pill></td>
+                    <td className="a-td">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => handleEdit(e)} className="a-act" title="Edit" aria-label={`Edit ${e.title}`}><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(e)} className="a-act del" title="Delete" aria-label={`Delete ${e.title}`}><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <ConfirmDeleteModal
         open={openDeleteModal}
         onClose={() => setOpenDeleteModal(false)}
         onConfirm={confirmDelete}
-        title="Delete Exam"
-        description={`Are you sure you want to delete "${selectedRow?.title}"?`}
+        title="Delete this exam?"
+        description={`“${selectedRow?.title || ""}” will be deleted. Its questions stay in their lessons.`}
       />
     </div>
   );

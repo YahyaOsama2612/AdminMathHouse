@@ -1,104 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
-import Loader from "@/components/Loader";
-import Errorpage from "@/components/Errorpage";
+import { FormSkeleton, LoadError } from "@/pages/Admin/Settings/settingsKit";
+import GradeForm from "./GradeForm";
 
 const AddGrade = () => {
   const navigate = useNavigate();
 
-  const { postData, loading: saving } = usePost();
-  const {
-    data: categoryData,
-    loading: loadingCats,
-    error,
-  } = useGet("/api/admin/category");
-
-  // ✅ state للـ parent المختار
-  const [selectedParent, setSelectedParent] = useState("");
-
-  // ✅ parent categories (اللي ملهاش parent)
-  const parentCategories = useMemo(() => {
-    return (
-      categoryData?.data?.data
-        ?.filter((cat) => !cat.parentCategoryId)
-        .map((cat) => ({
-          label: cat.name,
-          value: cat.id,
-        })) || []
-    );
-  }, [categoryData]);
-
-  // كل الكاتيجوري
-  const allCategories = categoryData?.data?.data || [];
-
-  // ✅ فلترة الكاتيجوري حسب الأب
-  const filteredCategories = useMemo(() => {
-    return allCategories
-      ?.filter((cat) => cat.parentCategoryId === selectedParent)
-      .map((cat) => ({
-        label: cat.name,
-        value: cat.id,
-      }));
-  }, [allCategories, selectedParent]);
-
-  const fields = useMemo(
-    () => [
-      {
-        name: "categoryParentId",
-        label: "Category Parent",
-        type: "select",
-        options: parentCategories,
-        required: true,
-        section: "General Information",
-        onChange: (value, setFormData) => {
-          setSelectedParent(value);
-          setFormData((prev) => ({
-            ...prev,
-            categoryParentId: value,
-            categoryId: "", // reset child
-          }));
-        },
-      },
-      {
-        name: "categoryId",
-        label: "Category",
-        type: "select",
-        options: filteredCategories,
-        required: true,
-        section: "General Information",
-      },
-      {
-        name: "name",
-        label: "Grade Name (EN)",
-        type: "text",
-        required: true,
-        placeholder: "Enter grade name",
-        section: "General Information",
-      },
-      {
-        name: "nameAr",
-        label: "Grade Name (AR)",
-        type: "text",
-        required: true,
-        placeholder: "ادخل اسم الصف",
-        section: "General Information",
-      },
-    ],
-    [parentCategories, filteredCategories]
-  );
-
-  const initialFormValues = useMemo(
-    () => ({
-      categoryParentId: "",
-      categoryId: "",
-      name: "",
-      nameAr: "",
-    }),
-    []
-  );
+  const { postData } = usePost();
+  const { data: categoryData, loading: loadingCats, error, refetch } = useGet("/api/admin/category");
 
   const onSave = async (formData) => {
     const payload = {
@@ -111,31 +22,19 @@ const AddGrade = () => {
         },
       ],
     };
-
-    try {
-      await postData(payload, "/api/admin/grade", "Grade added successfully");
-      navigate("/admin/courses/grade");
-    } catch (error) {
-      throw error;
-    }
+    await postData(payload, "/api/admin/grade", "Grade added successfully");
+    navigate("/admin/courses/grade");
   };
 
-  if (loadingCats) {
-    return <Loader />;
-  }
-
-  if (error) {
-    return <Errorpage />;
-  }
+  if (loadingCats || (!categoryData && !error)) return <FormSkeleton />;
+  if (error) return <LoadError text="Could not load the categories." onRetry={refetch} />;
 
   return (
-    <AddPage
-      title="Add Grade"
-      fields={fields}
+    <GradeForm
+      isNew
+      categories={categoryData?.data?.data || []}
+      initial={{ categoryParentId: "", categoryId: "", name: "", nameAr: "" }}
       onSave={onSave}
-      onCancel={() => navigate("/admin/courses/grade")}
-      initialData={initialFormValues}
-      loading={saving}
     />
   );
 };

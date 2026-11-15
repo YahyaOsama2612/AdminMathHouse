@@ -6,8 +6,8 @@ import React, { useMemo, useState } from "react";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
-import { MdAttachMoney } from "react-icons/md";
-import PricePlansModal from "@/components/PricePlansModal";
+import { DollarSign } from "lucide-react";
+import { PlansModal } from "../parts/catalog";
 
 const AllChapters = () => {
   const navigate = useNavigate();
@@ -105,8 +105,8 @@ const AllChapters = () => {
         loading={loading || deleteLoading}
         onEdit={handleEdit}
         extraActions={(row) => (
-          <button onClick={() => setPricePopup({ open: true, row })}>
-            <MdAttachMoney className="text-2xl text-green-600" />
+          <button type="button" className="a-act" title="Price plans" aria-label="Price plans" onClick={() => setPricePopup({ open: true, row: { ...row, name: row.chapterName } })}>
+            <DollarSign size={15} />
           </button>
         )}
         onDelete={handleDelete}
@@ -119,7 +119,7 @@ const AllChapters = () => {
         title="Delete Chapter"
         description={`Are you sure you want to delete "${selectedRow?.chapterName}" ?`}
       />
-      <PricePlansModal
+      <PlansModal
         open={pricePopup.open}
         row={pricePopup.row}
         onClose={() => setPricePopup({ open: false, row: null })}

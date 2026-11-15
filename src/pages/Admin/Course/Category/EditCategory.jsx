@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 
 const EditCategory = () => {
@@ -110,11 +109,11 @@ const EditCategory = () => {
       `/api/admin/category/${id}`,
       "Category updated successfully",
     );
-    navigate("/admin/courses/categories");
+    navigate("/admin/courses/categories/manage");
   };
 
   if (loadingCats || loadingOne) {
-    return <Loader />;
+    return <FormSkeleton />;
   }
 
   if (error || errorOne) {
@@ -124,11 +123,15 @@ const EditCategory = () => {
   const category = categoryRes?.data?.data;
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Courses & content", to: "/admin/courses/categories" }, { label: "Categories", to: "/admin/courses/categories/manage" },
+        { label: category?.name ? `Edit ${category.name}` : "Edit category" },
+      ]}
       title="Edit Category"
       fields={fields}
       onSave={onSave}
-      onCancel={() => navigate("/admin/courses/categories")}
+      onCancel={() => navigate("/admin/courses/categories/manage")}
       initialData={{
         name: category?.name || "",
         description: category?.description || "",

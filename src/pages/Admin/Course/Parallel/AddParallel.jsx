@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AddPage from "@/components/AddPage";
+import { LetterPicker } from "../Questions/parts/qb";
 import usePost from "@/hooks/usePost";
 import toast from "react-hot-toast";
 import useGet from "@/hooks/useGet";
@@ -73,30 +74,7 @@ const AddParallel = () => {
         const currentOptionsCount = formData.options?.length || 4;
         const availableLetters = Array.from({ length: currentOptionsCount }, (_, i) => String.fromCharCode(65 + i));
 
-        return (
-          <div className="flex flex-wrap flex-col gap-3">
-            {availableLetters.map((letter) => {
-              const isSelected = value === letter;
-              return (
-                <button
-                  key={letter}
-                  type="button"
-                  onClick={() => onChange(letter)}
-                  className={`
-                    w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold transition-all duration-200 border-2
-                    ${isSelected 
-                      ? "bg-one text-white border-one shadow-lg scale-110"
-                      : "bg-white text-slate-500 border-slate-200 hover:border-one/50 hover:bg-slate-50"
-                    }
-                    ${error ? "border-red-500" : ""}
-                  `}
-                >
-                  {letter}
-                </button>
-              );
-            })}
-          </div>
-        );
+        return <LetterPicker letters={availableLetters} value={value} onChange={onChange} error={error} />;
       },
     },
   ], []);

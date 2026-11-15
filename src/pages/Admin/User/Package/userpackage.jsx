@@ -1,218 +1,134 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReusableTable from "@/components/ReusableTable";
+import { toast } from "react-hot-toast";
+import { ArrowLeft, Check } from "lucide-react";
 import useGet from "@/hooks/useGet";
-import Loader from "@/components/Loader";
-import Errorpage from "@/components/Errorpage";
 import axios from "@/api/api";
+import { Card, Empty, Modal, PageHead, Pill, SkelRows, Stat, errText } from "@/components/admin/kit";
+
+/* Student → Packages: the packages of the student's category, which ones they bought,
+   and enrolling them in one with a manual payment method.
+   GET  /api/admin/student/:id/packages
+   POST /api/admin/student/:id/packages { packageId, paymentMethodId } */
+
+const TYPE_TONE = { live: "blue", exam: "amber", question: "purple" };
 
 const UserPackage = () => {
   const navigate = useNavigate();
   const { id: studentId } = useParams();
   const [actionLoading, setActionLoading] = useState(false);
-
-  // تخزين طريقة الدفع المختارة من قبل المستخدم
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
+  const [confirmPkg, setConfirmPkg] = useState(null);
+  const [q, setQ] = useState("");
+  const [type, setType] = useState("all");
 
-  // 🔹 جلب البيانات بناءً على هيكل الـ الـ API الجديد بالكامل
-  const { data, loading, error, refetch } = useGet(
-    `/api/admin/student/${studentId}/packages`,
-  );
-
-  // استخراج البيانات لتسهيل استخدامها في الواجهة
+  const { data, loading, error, refetch } = useGet(`/api/admin/student/${studentId}/packages`);
   const rootData = data?.data?.data;
   const student = rootData?.student;
   const paymentMethods = rootData?.manualPaymentMethods || [];
+  const all = useMemo(() => (Array.isArray(rootData?.packages) ? rootData.packages : []), [rootData]);
+  const ql = q.trim().toLowerCase();
+  const list = all.filter((p) => (type === "all" || p.type === type) && (!ql || String(p.name || "").toLowerCase().includes(ql)));
+  const methodName = paymentMethods.find((m) => String(m.id) === String(selectedPaymentMethod))?.name;
 
-  // 🔹 دالة تفعيل أو شراء الباقة
-  const handleEnrollmentChange = async (row, isChecked) => {
-    if (!row.id) return;
+  const askEnroll = (pkg) => {
+    if (!selectedPaymentMethod) { toast.error("Choose a payment method first, then enroll the package."); return; }
+    setConfirmPkg(pkg);
+  };
 
-    // إذا قام المستخدم بإلغاء التحديد (يمكنك تخصيصها حسب الرغبة)
-    if (!isChecked) {
-      alert("إلغاء الاشتراك يتم من خلال إدارة الفواتير والعمليات المالية.");
-      return;
-    }
-
-    // التحقق من اختيار طريقة الدفع أولاً
-    if (!selectedPaymentMethod) {
-      alert("برجاء اختيار طريقة الدفع أولاً قبل تفعيل الباقة.");
-      return;
-    }
-
+  const enroll = async () => {
+    const row = confirmPkg;
+    if (!row?.id) return;
     setActionLoading(true);
-
     try {
-      const payload = {
-        packageId: row.id,
-        paymentMethodId: selectedPaymentMethod,
-      };
-
-      await axios.post(`/api/admin/student/${studentId}/packages`, payload);
-
-      alert("تم تفعيل الباقة بنجاح للمستخدم!");
+      await axios.post(`/api/admin/student/${studentId}/packages`, { packageId: row.id, paymentMethodId: selectedPaymentMethod });
+      toast.success(`${row.name} enrolled for ${student?.name || "the student"}`);
+      setConfirmPkg(null);
       await refetch();
     } catch (err) {
       console.error("Failed to enroll package:", err);
-      const apiError =
-        err.response?.data?.error?.message || "حدث خطأ أثناء تفعيل الباقة";
-      alert(apiError);
+      toast.error(errText(err, "Could not enroll the package"));
     } finally {
       setActionLoading(false);
     }
   };
 
-  // 🔹 تعريف أعمدة الجدول لتناسب تفاصيل الباقة الجديدة
-  const columns = [
-    {
-      header: "Enroll",
-      key: "isPurchasedBefore",
-      render: (value, row) => {
-        return (
-          <input
-            type="checkbox"
-            checked={!!value}
-            disabled={actionLoading}
-            onChange={(e) => handleEnrollmentChange(row, e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer disabled:opacity-50"
-          />
-        );
-      },
-    },
-    { header: "Package Name", key: "name" },
-    {
-      header: "Type",
-      key: "type",
-      render: (value) => (
-        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-          {value?.toUpperCase()}
-        </span>
-      ),
-    },
-    { header: "Sessions/Items Count", key: "number" },
-    {
-      header: "Price",
-      key: "price",
-      render: (value) => (
-        <span className="font-semibold text-green-600">{value} EGP</span>
-      ),
-    },
-    {
-      header: "Duration",
-      key: "duration",
-      render: (value) => <span>{value} Days</span>,
-    },
-    {
-      header: "Purchase Count",
-      key: "purchaseCount",
-      render: (value) => (
-        <span className="badge bg-gray-100 p-1 rounded text-gray-700 font-mono">
-          {value || 0}
-        </span>
-      ),
-    },
-  ];
-
-  // 🔹 تجهيز بيانات الجدول من الـ packages المرتجعة مباشرة
-  const tableData = useMemo(() => {
-    const packagesArray = rootData?.packages;
-    if (!Array.isArray(packagesArray)) return [];
-
-    return packagesArray.map((pkg) => ({
-      id: pkg.id,
-      name: pkg.name,
-      type: pkg.type,
-      number: pkg.number,
-      price: pkg.price,
-      duration: pkg.duration,
-      purchaseCount: pkg.purchaseCount,
-      isPurchasedBefore: pkg.isPurchasedBefore,
-    }));
-  }, [rootData]);
-
-  if (loading) return <Loader />;
-  if (error) return <Errorpage />;
+  const sel = "border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white min-w-0";
 
   return (
-    <div className="p-6 space-y-6">
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
-          <Loader />
-        </div>
+    <div>
+      <button onClick={() => navigate(-1)} className="text-sm font-semibold text-gray-500 hover:text-one mb-3 inline-flex items-center gap-1"><ArrowLeft size={15} /> Back</button>
+      <PageHead title={student ? `${student.name} · Packages` : "Student packages"} sub="Packages for the student's category. Enrolling records a manual payment and adds the package." />
+
+      {loading && !data ? <SkelRows n={6} /> : error ? <Empty title="Could not load the packages" text={String(error)} /> : (
+        <>
+          {student && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <Stat label="Live balance" value={student.balances?.live || 0} />
+              <Stat label="Exam balance" value={student.balances?.exam || 0} />
+              <Stat label="Question balance" value={student.balances?.question || 0} />
+              <Stat label="Packages bought" value={all.filter((p) => p.isPurchasedBefore).length} sub={`of ${all.length} available`} />
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4 grid grid-cols-2 md:flex md:flex-wrap md:items-center gap-2">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search packages…" className={`${sel} col-span-2 md:flex-1 md:min-w-[200px]`} />
+            <select value={type} onChange={(e) => setType(e.target.value)} className={sel}>
+              <option value="all">All types</option>
+              <option value="live">Live</option>
+              <option value="exam">Exam</option>
+              <option value="question">Question</option>
+            </select>
+            <select value={selectedPaymentMethod} onChange={(e) => setSelectedPaymentMethod(e.target.value)} className={`${sel} ${selectedPaymentMethod ? "" : "!border-amber-300"}`} aria-label="Payment method">
+              <option value="">Payment method…</option>
+              {paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <span className="text-xs text-gray-400 col-span-2 md:ml-auto">{list.length} of {all.length}</span>
+          </div>
+
+          <Card bodyClass="">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr>{["Package", "Type", "Count", "Price", "Duration", "Purchases", ""].map((h, i) => <th key={i} className="a-th">{h}</th>)}</tr></thead>
+                <tbody>
+                  {list.map((p) => (
+                    <tr key={p.id} className="a-tr">
+                      <td className="a-td font-bold text-gray-800">{p.name}</td>
+                      <td className="a-td"><Pill tone={TYPE_TONE[p.type] || "gray"}>{String(p.type || "—").toUpperCase()}</Pill></td>
+                      <td className="a-td font-semibold text-gray-800">{p.number ?? "—"}</td>
+                      <td className="a-td font-semibold text-gray-800 whitespace-nowrap">{p.price} EGP</td>
+                      <td className="a-td whitespace-nowrap">{p.duration} Days</td>
+                      <td className="a-td">{p.purchaseCount || 0}</td>
+                      <td className="a-td text-right">
+                        {p.isPurchasedBefore ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700" title="Cancelling an enrolment is done from finance / payments."><Check size={14} /> Enrolled</span>
+                        ) : (
+                          <button onClick={() => askEnroll(p)} disabled={actionLoading} className="a-btn !py-1.5 !px-3">Enroll</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!list.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-gray-400">{all.length ? "No packages match." : "No packages for this student's category."}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          {!paymentMethods.length && <p className="text-xs text-amber-700 mt-3">No active manual payment method — add one in Payment Methods to enroll packages.</p>}
+        </>
       )}
 
-      {/* 🔹 كارت معلومات الطالب والرصيد الحالي */}
-      {student && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">{student.name}</h1>
-           
-          </div>
-          <div className="flex flex-wrap gap-3 md:justify-end">
-            <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-center">
-              <span className="block text-xs text-blue-600 font-semibold">
-                Live Balance
-              </span>
-              <span className="text-lg font-bold text-blue-800">
-                {student.balances?.live || 0}
-              </span>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg text-center">
-              <span className="block text-xs text-amber-600 font-semibold">
-                Exam Balance
-              </span>
-              <span className="text-lg font-bold text-amber-800">
-                {student.balances?.exam || 0}
-              </span>
-            </div>
-            <div className="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-center">
-              <span className="block text-xs text-emerald-600 font-semibold">
-                Question Balance
-              </span>
-              <span className="text-lg font-bold text-emerald-800">
-                {student.balances?.question || 0}
-              </span>
-            </div>
-          </div>
-        </div>
+      {confirmPkg && (
+        <Modal
+          title="Enroll this package?"
+          onClose={() => !actionLoading && setConfirmPkg(null)}
+          actions={<>
+            <button onClick={() => setConfirmPkg(null)} disabled={actionLoading} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+            <button onClick={enroll} disabled={actionLoading} className="a-btn primary !py-2">{actionLoading ? "Enrolling…" : "Enroll"}</button>
+          </>}
+        >
+          <p>Enroll <b>{student?.name}</b> in <b>{confirmPkg.name}</b> for <b>{confirmPkg.price} EGP</b>, paid by <b>{methodName}</b>?</p>
+        </Modal>
       )}
-
-      {/* 🔹 شريط التحكم واختيار طريقة الدفع */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800">
-            Enrollment Controls
-          </h2>
-          <p className="text-xs text-gray-500">
-            Select a payment method before assigning a package.
-          </p>
-        </div>
-        <div className="w-full sm:w-64">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Payment Method
-          </label>
-          <select
-            value={selectedPaymentMethod}
-            onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-            className="w-full text-sm bg-white border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-          >
-            <option value="">-- Select Payment Method --</option>
-            {paymentMethods.map((method) => (
-              <option key={method.id} value={method.id}>
-                {method.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* 🔹 جدول عرض الباقات وإدارتها */}
-      <ReusableTable
-        title="Student Packages Management List"
-        columns={columns}
-        data={tableData}
-        loading={loading}
-      />
     </div>
   );
 };

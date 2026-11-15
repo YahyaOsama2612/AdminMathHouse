@@ -1,10 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 
@@ -284,11 +283,25 @@ const AddChapters = () => {
     loadingCours ||
     (semesterId && !stateCourseId && loadingSemester)
   )
-    return <Loader />;
+    return <FormSkeleton />;
   if (error || errorTeachers) return <Errorpage />;
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        effectiveCourseId && {
+          label: location.state?.courseName || "Course",
+          to: semesterId ? `/admin/courses/semester/${effectiveCourseId}` : `/admin/courses/chapters/${effectiveCourseId}`,
+          state: { courseId: effectiveCourseId, courseName: location.state?.courseName },
+        },
+        semesterId && {
+          label: location.state?.semesterName || fetchedSemester?.name || "Semester",
+          to: `/admin/courses/chapters/semester/${semesterId}`,
+          state: { courseId: effectiveCourseId, semesterId, semesterName: location.state?.semesterName, courseName: location.state?.courseName },
+        },
+        { label: "Add chapter" },
+      ]}
       title="Add Chapter"
       fields={fields}
       onSave={onSave}

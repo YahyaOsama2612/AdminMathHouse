@@ -3,6 +3,8 @@ import Select from "react-select";
 import { Trash2 } from "lucide-react";
 import api from "@/api/api";
 
+const byLabel = (a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true, sensitivity: "base" });
+
 const LessonSelectionRow = ({
   index,
   onUpdate,
@@ -144,7 +146,7 @@ const LessonSelectionRow = ({
             value: c.id,
             label: c.name,
           })) || [];
-        setOptions((prev) => ({ ...prev, chapters: formatted }));
+        setOptions((prev) => ({ ...prev, chapters: formatted.sort(byLabel) }));
       } catch (err) {
         console.error(err);
       } finally {
@@ -178,7 +180,7 @@ const LessonSelectionRow = ({
         const unique = Array.from(
           new Map(allLessons.map((l) => [l.value, l])).values(),
         );
-        setOptions((prev) => ({ ...prev, lessons: unique }));
+        setOptions((prev) => ({ ...prev, lessons: unique.sort(byLabel) }));
       } catch (err) {
         console.error(err);
       } finally {
@@ -251,9 +253,9 @@ const LessonSelectionRow = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         {/* Category */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-2 min-w-0">
           <label className="text-[11px] font-bold text-slate-500">
             Category
           </label>
@@ -273,7 +275,7 @@ const LessonSelectionRow = ({
         </div>
 
         {/* Sub-Category */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-2 min-w-0">
           <label className="text-[11px] font-bold text-slate-500">
             Sub-Category
           </label>
@@ -294,7 +296,7 @@ const LessonSelectionRow = ({
         </div>
 
         {/* Course */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-2 min-w-0">
           <label className="text-[11px] font-bold text-slate-500">Course</label>
           <Select
             isLoading={isLoading.courses}
@@ -313,7 +315,7 @@ const LessonSelectionRow = ({
         </div>
 
         {/* Chapters */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-3 min-w-0">
           <label className="text-[11px] font-bold text-slate-500">
             Chapters
           </label>
@@ -335,7 +337,7 @@ const LessonSelectionRow = ({
         </div>
 
         {/* Lessons */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-3 min-w-0">
           <label className="text-[11px] font-bold text-slate-500">
             Lessons
           </label>

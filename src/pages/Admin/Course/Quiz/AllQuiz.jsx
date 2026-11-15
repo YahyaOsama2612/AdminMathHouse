@@ -6,11 +6,12 @@ import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
+import { Pill } from "@/components/admin/kit";
 
 const AllQuiz = () => {
   const navigate = useNavigate();
 
-  const { data, loading, error } = useGet("/api/admin/quiz");
+  const { data, loading, error, refetch } = useGet("/api/admin/quiz");
   const { deleteData, loading: deleteLoading } = useDelete();
 const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -37,6 +38,7 @@ const [openDeleteModal, setOpenDeleteModal] = useState(false);
     {
       header: "Quiz",
       key: "title",
+      render: (v) => <span className="font-bold text-gray-800">{v}</span>,
     },
         {
       header: "Category",
@@ -86,6 +88,7 @@ const [openDeleteModal, setOpenDeleteModal] = useState(false);
     {
       header: "Status",
       key: "status",
+      render: (v) => <Pill tone={v === "Active" ? "green" : "gray"}>{v}</Pill>,
     },
   ];
 

@@ -78,9 +78,6 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
   };
 
   const handleDriveSelect = (file) => {
-    // للتأكد من شكل الداتا اللي راجعة من الـ Drive (امسحه بعد ما تتأكد)
-    console.log("picked file:", file);
-
     // فيديوهات Bunny ممكن ماترجعش sourceUrl، فنستخدم الـ bunnyGuid كـ fallback
     const videoValue = file.sourceUrl || file.bunnyGuid || "";
 
@@ -292,8 +289,8 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
                       </a>
                     )}
                     {!idea.video && idea.bunnyGuid && (
-                      <p className="text-sm text-gray-600 break-all">
-                        🎥 Drive video: {idea.bunnyGuid}
+                      <p className="text-sm text-gray-600" title={`Drive video id: ${idea.bunnyGuid}`}>
+                        🎥 Drive video attached
                       </p>
                     )}
                   </div>
@@ -358,6 +355,7 @@ const LessonIdeasModal = ({ open, onClose, lessonId }) => {
                 {/* Delete */}
                 <button
                   onClick={async () => {
+                    if (!window.confirm(`Delete the idea "${idea.idea || idea.title || ""}"? This cannot be undone.`)) return;
                     await deleteData(`/api/admin/lessons/ideas/${idea.id}`);
                     refetch();
                   }}

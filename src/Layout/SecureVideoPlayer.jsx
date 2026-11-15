@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+import { Check, Maximize, Minimize, Pause, Play, RotateCw, Settings, ShieldAlert, Volume2, VolumeX } from 'lucide-react';
 
 const WATERMARK_MIN = 5;
 const WATERMARK_MAX = 85;
@@ -132,14 +133,25 @@ export function SecureVideoPlayer({
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
   };
 
+
   return (
-    <div 
+    <div
       ref={containerRef}
-      className={`yt-player-container ${!showControls && isPlaying ? 'hide-cursor' : ''}`}
+      className={`yt-player-container svp ${!showControls && isPlaying ? 'hide-cursor cursor-none' : ''}`}
       onMouseMove={handleMouseMove}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ clipPath }}
+      style={{ clipPath, boxShadow: 'none' }}
     >
+      {/* Player chrome only (MathPortal look): white progress fill, brand thumb, icon buttons */}
+      <style>{`
+        .svp .yt-range { cursor: pointer; background: linear-gradient(to right, #fff var(--progress, 0%), rgba(255,255,255,.25) var(--progress, 0%)); }
+        .svp .yt-range::-webkit-slider-thumb { background: #fff; box-shadow: 0 0 0 3px rgba(125,10,10,.85); }
+        .svp .yt-range::-moz-range-thumb { height: 13px; width: 13px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(125,10,10,.85); cursor: pointer; }
+        .svp .volume-slider { accent-color: #fff; }
+        .svp .control-btn { display: inline-flex; align-items: center; justify-content: center; border-radius: .6rem; }
+        .svp .control-btn:hover { transform: none; background: rgba(255,255,255,.12); }
+      `}</style>
+
       <video
         ref={videoRef}
         className="main-video"
@@ -154,17 +166,20 @@ export function SecureVideoPlayer({
         onDoubleClick={toggleFullScreen}
       />
 
-      {/* العلامة المائية */}
-      <div className="watermark" style={{ top: watermarkPos.top, left: watermarkPos.left }}>
+      {/* Watermark */}
+      <div
+        className="watermark absolute z-[5] pointer-events-none select-none text-white/40 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-1000"
+        style={{ top: watermarkPos.top, left: watermarkPos.left, textShadow: '0 1px 2px rgba(0,0,0,.5)' }}
+      >
         {studentIdentifier}
       </div>
 
-      {/* واجهة التحكم */}
+      {/* Controls */}
       <div className={`controls-overlay ${showControls || !isPlaying ? 'visible' : ''}`}>
-        
-        {/* شريط التقدم */}
+
+        {/* Progress bar */}
         <div className="progress-container">
-          <input 
+          <input
             type="range"
             className="yt-range"
             min={0}
@@ -173,73 +188,79 @@ export function SecureVideoPlayer({
             value={currentTime}
             onChange={(e) => (videoRef.current.currentTime = e.target.value)}
             style={{ '--progress': `${(currentTime / (duration || 1)) * 100}%` }}
+            aria-label="Seek"
           />
         </div>
 
-        <div className="bottom-controls">
-          <div className="left-side">
-            <button className="control-btn" onClick={togglePlay} title="Play/Pause (k)">
-              {isPlaying ? '⏸' : '▶'}
+        <div className="bottom-controls gap-2">
+          <div className="left-side flex items-center gap-1 min-w-0">
+            <button className="control-btn" onClick={togglePlay} title="Play/Pause (k)" aria-label={isPlaying ? 'Pause' : 'Play'}>
+              {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
             </button>
-            <button className="control-btn" onClick={() => handleSeek(10)} title="Forward 10s">
-              <span>+10s</span>
+            <button className="control-btn !text-xs font-bold" onClick={() => handleSeek(10)} title="Forward 10s (l)">
+              <RotateCw size={16} className="mr-1" /> 10s
             </button>
-            <div className="volume-wrapper">
-              <button className="control-btn" onClick={toggleMute}>
-                {volumeLevel === 0 ? '🔇' : '🔊'}
+            <div className="volume-wrapper flex items-center gap-1">
+              <button className="control-btn" onClick={toggleMute} title="Mute (m)" aria-label={volumeLevel === 0 ? 'Unmute' : 'Mute'}>
+                {volumeLevel === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
-              <input 
-                type="range" 
-                min="0" max="1" step="0.1" 
-                value={volumeLevel} 
+              <input
+                type="range"
+                min="0" max="1" step="0.1"
+                value={volumeLevel}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   videoRef.current.volume = val;
                   videoRef.current.muted = val === 0;
                   setVolumeLevel(val);
                 }}
-                className="volume-slider"
+                className="volume-slider w-16 sm:w-20 h-1 cursor-pointer hidden sm:block"
+                aria-label="Volume"
               />
             </div>
-            <span className="time-display">
+            <span className="time-display whitespace-nowrap tabular-nums">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
 
-          <div className="right-side">
-            <div className="settings-wrapper">
-              <button className="control-btn" onClick={() => setShowSettings(!showSettings)} title="Settings">
-                ⚙️
+          <div className="right-side flex items-center gap-1 shrink-0">
+            <div className="settings-wrapper relative">
+              <button className="control-btn" onClick={() => setShowSettings(!showSettings)} title="Playback speed" aria-label="Playback speed">
+                <Settings size={19} />
               </button>
               {showSettings && (
-                <div className="settings-menu">
-                  <p>السرعة (Playback Speed)</p>
+                <div className="settings-menu absolute bottom-full right-0 mb-2 w-40 bg-gray-900/95 border border-white/10 rounded-xl p-1.5 shadow-2xl z-20">
+                  <p className="px-2.5 pt-1 pb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Playback speed</p>
                   {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
-                    <button 
-                      key={rate} 
-                      onClick={() => changePlaybackRate(rate)} 
-                      className={playbackRate === rate ? 'active' : ''}
+                    <button
+                      key={rate}
+                      onClick={() => changePlaybackRate(rate)}
+                      className={`${playbackRate === rate ? 'active bg-white/15 text-white' : 'text-gray-300 hover:bg-white/10'} w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-semibold`}
                     >
                       {rate === 1 ? 'Normal' : `${rate}x`}
+                      {playbackRate === rate && <Check size={14} />}
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <button className="control-btn" onClick={toggleFullScreen} title="Fullscreen (f)">
-              {isFullscreen ? '🔳' : '🔲'}
+            <button className="control-btn" onClick={toggleFullScreen} title="Fullscreen (f)" aria-label="Fullscreen">
+              {isFullscreen ? <Minimize size={19} /> : <Maximize size={19} />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* رسالة الحماية عند فقدان التركيز */}
+      {/* Protection notice when focus is lost */}
       {shieldReason && (
-        <div className="shield-active">
-          <div className="shield-content">
-            <p>⚠️ وضع الحماية نشط</p>
-            <span>تم إيقاف الفيديو لأنك غادرت الصفحة أو تحاول التصوير.</span>
-            <button onClick={() => setShieldReason(null)} className="dismiss-btn">إكمال المشاهدة</button>
+        <div className="shield-active absolute inset-0 z-30 bg-gray-950/90 flex items-center justify-center p-4">
+          <div className="shield-content bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <span className="mx-auto mb-3 w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+              <ShieldAlert size={22} />
+            </span>
+            <p className="font-bold text-gray-800">Protection mode is on</p>
+            <span className="block text-sm text-gray-500 mt-1">The video was paused because you left the page or tried to record the screen.</span>
+            <button onClick={() => setShieldReason(null)} className="dismiss-btn a-btn primary w-full mt-4">Continue watching</button>
           </div>
         </div>
       )}

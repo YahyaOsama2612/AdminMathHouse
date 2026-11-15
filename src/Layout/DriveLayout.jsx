@@ -1,16 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { API_URL } from "@/api/api";
 import useGet from "../hooks/useGet";
 import usePost from "../hooks/usePost";
 import useDelete from "../hooks/useDelete";
 import { Toaster, toast } from "react-hot-toast";
 import * as tus from "tus-js-client";
+import {
+  ArrowLeft, ExternalLink, FileText, FileVideo, Folder, FolderPlus, FolderUp,
+  Image as ImageIcon, Loader2, Play, Trash2, Upload, X,
+} from "lucide-react";
+import { Card, Empty, Modal, PageHead, Pill, SkelRows } from "@/components/admin/kit";
 
-// استيراد مكتبة الحركات
-import AOS from "aos";
-import "aos/dist/aos.css";
+// Secure HLS player (watermark + custom controls)
+import { SecureVideoPlayer } from "./SecureVideoPlayer";
 
-// استيراد مشغل الفيديو المخصص
-import { SecureVideoPlayer } from "./SecureVideoPlayer"; // تأكد من مسار الملف الصحيح
+/* Drive (MathPortal design): its own top bar (outside the admin shell), a PageHead with the current
+   folder, four action cards (new folder / upload video via TUS / upload PDF-image / upload a whole
+   folder) and one card listing the folder's contents as a table. */
+
+const FILE_KIND = {
+  folder: { label: "Folder", tone: "amber", Icon: Folder, tile: "bg-amber-50 text-amber-600" },
+  video: { label: "Video", tone: "purple", Icon: FileVideo, tile: "bg-purple-50 text-purple-600" },
+  pdf: { label: "PDF", tone: "red", Icon: FileText, tile: "bg-red-50 text-red-600" },
+  image: { label: "Image", tone: "green", Icon: ImageIcon, tile: "bg-green-50 text-green-600" },
+  file: { label: "File", tone: "gray", Icon: FileText, tile: "bg-gray-100 text-gray-500" },
+};
+
+const FILE_INPUT =
+  "a-inp !p-1.5 cursor-pointer text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200";
+
+const Bar = ({ pct }) => (
+  <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+    <div className="bg-one h-2 rounded-full transition-all duration-300 ease-out" style={{ width: `${pct}%` }} />
+  </div>
+);
 
 const DriveLayout = () => {
   // 🗂️ States العامة
@@ -52,15 +75,6 @@ const DriveLayout = () => {
   const { deleteData, loading: isDeleting } = useDelete();
 
   const driveData = data?.data;
-
-  // 🎨 تهيئة حركات AOS
-  useEffect(() => {
-    AOS.init({
-      duration: 600,
-      once: true,
-      easing: "ease-out-cubic",
-    });
-  }, []);
 
   // 📁 Create Folder
   const handleCreateFolder = async (e) => {
@@ -127,7 +141,7 @@ const DriveLayout = () => {
         },
         onSuccess: () => {
           setUploadProgress(100);
-          toast.success("Video uploaded successfully 🎉");
+          toast.success("Video uploaded successfully");
           setNewVideoTitle("");
           setVideoFile(null);
           setTimeout(() => setUploadProgress(0), 2000);
@@ -178,7 +192,7 @@ const DriveLayout = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        "https://bcknd.mathshouse.net/api/drive/upload/file",
+        `${API_URL}/api/drive/upload/file`,
         {
           method: "POST",
           headers: {
@@ -194,7 +208,7 @@ const DriveLayout = () => {
         throw new Error(resData?.message || "Failed to upload file");
       }
 
-      toast.success("File uploaded successfully 🎉");
+      toast.success("File uploaded successfully");
       setNewFileTitle("");
       setRegularFile(null);
       refetch();
@@ -207,7 +221,7 @@ const DriveLayout = () => {
   };
 
   // 📂 [الفانكشن الثالثة] - Upload Folder (recreates tree client-side, no backend changes needed)
-  const API_BASE_URL = "https://bcknd.mathshouse.net";
+  const API_BASE_URL = `${API_URL}`;
 
   // Lists the folders already inside a given parent (used to resolve name collisions)
   const listChildFolders = async (parentFolderId) => {
@@ -432,7 +446,7 @@ const DriveLayout = () => {
     setFolderFiles(null);
 
     if (failCount === 0) {
-      toast.success(`Folder uploaded successfully 🎉 (${successCount} files)`);
+      toast.success(`Folder uploaded successfully (${successCount} files)`);
     } else {
       toast.error(
         `Uploaded ${successCount} file(s), ${failCount} failed. Check console for details.`,
@@ -477,7 +491,7 @@ const DriveLayout = () => {
       if (!token) throw new Error("No auth token found");
 
       const response = await fetch(
-        `https://bcknd.mathshouse.net/api/drive/stream/${file.id}`,
+        `${API_URL}/api/drive/stream/${file.id}`,
         {
           method: "GET",
           headers: {
@@ -514,426 +528,388 @@ const DriveLayout = () => {
     setStreamUrl(null);
   };
 
-  // ⏳ Loading Screen
-  if (loading && !driveData) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-slate-50">
-        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+
+  // 📂 Open a file: videos play in the secure player, PDFs/images open in a new tab
+  const openFile = (file) => {
+    const isVideo = (file.type?.toLowerCase() || "") === "video";
+    if (isVideo) {
+      handlePlayVideo(file);
+    } else {
+      const fileLink = file.sourceUrl || file.fileUrl || file.url;
+      if (fileLink) window.open(fileLink, "_blank");
+      else toast.error("File URL is not available");
+    }
+  };
+
+  const askDelete = (e, item) => {
+    e.stopPropagation();
+    setItemToDelete(item);
+  };
+
+  const folders = driveData?.folders || [];
+  const files = driveData?.files || [];
+  const initialLoading = loading && !driveData;
+  const isEmpty =
+    !loading &&
+    driveData?.folders?.length === 0 &&
+    driveData?.files?.length === 0;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const folderPct = folderUploadCounts.total
+    ? (folderUploadCounts.done / folderUploadCounts.total) * 100
+    : 0;
 
   return (
-    <div className="p-6 md:p-10 w-full min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-slate-800 font-sans">
+    <div className="min-h-screen font-sans text-gray-800" style={{ background: "#f8fafc" }}>
       <Toaster position="top-center" reverseOrder={false} />
 
-      {/* Header */}
-      <div
-        className="flex justify-between items-center mb-8"
-        data-aos="fade-down"
-      >
-        <div className="flex items-center gap-4">
-          {currentFolderId && (
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-full hover:bg-white hover:shadow-sm transition-all text-slate-500 hover:text-indigo-600"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-                />
-              </svg>
-            </button>
-          )}
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">
-            {driveData?.currentFolder?.name || "My Drive"}
-          </h1>
-        </div>
-      </div>
-
-      {/* Actions Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-        {/* Create Folder Card */}
-        <div
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md"
-          data-aos="fade-right"
-          data-aos-delay="100"
-        >
-          <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
-            Create Folder
-          </h2>
-          <form onSubmit={handleCreateFolder} className="flex gap-3">
-            <input
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="e.g. Projects 2024"
-              className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            <button className="bg-slate-800 hover:bg-slate-900 text-white font-medium px-5 py-2.5 rounded-xl transition-colors shrink-0">
-              Create
-            </button>
-          </form>
-        </div>
-
-        {/* Upload Video Card */}
-        <div
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md"
-          data-aos="fade-up"
-          data-aos-delay="150"
-        >
-          <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
-            Upload Video (TUS)
-          </h2>
-          <form
-            onSubmit={handleUploadFile}
-            className="flex flex-col sm:flex-row gap-3"
-          >
-            <input
-              value={newVideoTitle}
-              onChange={(e) => setNewVideoTitle(e.target.value)}
-              placeholder="Video title"
-              className="w-full sm:w-1/3 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            <input
-              type="file"
-              accept="video/*"
-              onChange={(e) => setVideoFile(e.target.files[0])}
-              className="w-full sm:flex-1 text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-            />
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors shadow-sm shadow-indigo-200 shrink-0">
-              Upload
-            </button>
-          </form>
-
-          {/* Progress Bar */}
-          {uploadProgress > 0 && (
-            <div className="mt-4 w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-              <div
-                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out relative"
-                style={{ width: `${uploadProgress}%` }}
-              >
-                <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-pulse"></div>
-              </div>
+      {/* Top bar */}
+      <header className="bg-white border-b border-gray-200 h-16 sticky top-0 z-40">
+        <div className="max-w-[1600px] mx-auto h-full px-4 md:px-6 flex items-center gap-3">
+          <img alt="MathPortal" className="w-9 h-9 rounded-lg shadow-sm shrink-0" src="/favicon.svg" />
+          <div className="leading-tight min-w-0">
+            <div className="font-bold text-lg text-gray-900 tracking-tight whitespace-nowrap">
+              Math<span className="text-one">Portal</span>
             </div>
-          )}
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+              Drive
+            </div>
+          </div>
         </div>
+      </header>
 
-        {/* Upload File Card (PDF / Images) */}
-        <div
-          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md"
-          data-aos="fade-left"
-          data-aos-delay="200"
-        >
-          <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
-            Upload File (PDF / Images)
-          </h2>
-          <form
-            onSubmit={handleUploadRegularFile}
-            className="flex flex-col sm:flex-row gap-3"
-          >
-            <input
-              value={newFileTitle}
-              onChange={(e) => setNewFileTitle(e.target.value)}
-              placeholder="File title"
-              className="w-full sm:w-1/3 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-            />
-            <input
-              type="file"
-              accept=".pdf, image/*"
-              onChange={(e) => setRegularFile(e.target.files[0])}
-              className="w-full sm:flex-1 text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-            />
-            <button
-              disabled={isFileUploading}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium px-6 py-2.5 rounded-xl transition-colors shadow-sm shadow-emerald-200 shrink-0 flex items-center justify-center"
-            >
-              {isFileUploading ? "Uploading..." : "Upload "}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Upload Folder Card — its own full-width row, separate from the 3-card grid above */}
-      <div
-        className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100/60 transition-shadow hover:shadow-md mb-10"
-        data-aos="fade-up"
-        data-aos-delay="250"
-      >
-        <h2 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
-          Upload Folder
-        </h2>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="file"
-            webkitdirectory=""
-            directory=""
-            multiple
-            onChange={(e) => setFolderFiles(e.target.files)}
-            className="w-full sm:flex-1 text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer"
-          />
-          <button
-            onClick={handleUploadFolder}
-            disabled={isFolderUploading || !folderFiles}
-            className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-medium px-6 py-2.5 rounded-xl transition-colors shadow-sm shadow-amber-200 shrink-0 flex items-center justify-center"
-          >
-            {isFolderUploading ? "Uploading..." : "Upload"}
+      <main className="max-w-[1600px] mx-auto p-4 md:p-6">
+        {currentFolderId && (
+          <button onClick={handleBack} className="a-btn !py-1.5 !px-3 mb-3">
+            <ArrowLeft size={15} /> Back
           </button>
-        </div>
-
-        {folderFiles && !isFolderUploading && (
-          <p className="mt-3 text-xs text-slate-400">
-            {folderFiles.length} file(s) selected
-          </p>
         )}
 
-        {isFolderUploading && (
-          <div className="mt-4">
-            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-              <div
-                className="bg-amber-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                style={{
-                  width: `${
-                    folderUploadCounts.total
-                      ? (folderUploadCounts.done / folderUploadCounts.total) *
-                        100
-                      : 0
-                  }%`,
-                }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-500 truncate">
-              {folderUploadStatus} ({folderUploadCounts.done}/
-              {folderUploadCounts.total})
-            </p>
-          </div>
-        )}
-      </div>
+        <PageHead
+          title={driveData?.currentFolder?.name || "My Drive"}
+          sub={
+            initialLoading
+              ? "Loading the folder…"
+              : `${plural(folders.length, "folder")} · ${plural(files.length, "file")}`
+          }
+        />
 
-      {/* Grid: Folders & Files */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {/* Folders */}
-        {driveData?.folders?.map((folder, index) => (
-          <div
-            key={folder.id}
-            data-aos="fade-up"
-            data-aos-delay={index * 50}
-            className="group bg-white p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-slate-100/60 hover:-translate-y-1 flex flex-col justify-between h-36 cursor-pointer"
-            onClick={() => setCurrentFolderId(folder.id)}
-          >
-            <div className="flex items-center gap-3 text-lg font-medium text-slate-700 hover:text-indigo-600 transition-colors">
-              <span className="text-3xl">📁</span>
-              <span className="truncate">{folder.name}</span>
-            </div>
-            <div className="flex justify-end mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setItemToDelete({
-                    id: folder.id,
-                    type: "folder",
-                    name: folder.name,
-                  });
-                }}
-                className="text-xs font-semibold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {/* Files */}
-        {driveData?.files?.map((file, index) => {
-          // API returns file.type as "pdf", "image", or "video"
-          const fileType = file.type?.toLowerCase() || "";
-
-          const isPdf = fileType === "pdf";
-          const isImage = fileType === "image";
-          const isVideo = fileType === "video";
-
-          let fileIcon = "📄";
-          if (isVideo) fileIcon = "🎬";
-          else if (isPdf) fileIcon = "📕";
-          else if (isImage) fileIcon = "🖼️";
-
-          return (
-            <div
-              key={file.id}
-              data-aos="fade-up"
-              data-aos-delay={
-                (driveData?.folders?.length || 0) * 50 + index * 50
-              }
-              className="group bg-white p-5 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-slate-100/60 hover:-translate-y-1 flex flex-col justify-between h-36 cursor-pointer"
-              onClick={() => {
-                if (isVideo) {
-                  handlePlayVideo(file);
-                } else {
-                  const fileLink = file.sourceUrl || file.fileUrl || file.url;
-                  if (fileLink) window.open(fileLink, "_blank");
-                  else toast.error("File URL is not available");
-                }
-              }}
-            >
-              <div className="flex items-start gap-3 text-base font-medium text-slate-700">
-                <span className="text-3xl">{fileIcon}</span>
-                <span className="line-clamp-2 leading-snug">
-                  {file.title || file.videoTitle}
-                </span>
-              </div>
-              <div className="flex justify-end mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setItemToDelete({
-                      id: file.id,
-                      type: file.type || "file", // "pdf", "image", or "video"
-                      name: file.title || file.videoTitle,
-                    });
-                  }}
-                  className="text-xs font-semibold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Empty State */}
-        {!loading &&
-          driveData?.folders?.length === 0 &&
-          driveData?.files?.length === 0 && (
-            <div
-              className="col-span-full py-20 flex flex-col items-center justify-center text-slate-400"
-              data-aos="zoom-in"
-            >
-              <span className="text-6xl mb-4">📭</span>
-              <p className="text-lg font-medium">This folder is empty</p>
-            </div>
-          )}
-      </div>
-
-      {/* 📺 Video Player Modal */}
-      {playingVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 transition-all">
-          <div
-            className="bg-black p-4 rounded-3xl shadow-2xl w-full max-w-5xl border border-slate-800 relative flex flex-col"
-            data-aos="zoom-in"
-            data-aos-duration="300"
-          >
-            {/* Close Button */}
-            <button
-              onClick={handleCloseVideo}
-              className="absolute -top-4 -right-4 md:-top-5 md:-right-5 bg-slate-800 hover:bg-red-500 text-white p-2.5 rounded-full shadow-lg transition-all hover:scale-110 z-10 border-2 border-slate-700 hover:border-red-500"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M6 18L18 6M6 6l12 12"
+        {/* Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4 mb-4">
+          {/* Create Folder */}
+          <Card title="New folder" sub="Created inside the folder you are in">
+            <form onSubmit={handleCreateFolder} className="space-y-3">
+              <div>
+                <label htmlFor="dr-folder" className="a-lbl-f">Folder name</label>
+                <input
+                  id="dr-folder"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="e.g. Projects 2024"
+                  className="a-inp"
                 />
-              </svg>
-            </button>
+              </div>
+              <button className="a-btn primary w-full">
+                <FolderPlus size={16} /> Create folder
+              </button>
+            </form>
+          </Card>
 
-            <h3 className="text-lg font-semibold text-slate-200 mb-4 px-2 truncate">
-              {playingVideo.title}
-            </h3>
-
-            <div className="rounded-2xl overflow-hidden bg-slate-900 w-full relative min-h-[50vh] flex items-center justify-center">
-              {isLoadingStream ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-                  <span className="text-slate-400 text-sm">
-                    Loading secure stream...
-                  </span>
-                </div>
-              ) : streamUrl ? (
-                <div className="w-full h-full aspect-video">
-                  <SecureVideoPlayer
-                    streamUrl={streamUrl}
-                    studentIdentifier="Admin / Instructor View"
-                    autoplay={true}
-                    showControls={true}
-                  />
-                </div>
-              ) : (
-                <div className="text-slate-400">
-                  Failed to load video stream.
+          {/* Upload Video (TUS) */}
+          <Card title="Upload video" sub="Sent straight to the video library (resumable)">
+            <form onSubmit={handleUploadFile} className="space-y-3">
+              <div>
+                <label htmlFor="dr-vtitle" className="a-lbl-f">Video title</label>
+                <input
+                  id="dr-vtitle"
+                  value={newVideoTitle}
+                  onChange={(e) => setNewVideoTitle(e.target.value)}
+                  placeholder="Video title"
+                  className="a-inp"
+                />
+              </div>
+              <div>
+                <label htmlFor="dr-vfile" className="a-lbl-f">Video file</label>
+                <input
+                  id="dr-vfile"
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setVideoFile(e.target.files[0])}
+                  className={FILE_INPUT}
+                />
+              </div>
+              <button className="a-btn primary w-full">
+                <Upload size={16} /> Upload video
+              </button>
+              {uploadProgress > 0 && (
+                <div>
+                  <Bar pct={uploadProgress} />
+                  <p className="mt-1.5 text-[11px] font-bold text-gray-500">{uploadProgress}%</p>
                 </div>
               )}
+            </form>
+          </Card>
+
+          {/* Upload File (PDF / Images) */}
+          <Card title="Upload file" sub="PDF or image (JPG, PNG, GIF, WebP)">
+            <form onSubmit={handleUploadRegularFile} className="space-y-3">
+              <div>
+                <label htmlFor="dr-ftitle" className="a-lbl-f">File title</label>
+                <input
+                  id="dr-ftitle"
+                  value={newFileTitle}
+                  onChange={(e) => setNewFileTitle(e.target.value)}
+                  placeholder="File title"
+                  className="a-inp"
+                />
+              </div>
+              <div>
+                <label htmlFor="dr-ffile" className="a-lbl-f">File</label>
+                <input
+                  id="dr-ffile"
+                  type="file"
+                  accept=".pdf, image/*"
+                  onChange={(e) => setRegularFile(e.target.files[0])}
+                  className={FILE_INPUT}
+                />
+              </div>
+              <button disabled={isFileUploading} className="a-btn primary w-full">
+                {isFileUploading ? (
+                  <><Loader2 size={16} className="animate-spin" /> Uploading…</>
+                ) : (
+                  <><Upload size={16} /> Upload file</>
+                )}
+              </button>
+            </form>
+          </Card>
+
+          {/* Upload Folder */}
+          <Card title="Upload folder" sub="Keeps the sub-folders; videos, PDFs and images">
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="dr-dir" className="a-lbl-f">Folder</label>
+                <input
+                  id="dr-dir"
+                  type="file"
+                  webkitdirectory=""
+                  directory=""
+                  multiple
+                  onChange={(e) => setFolderFiles(e.target.files)}
+                  className={FILE_INPUT}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleUploadFolder}
+                disabled={isFolderUploading || !folderFiles}
+                className="a-btn primary w-full"
+              >
+                {isFolderUploading ? (
+                  <><Loader2 size={16} className="animate-spin" /> Uploading…</>
+                ) : (
+                  <><FolderUp size={16} /> Upload folder</>
+                )}
+              </button>
+
+              {folderFiles && !isFolderUploading && (
+                <p className="text-xs text-gray-400">{folderFiles.length} file(s) selected</p>
+              )}
+
+              {isFolderUploading && (
+                <div>
+                  <Bar pct={folderPct} />
+                  <p className="mt-1.5 text-[11px] text-gray-500 truncate">
+                    {folderUploadStatus} ({folderUploadCounts.done}/{folderUploadCounts.total})
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Contents */}
+        <Card
+          title="Contents"
+          sub="Open a folder, play a video, or open a PDF/image in a new tab"
+          bodyClass="p-0"
+        >
+          {initialLoading ? (
+            <div className="p-5"><SkelRows n={5} /></div>
+          ) : error && !driveData ? (
+            <p className="p-5 text-sm text-red-600">{error}</p>
+          ) : isEmpty ? (
+            <div className="p-5">
+              <Empty title="This folder is empty" text="Create a folder or upload files above." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="a-th">Name</th>
+                    <th className="a-th">Type</th>
+                    <th className="a-th text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {folders.map((folder) => {
+                    const k = FILE_KIND.folder;
+                    return (
+                      <tr
+                        key={`folder-${folder.id}`}
+                        className="a-tr cursor-pointer"
+                        onClick={() => setCurrentFolderId(folder.id)}
+                      >
+                        <td className="a-td">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${k.tile}`}>
+                              <k.Icon size={17} />
+                            </span>
+                            <span className="font-semibold text-gray-800 truncate max-w-[60vw] md:max-w-[50ch]">
+                              {folder.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="a-td"><Pill tone={k.tone}>{k.label}</Pill></td>
+                        <td className="a-td">
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              className="a-act"
+                              title="Open folder"
+                              aria-label="Open folder"
+                              onClick={(e) => { e.stopPropagation(); setCurrentFolderId(folder.id); }}
+                            >
+                              <Folder size={15} />
+                            </button>
+                            <button
+                              className="a-act del"
+                              title="Delete"
+                              aria-label="Delete folder"
+                              onClick={(e) => askDelete(e, { id: folder.id, type: "folder", name: folder.name })}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {files.map((file) => {
+                    // API returns file.type as "pdf", "image", or "video"
+                    const fileType = file.type?.toLowerCase() || "";
+                    const isVideo = fileType === "video";
+                    const k = FILE_KIND[fileType] || FILE_KIND.file;
+                    const name = file.title || file.videoTitle;
+                    return (
+                      <tr key={`file-${file.id}`} className="a-tr cursor-pointer" onClick={() => openFile(file)}>
+                        <td className="a-td">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${k.tile}`}>
+                              <k.Icon size={17} />
+                            </span>
+                            <span className="font-semibold text-gray-800 line-clamp-2 max-w-[60vw] md:max-w-[50ch]">
+                              {name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="a-td"><Pill tone={k.tone}>{k.label}</Pill></td>
+                        <td className="a-td">
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              className="a-act"
+                              title={isVideo ? "Play" : "Open in a new tab"}
+                              aria-label={isVideo ? "Play video" : "Open file"}
+                              onClick={(e) => { e.stopPropagation(); openFile(file); }}
+                            >
+                              {isVideo ? <Play size={15} /> : <ExternalLink size={15} />}
+                            </button>
+                            <button
+                              className="a-act del"
+                              title="Delete"
+                              aria-label="Delete file"
+                              onClick={(e) =>
+                                askDelete(e, {
+                                  id: file.id,
+                                  type: file.type || "file", // "pdf", "image", or "video"
+                                  name,
+                                })
+                              }
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </main>
+
+      {/* Video Player Modal */}
+      {playingVideo && (
+        <div className="a-modal-bg">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100">
+              <div className="min-w-0">
+                <h3 className="font-bold text-gray-800 truncate">{playingVideo.title}</h3>
+                <p className="text-[11px] text-gray-400">Secure stream · watermarked</p>
+              </div>
+              <button onClick={handleCloseVideo} className="a-act shrink-0" title="Close" aria-label="Close player">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-gray-950 p-2 sm:p-4">
+              <div className="rounded-xl overflow-hidden w-full relative min-h-[40vh] flex items-center justify-center">
+                {isLoadingStream ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 size={28} className="animate-spin text-white/70" />
+                    <span className="text-gray-400 text-sm">Loading secure stream…</span>
+                  </div>
+                ) : streamUrl ? (
+                  <div className="w-full h-full aspect-video">
+                    <SecureVideoPlayer
+                      streamUrl={streamUrl}
+                      studentIdentifier="Admin / Instructor View"
+                      autoplay={true}
+                      showControls={true}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-gray-400 text-sm">Failed to load video stream.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🗑️ Delete Modal */}
+      {/* Delete Modal */}
       {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 transition-all">
-          <div
-            className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full border border-slate-100"
-            data-aos="zoom-out"
-            data-aos-duration="300"
-          >
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-500 mb-5">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">
-              Delete Item
-            </h3>
-            <p className="text-slate-500 mb-8 leading-relaxed">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-slate-700">
-                "{itemToDelete.name}"
-              </span>
-              ? This action cannot be undone.
-            </p>
-
-            <div className="flex gap-3 w-full">
-              <button
-                onClick={() => setItemToDelete(null)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-xl transition-colors"
-              >
-                Cancel
+        <Modal
+          title="Delete item?"
+          onClose={() => setItemToDelete(null)}
+          actions={
+            <>
+              <button onClick={() => setItemToDelete(null)} className="a-btn">Cancel</button>
+              <button onClick={confirmDelete} disabled={isDeleting} className="a-btn danger">
+                {isDeleting ? (<><Loader2 size={15} className="animate-spin" /> Deleting…</>) : (<><Trash2 size={15} /> Delete</>)}
               </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-3 rounded-xl transition-colors shadow-sm shadow-red-200 flex justify-center items-center gap-2"
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Yes, Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p>
+            Delete <span className="font-semibold text-gray-800">“{itemToDelete.name}”</span>? This cannot be undone.
+          </p>
+        </Modal>
       )}
     </div>
   );

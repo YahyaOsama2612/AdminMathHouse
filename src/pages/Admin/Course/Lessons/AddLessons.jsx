@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 import PricePlansField from "@/components/PricePlansField";
 import PdfUploadField, {
@@ -205,11 +204,16 @@ const AddLessons = () => {
     }
   };
 
-  if (loadingTeachers) return <Loader />;
+  if (loadingTeachers) return <FormSkeleton />;
   if (error) return <Errorpage />;
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        chapterId && { label: "Chapter lessons", to: `/admin/courses/lessons/${chapterId}` },
+        { label: "Add lesson" },
+      ]}
       title="Add Lesson"
       fields={fields}
       onSave={onSave}

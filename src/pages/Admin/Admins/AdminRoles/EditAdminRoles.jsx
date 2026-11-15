@@ -1,72 +1,71 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { Card, SkelRows } from "@/components/admin/kit";
+import RolePermissions, { countSelected } from "./parts/RolePermissions";
 
-const EditAdminRoles = ({ roleId, onSaveSuccess, onCancel }) => {
+/* Admins → Admin Roles → Edit (MathPortal role form): role details card, access-control matrix,
+   sticky footer with the selection count and Save. Works as a routed page (/admin-roles/edit/:id)
+   or embedded with the roleId / onSaveSuccess / onCancel props. */
+const EditAdminRoles = ({ roleId: roleIdProp, onSaveSuccess, onCancel }) => {
   const navigate = useNavigate();
+  const params = useParams();
+  const roleId = roleIdProp || params.id;
 
-  // 1. جلب الهيكل العام لجميع الصلاحيات المتاحة في النظام
-  const { data: schemaRes, loading: loadingSchema } = useGet(
-    "/api/admin/roles/available-permissions",
-  );
+  // 1. All permissions available in the system
+  const { data: schemaRes, loading: loadingSchema } = useGet("/api/admin/roles/available-permissions");
 
-  // 2. جلب بيانات الدور الحالي المراد تعديله
-  const { data: roleRes, loading: loadingRole } = useGet(
-    roleId ? `/api/admin/roles/${roleId}` : null,
-  );
+  // 2. The role being edited
+  const { data: roleRes, loading: loadingRole, error: roleError } = useGet(roleId ? `/api/admin/roles/${roleId}` : null);
 
-  // 3. تجهيز الـ Hook الخاص بالتعديل (PUT)
-  const { putData, loading: saving } = usePut(
-    roleId ? `/api/admin/roles/${roleId}` : null,
-  );
+  // 3. PUT hook
+  const { putData, loading: saving } = usePut(roleId ? `/api/admin/roles/${roleId}` : null);
 
-  const availablePermissions = schemaRes?.data || [];
-  const roleData = roleRes?.data;
+  // The schema is { modules, actions, permissions:[{ module, label, actions:[{ action }] }] };
+  // an array of { module, actions:[{ action }] } is also accepted.
+  const { modules, actions, labels } = useMemo(() => {
+    const raw = schemaRes?.data ?? schemaRes;
+    const perms = Array.isArray(raw) ? raw : raw?.permissions || [];
+    const mods = raw?.modules || perms.map((p) => p.module);
+    const acts = raw?.actions || [...new Set(perms.flatMap((p) => (p.actions || []).map((a) => (typeof a === "string" ? a : a.action))))];
+    const lbl = {};
+    perms.forEach((p) => { if (p.label) lbl[p.module] = p.label; });
+    return { modules: mods || [], actions: acts || [], labels: lbl };
+  }, [schemaRes]);
 
-  // state محلي لإدارة اسم الدور والـ permissions المحددة أثناء التعديل
+  const roleData = roleRes?.data?.role || roleRes?.data;
+
   const [roleName, setRoleName] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState({});
+  const [formError, setFormError] = useState("");
 
-  // شحن البيانات داخل الـ state بمجرد اكتمال التحميل من الـ API (تماماً كـ initialFormValues)
   useEffect(() => {
     if (roleData) {
       setRoleName(roleData.name || "");
-
       const initialSelections = {};
-      roleData.permissions?.forEach((p) => {
-        initialSelections[p.module] = p.actions.map((a) => a.action);
+      (roleData.permissions || []).forEach((p) => {
+        initialSelections[p.module] = (p.actions || []).map((a) => (typeof a === "string" ? a : a.action));
       });
       setSelectedPermissions(initialSelections);
     }
   }, [roleData]);
 
-  // دالة التعامل مع تغيير الـ Checkbox واختيار الصلاحيات
-  const handleCheckboxChange = (moduleName, actionName) => {
-    setSelectedPermissions((prev) => {
-      const currentActions = prev[moduleName] || [];
-      if (currentActions.includes(actionName)) {
-        return {
-          ...prev,
-          [moduleName]: currentActions.filter((a) => a !== actionName),
-        };
-      } else {
-        return { ...prev, [moduleName]: [...currentActions, actionName] };
-      }
-    });
-  };
+  const goBack = onCancel || (() => navigate("/admin/admin-roles"));
+  const n = countSelected(selectedPermissions);
+  const moduleCount = Object.values(selectedPermissions).filter((l) => l?.length).length;
 
-  // دالة الحفظ التي تحول البيانات للشكل المطلوب وترسلها عبر usePut
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!roleName.trim()) { setFormError("Enter a role name"); return; }
+    setFormError("");
 
+    // The API expects actions as plain strings ("View", "Add", …), same as Create role.
     const formattedPermissions = Object.keys(selectedPermissions)
       .map((moduleName) => ({
         module: moduleName,
-        actions: selectedPermissions[moduleName].map((act) => ({
-          action: act,
-        })),
+        actions: selectedPermissions[moduleName],
       }))
       .filter((p) => p.actions.length > 0);
 
@@ -76,112 +75,87 @@ const EditAdminRoles = ({ roleId, onSaveSuccess, onCancel }) => {
     };
 
     try {
-      // استخدام الـ putData الموحدة في مشروعك مع رسالة النجاح
-      await putData(
-        payload,
-        `/api/admin/roles/${roleId}`,
-        "Role configuration updated successfully",
-      );
-
-      if (onSaveSuccess) {
-        onSaveSuccess();
-      } else {
-        navigate("/admin/roles");
-      }
+      await putData(payload, `/api/admin/roles/${roleId}`, "Role configuration updated successfully");
+      if (onSaveSuccess) onSaveSuccess();
+      else navigate("/admin/admin-roles");
     } catch (err) {
-      // الـ Hook يتعامل مع الخطأ أو يمكنك عمل throw له هنا
       console.error(err);
     }
   };
 
-  // حالة التحميل الموحدة التي تعرض الـ Loader الخاص بالنظام
+  const head = (
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</p>
+        <h1 className="font-bold text-2xl text-gray-900">{roleData?.name ? `Edit ${roleData.name}` : "Edit role"}</h1>
+      </div>
+      <button type="button" onClick={goBack} className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-one hover:border-one shrink-0 flex items-center gap-1.5">
+        <ArrowLeft size={16} /> Back
+      </button>
+    </div>
+  );
+
+  if (!roleId || roleError) {
+    return (
+      <div>
+        {head}
+        <Card>
+          <p className="font-bold text-gray-800">This role could not be loaded</p>
+          <p className="text-sm text-gray-500">{roleError ? String(roleError) : "No role was chosen."}</p>
+        </Card>
+      </div>
+    );
+  }
+
   if (loadingSchema || loadingRole || !roleData) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader />
+      <div>
+        {head}
+        <div className="skel h-28 mb-4"></div>
+        <SkelRows n={6} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold mb-6 text-gray-800">Edit Admin Role</h2>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* حقل اسم الـ Role */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-semibold text-gray-700">
-            Role Name
-          </label>
-          <input
-            type="text"
-            value={roleName}
-            onChange={(e) => setRoleName(e.target.value)}
-            className="w-full max-w-md p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            placeholder="Enter role name"
-            required
-          />
-        </div>
-
-        {/* مصفوفة الصلاحيات Permissions Matrix */}
-        <div>
-          <h3 className="text-lg font-bold mb-4 text-gray-800 border-b pb-2">
-            Permissions Matrix
-          </h3>
-          <div className="space-y-4">
-            {availablePermissions.map((item) => (
-              <div
-                key={item.module}
-                className="border border-gray-200 rounded-lg p-4 bg-gray-50/50"
-              >
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-3">
-                  {item.module}
-                </span>
-                <div className="flex flex-wrap gap-6">
-                  {item.actions.map((actObj) => {
-                    const isChecked =
-                      selectedPermissions[item.module]?.includes(
-                        actObj.action,
-                      ) || false;
-                    return (
-                      <label
-                        key={actObj.action}
-                        className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() =>
-                            handleCheckboxChange(item.module, actObj.action)
-                          }
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        {actObj.action}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+    <div>
+      {head}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Card title="Role details" sub="A clear name helps when you pick a role for an admin.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="role-name" className="a-lbl-f">Role name <span className="text-red-500">*</span></label>
+              <input
+                id="role-name"
+                type="text"
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                className="a-inp"
+                placeholder="e.g. Supervisor, Manager"
+                required
+              />
+            </div>
           </div>
-        </div>
+        </Card>
 
-        {/* أزرار التحكم والـ Actions المتناسقة مع الـ EditAdmin */}
-        <div className="flex gap-3 pt-4 border-t border-gray-100">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Update Changes"}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel || (() => navigate("/admin/roles"))}
-            className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg text-sm hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
+        <Card title="Access control" sub="Turn on what this role may do in each part of the panel.">
+          <RolePermissions
+            modules={modules}
+            actions={actions}
+            labels={labels}
+            value={selectedPermissions}
+            onChange={setSelectedPermissions}
+          />
+        </Card>
+
+        {formError && <p className="text-sm font-semibold text-red-600" role="alert">{formError}</p>}
+
+        <div className="sticky bottom-0 z-10 -mx-1 px-1 py-3 bg-[#f8fafc]/95 backdrop-blur flex flex-wrap items-center justify-end gap-2 border-t border-gray-100">
+          <span className="hidden sm:inline text-xs text-gray-400 mr-auto">
+            {n} permission{n === 1 ? "" : "s"} across {moduleCount} module{moduleCount === 1 ? "" : "s"}
+          </span>
+          <button type="button" onClick={goBack} className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
+          <button type="submit" disabled={saving} className="a-btn primary">{saving ? "Saving…" : "Save changes"}</button>
         </div>
       </form>
     </div>

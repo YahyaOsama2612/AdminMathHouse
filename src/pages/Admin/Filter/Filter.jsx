@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { PageHead, Tabs } from "@/components/admin/kit";
 import AllSemesters from "../Course/Semester/AllSemesters";
 import AllCourses from "../Course/Courses/AllCourses";
 import AllChapters from "../Course/Chapters/AllChapters";
@@ -8,6 +10,7 @@ import AllDiagnosticExam from "../Course/Diagnosticexam/AllDiagnosticExam";
 import AllQuiz from "../Course/Quiz/AllQuiz";
 import AllExams from "../Course/Exam/AllExams";
 
+/* Segmented tab bar (MathPortal design) over the course lists; the open tab is remembered per session. */
 const Filter = () => {
   const [activeTab, setActiveTab] = useState(() => {
     return sessionStorage.getItem("activeTab") || "semesters";
@@ -30,27 +33,10 @@ const Filter = () => {
 
   return (
     <div>
-      {/* Tabs */}
-      <div className="flex gap-2 w-full justify-around flex-wrap mb-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-lg border ${
-              activeTab === tab.key
-                ? "bg-one text-white"
-                : "bg-gray-100"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="bg-white p-4 rounded-xl shadow">
-        {tabs.find((tab) => tab.key === activeTab)?.component}
-      </div>
+      <Link to="/admin/Filter" className="text-xs font-bold text-gray-500 hover:text-one">← Filter</Link>
+      <PageHead title="All content tables" sub="Every course, semester, chapter, lesson, question, quiz and exam in one place." />
+      <Tabs tabs={tabs.map(({ key, label }) => ({ key, label }))} value={activeTab} onChange={setActiveTab} />
+      <div key={activeTab}>{tabs.find((tab) => tab.key === activeTab)?.component}</div>
     </div>
   );
 };

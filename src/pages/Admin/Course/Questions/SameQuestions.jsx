@@ -7,6 +7,7 @@ import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import toast from "react-hot-toast";
 import TipTapMathEditor from "../../../../components/TipTapMathEditor";
+import { LetterPicker, OcrButton } from "./parts/qb";
 
 const SameQuestions = () => {
   const { id } = useParams();
@@ -86,21 +87,11 @@ const SameQuestions = () => {
       section: "General Information",
       fullWidth: true,
       actionButton: ({ formData, setFormData }) => (
-        <button
-          type="button"
-          onClick={() => handleOCR(formData.image, setFormData)}
-          disabled={ocrLoading || !formData.image}
-      className="w-full md:w-auto h-full px-8 py-4 bg-one text-white rounded-xl hover:bg-one/80 disabled:opacity-50 flex items-center justify-center gap-2 transition-all font-bold shadow-sm"
-        >
-          {ocrLoading ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Extracting...</span>
-            </>
-          ) : (
-            <>📄 Extract Text</>
-          )}
-        </button>
+        <OcrButton
+            onClick={() => handleOCR(formData.image, setFormData)}
+            disabled={ocrLoading || !formData.image}
+            loading={ocrLoading}
+          />
       ),
     },
     {
@@ -194,21 +185,7 @@ const SameQuestions = () => {
       render: ({ value, onChange, formData }) => {
         const count = formData.options?.length || 4;
         const letters = Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i));
-        return (
-          <div className="flex gap-3 flex-wrap">
-            {letters.map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => onChange(l)}
-                className={`w-12 h-12 rounded-xl border-2 font-bold transition-all
-                  ${value === l ? "bg-one text-white border-one shadow-md" : "bg-white text-slate-500 border-slate-200"}`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        );
+        return <LetterPicker letters={letters} value={value} onChange={onChange} />;
       },
     },
 

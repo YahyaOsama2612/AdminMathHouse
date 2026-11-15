@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import useGet from "@/hooks/useGet";
 import usePut from "@/hooks/usePut";
-import Loader from "@/components/Loader";
+import { CatalogForm, FormSkeleton } from "../parts/catalog";
 import Errorpage from "@/components/Errorpage";
 
 const EditSemester = () => {
@@ -42,7 +41,7 @@ const EditSemester = () => {
   };
 
   if (loadingOne) {
-    return <Loader />;
+    return <FormSkeleton />;
   }
 
   if (errorOne) {
@@ -52,7 +51,12 @@ const EditSemester = () => {
   const semester = semesterRes?.data?.data?.[0];
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        typeof coursesId === "string" && coursesId && { label: "Semesters", to: `/admin/courses/semester/${coursesId}` },
+        { label: semester?.name ? `Edit ${semester.name}` : "Edit semester" },
+      ]}
       title="Edit Semester"
       fields={fields}
       onSave={onSave}

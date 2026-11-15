@@ -1,30 +1,22 @@
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReusableTable from "@/components/ReusableTable";
+import { ChevronRight, Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import useGet from "@/hooks/useGet";
-import React, { useMemo, useState } from "react";
-import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import useDelete from "@/hooks/useDelete";
-import Loader from "@/components/Loader";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import Errorpage from "@/components/Errorpage";
-import NavChild from "@/components/NavChild";
-import { MdGridView } from "react-icons/md";
-import { FaBook } from "react-icons/fa";
-import IconButton from "@/components/IconButton";
+import { Chip, EmptyBox, HeroCard, IconBtn, PageSkeleton, Thumb, plural } from "../parts/catalog";
+
+/* Semesters of a course (courses with "Has semesters" on). Each semester opens its chapters.
+   Endpoints: GET /api/admin/courses/:id, GET /api/admin/semester/course/:id, DELETE /api/admin/semester/:id */
 
 const Semester = () => {
   const navigate = useNavigate();
   const { coursesId } = useParams();
-  const {
-    data: courseRes,
-    loading: loadingOne,
-    error: errorOne,
-  } = useGet(`/api/admin/courses/${coursesId}`);
-
+  const { data: courseRes } = useGet(`/api/admin/courses/${coursesId}`);
   const course = courseRes?.data || {};
 
-  const { data, loading, refetch, error } = useGet(
-    `/api/admin/semester/course/${coursesId}`,
-  );
+  const { data, refetch, error } = useGet(`/api/admin/semester/course/${coursesId}`);
   const { deleteData, loading: deleteLoading } = useDelete();
 
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
@@ -46,8 +38,6 @@ const Semester = () => {
     }
   };
 
-  const columns = [{ header: "Name", key: "name" }];
-
   const tableData = useMemo(() => {
     return (
       data?.data?.data?.map((sem) => ({
@@ -63,63 +53,79 @@ const Semester = () => {
     navigate(`/admin/courses/semester/edit/${row.id}`, { state: coursesId });
   };
 
-  if (loading && loadingOne) {
-    return <Loader />;
-  }
-  if (error && errorOne) {
-    return <Errorpage />;
-  }
+  const openChapters = (row) =>
+    navigate(`/admin/courses/chapters/semester/${row.id}`, {
+      state: {
+        courseId: coursesId || row.raw?.courseId,
+        semesterId: row.id,
+        semesterName: row.name,
+        courseName: course?.name,
+      },
+    });
+
+  const addSemester = () => navigate("/admin/courses/semester/add", { state: coursesId });
+
+  if (error) return <Errorpage />;
+  if (!data) return <PageSkeleton cards={3} />;
 
   return (
     <div>
-      <ReusableTable
-        title={`Semesters | ${course.name}`}
-        titleAdd="Semester"
-        columns={columns}
-        data={tableData}
-        loading={loading || deleteLoading}
-        onAddClick={() =>
-          navigate("/admin/courses/semester/add", { state: coursesId })
+      <HeroCard
+        crumbs={[
+          { label: "Categories", to: "/admin/courses/categories" },
+          course.categoryId && { label: "Courses", to: `/admin/courses/courses/${course.categoryId}` },
+          { label: course.name || "Course" },
+        ]}
+        thumb={<Thumb src={course.image} name={course.name || "?"} size={56} />}
+        kicker="Course · Semesters"
+        title={course.name || "Semesters"}
+        desc={course.description}
+        chips={
+          <>
+            <Chip tone="blue">Semesters</Chip>
+            {course.teachers?.length > 0 && <Chip>{plural(course.teachers.length, "teacher")}</Chip>}
+          </>
         }
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        extraActions={(row) => (
-          <div className="flex gap-2">
-            {/* ✅ استخدم navigate بدل NavChild عشان الـ URL تكون آمنة */}
-            <button
-              onClick={() =>
-                navigate(`/admin/courses/chapters/semester/${row.id}`, {
-                  state: {
-                    courseId: coursesId || row.raw?.courseId,
-                    semesterId: row.id,
-                    semesterName: row.name,
-                    courseName: course?.name,
-                  },
-                })
-              }
-              className="flex items-center gap-1 text-blue-500 hover:text-blue-700"
-              title="View Chapters"
+        actions={
+          <>
+            <button type="button" onClick={addSemester} className="a-btn primary"><Plus size={16} /> Add semester</button>
+            {course.id && (
+              <button type="button" onClick={() => navigate(`/admin/courses/courses/edit/${course.id}`)} className="a-btn">Edit course</button>
+            )}
+          </>
+        }
+      />
+
+      {!tableData.length ? (
+        <EmptyBox title="No semesters yet" text="Add a semester, then add its chapters.">
+          <button type="button" onClick={addSemester} className="a-btn primary mt-4"><Plus size={16} /> Add semester</button>
+        </EmptyBox>
+      ) : (
+        <div className={`grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 ${deleteLoading ? "opacity-60 pointer-events-none" : ""}`}>
+          {tableData.map((row, i) => (
+            <div
+              key={row.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openChapters(row)}
+              onKeyDown={(e) => e.key === "Enter" && openChapters(row)}
+              className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-[#7d0a0a]/40 hover:shadow-md transition cursor-pointer flex items-center gap-3"
             >
-              📚 Chapters
-            </button>
-          </div>
-        )}
-      >
-        <div className="flex gap-2">
-          <IconButton
-            icon={MdGridView}
-            color="bg-one"
-            navigateTo={`/admin/courses/categories`}
-            name="Categories"
-          />
-          <IconButton
-            icon={FaBook}
-            color="bg-one"
-            navigateTo={`/admin/courses/courses/${course.categoryId}`}
-            name="courses"
-          />
+              <span className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0"><Layers size={20} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-one">Semester {i + 1}</p>
+                <p className="font-bold text-gray-900 leading-snug break-words">{row.name}</p>
+                <p className="text-xs font-bold text-one flex items-center gap-0.5 opacity-70 group-hover:opacity-100">Chapters <ChevronRight size={13} /></p>
+              </div>
+              <span className="flex gap-1">
+                <IconBtn title={`Edit ${row.name}`} onClick={() => handleEdit(row)}><Pencil size={15} /></IconBtn>
+                <IconBtn title={`Delete ${row.name}`} danger onClick={() => handleDelete(row)}><Trash2 size={15} /></IconBtn>
+              </span>
+            </div>
+          ))}
         </div>
-      </ReusableTable>
+      )}
+
       <ConfirmDeleteModal
         open={openDeleteModal}
         onClose={() => setOpenDeleteModal(false)}

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
+import { CatalogForm } from "../parts/catalog";
 import usePost from "@/hooks/usePost";
 
 const AddSemester = () => {
@@ -51,7 +51,12 @@ const AddSemester = () => {
   };
 
   return (
-    <AddPage
+    <CatalogForm
+      crumbs={[
+        { label: "Categories", to: "/admin/courses/categories" },
+        coursesId && { label: "Semesters", to: `/admin/courses/semester/${coursesId}` },
+        { label: "Add semester" },
+      ]}
       title="Add Semester"
       fields={fields}
       onSave={onSave}

@@ -6,8 +6,8 @@ import React, { useMemo, useState } from "react";
 import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
-import PricePlansModal from "@/components/PricePlansModal";
-import { MdAttachMoney } from "react-icons/md";
+import { PlansModal } from "../parts/catalog";
+import { DollarSign } from "lucide-react";
 
 const AllLessons = () => {
   const navigate = useNavigate();
@@ -116,13 +116,13 @@ const tableData = useMemo(() => {
         onDelete={handleDelete}
          rowsPerPage={5}
            extraActions={(row) => (
-    <button onClick={() => setPricePopup({ open: true, row })}>
-      <MdAttachMoney className="text-2xl text-green-600" />
-    </button>
+    <button type="button" className="a-act" title="Price plans" aria-label="Price plans" onClick={() => setPricePopup({ open: true, row: { ...row, name: row.lessonName } })}>
+            <DollarSign size={15} />
+          </button>
   )}
       />
      
-<PricePlansModal
+<PlansModal
   open={pricePopup.open}
   row={pricePopup.row}
   onClose={() => setPricePopup({ open: false, row: null })}

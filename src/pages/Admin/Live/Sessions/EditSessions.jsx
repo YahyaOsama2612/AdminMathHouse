@@ -4,35 +4,15 @@ import usePut from "@/hooks/usePut";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
 import api from "@/api/api";
-import Loader from "@/components/Loader";
 import Errorpage from "@/components/Errorpage";
-import SearchStudents from "@/components/SearchStudents";
-import HierarchicalLessonSelector from "@/components/HierarchicalLessonSelector";
-import SessionExamSelect from "./SessionExamSelect";
-import ExamSessionCourseFields from "./ExamSessionCourseFields";
-import CommonLessonsReportView from "./CommonLessonsReportView";
-import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { ArrowLeft, AlertCircle, UserCheck } from "lucide-react";
+import { PageHead } from "@/components/admin/kit";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ManualAttendanceModal from "./ManualAttendanceModal";
+import SessionForm from "./parts/SessionForm";
+import { FormSkeleton, scrollToFirstError } from "./parts/formKit";
 
-// Timezone-safe date helpers (avoid toISOString(), which shifts the day in UTC+ zones)
-const toLocalDateString = (date) => {
-  if (!date) return "";
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-const parseLocalDate = (str) => {
-  if (!str) return null;
-  const [y, m, d] = String(str).slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-};
+const NO_LESSONS = [];
 
 const EditSessions = () => {
   const navigate = useNavigate();
@@ -46,7 +26,6 @@ const EditSessions = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [openManualAttendance, setOpenManualAttendance] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState("info");
 
   // 🔹 Fetch existing data and configuration options
   const {
@@ -97,6 +76,7 @@ const EditSessions = () => {
 
   const [errors, setErrors] = useState({});
   const [clearInitialLessons, setClearInitialLessons] = useState(false);
+  const manualSession = useMemo(() => ({ id, name: formData.name }), [id, formData.name]);
 
   // Fetch the members of the currently selected group so they can be displayed
   const {
@@ -139,8 +119,25 @@ const EditSessions = () => {
 
   // 🔹 Sync database session data carefully to localized state hooks
   useEffect(() => {
-    if (sessionRes?.data?.session) {
+    if (!sessionRes?.data?.session) return;
+    let cancelled = false;
+    (async () => {
       const session = sessionRes.data.session;
+      // GET /api/admin/session/:id returns groups as [{ id, name }]. The session's students include the
+      // group's members, so only students outside the group count as "specific students".
+      const loadedGroupIds = session.groupIds?.length
+        ? session.groupIds
+        : session.groups?.length ? session.groups.map((g) => g.id) : session.groupId ? [session.groupId] : [];
+      let groupMemberIds = new Set();
+      if (loadedGroupIds.length) {
+        try {
+          const res = await Promise.all(loadedGroupIds.map((gid) => api.get(`/api/admin/groups/${gid}`)));
+          res.forEach((r) => (r.data?.data?.group?.students || r.data?.data?.students || [])
+            .forEach((s) => groupMemberIds.add(s.id || s.studentId)));
+        } catch { groupMemberIds = new Set((session.students || []).map((s) => s.id)); }
+      }
+      if (cancelled) return;
+      const directStudents = (session.students || []).filter((s) => !groupMemberIds.has(s.id));
       const linkedExam = session.materials?.find(
         (material) => material.source === "exam",
       );
@@ -151,9 +148,9 @@ const EditSessions = () => {
         (sessionExamId ? "Exam" : "Explanation");
       const sessionIsExam = sessionType === "Exam";
 
-      const hasGroup = Boolean(session.groupIds?.length || session.groupId);
-      const hasStudents = Boolean(session.students?.length);
-      const mappedGroupId = session.groupIds?.[0] || session.groupId || "";
+      const hasGroup = loadedGroupIds.length > 0;
+      const hasStudents = directStudents.length > 0;
+      const mappedGroupId = loadedGroupIds[0] || "";
 
       // The lessons the session API returns nest course/category/chapter as
       // objects (e.g. lesson.course.id), not flat lesson.courseId fields.
@@ -218,7 +215,7 @@ const EditSessions = () => {
           : [{ dayOfWeek: "", timeFrom: "", timeTo: "" }],
         lessonIds: session.lessons?.map((l) => l.id) || [],
         lessonsFullDetails: initialLessonsFullDetails, // pre-filled from loaded session data
-        userIds: session.students?.map((s) => s.id) || [],
+        userIds: directStudents.map((s) => s.id),
         session_link: session.session_link || "",
         material_link: session.material_link || "",
         teacher_material_link: session.teacher_material_link || "",
@@ -227,8 +224,8 @@ const EditSessions = () => {
         initialSubCategoryId: targetSubCategoryId,
         initialCourseId: targetCourseId,
       });
-
-    }
+    })();
+    return () => { cancelled = true; };
   }, [sessionRes]);
 
   // 🔹 Configuration selections mapping arrays
@@ -248,26 +245,6 @@ const EditSessions = () => {
       })) || [],
     [teachersData],
   );
-
-  const scheduleTypeOptions = [
-    { value: "once", label: "Once" },
-    { value: "repeat", label: "Repeat" },
-  ];
-  const sessionRelationalTypeOptions = [
-    { value: "Explanation", label: "Explanation" },
-    { value: "Re-Explanation", label: "Re-Explanation" },
-    { value: "Mistakes", label: "Mistakes" },
-    { value: "Exam", label: "Exam" },
-  ];
-  const dayOfWeekOptions = [
-    { value: "Sunday", label: "Sunday" },
-    { value: "Monday", label: "Monday" },
-    { value: "Tuesday", label: "Tuesday" },
-    { value: "Wednesday", label: "Wednesday" },
-    { value: "Thursday", label: "Thursday" },
-    { value: "Friday", label: "Friday" },
-    { value: "Saturday", label: "Saturday" },
-  ];
 
   // 🔹 Field change event mutators
   const handleInputChange = (e) => {
@@ -355,23 +332,6 @@ const EditSessions = () => {
     }
   };
 
-  const formatTimeToHMS = (dateObj) => {
-    if (!dateObj) return "";
-    // الوقت بيتبعت زي ما الأدمن اختاره بالظبط (من غير أي تحويل لـ UTC)
-    const hours = String(dateObj.getHours()).padStart(2, "0");
-    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}:00`;
-  };
-
-  const parseHMSToDate = (timeStr) => {
-    if (!timeStr) return null;
-    const [hours, minutes] = timeStr.split(":");
-    const d = new Date();
-    // بيتعرض في الـ picker زي ما هو في الـ formData بالظبط (من غير تحويل)
-    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-    return d;
-  };
-
   const validateForm = () => {
     const tempErrors = {};
     if (!formData.name.trim()) tempErrors.name = "Session name is required";
@@ -411,81 +371,11 @@ const EditSessions = () => {
     return Object.keys(tempErrors).length === 0;
   };
 
-  // 🔹 Step-by-step navigation
-  const TABS = ["info", "schedule", "content", "links"];
-
-  const validateStep = (tab) => {
-    const tempErrors = {};
-
-    if (tab === "info") {
-      if (!formData.name.trim()) tempErrors.name = "Session name is required";
-      if (!formData.teacherId) tempErrors.teacherId = "Teacher is required";
-      if (formData.sessionRelationalType === "Exam" && !formData.examId) {
-        tempErrors.examId = "Select an exam for this session";
-      }
-    }
-
-    if (tab === "schedule") {
-      if (formData.scheduleType === "once") {
-        if (!formData.sessionDate)
-          tempErrors.sessionDate = "Session date is required";
-        if (!formData.timeFrom) tempErrors.timeFrom = "From time is required";
-        if (!formData.timeTo) tempErrors.timeTo = "To time is required";
-      } else {
-        if (!formData.startDate)
-          tempErrors.startDate = "Start date is required";
-        if (!formData.endDate) tempErrors.endDate = "End date is required";
-      }
-    }
-
-    if (tab === "content") {
-      if (!formData.assignToGroup && !formData.assignToStudents) {
-        tempErrors.assignmentTarget =
-          "Select at least one of Group or Students";
-      }
-      if (formData.assignToGroup && !formData.groupId)
-        tempErrors.groupId = "Group selection is required";
-      if (
-        formData.assignToStudents &&
-        (!formData.userIds || formData.userIds.length === 0)
-      ) {
-        tempErrors.userIds = "At least one student must be selected";
-      }
-      if (
-        !isExamSession &&
-        (!formData.lessonIds || formData.lessonIds.length === 0)
-      )
-        tempErrors.lessonIds = "At least one lesson must be selected";
-    }
-
-    setErrors((prev) => ({ ...prev, ...tempErrors }));
-    return Object.keys(tempErrors).length === 0;
-  };
-
-  const handleNext = (e) => {
-    e.preventDefault();
-    if (!validateStep(activeTab)) {
-      toast.error("Please fill all required fields before continuing");
-      return;
-    }
-    const currentIndex = TABS.indexOf(activeTab);
-    if (currentIndex < TABS.length - 1) {
-      setActiveTab(TABS[currentIndex + 1]);
-    }
-  };
-
-  const handlePrevious = (e) => {
-    e.preventDefault();
-    const currentIndex = TABS.indexOf(activeTab);
-    if (currentIndex > 0) {
-      setActiveTab(TABS[currentIndex - 1]);
-    }
-  };
-
   const onSave = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
-      toast.error("Please fill all required fields correctly across tabs");
+      toast.error("Please fill all required fields correctly");
+      scrollToFirstError();
       return;
     }
 
@@ -574,7 +464,7 @@ const EditSessions = () => {
         `/api/admin/session/${id}`,
         "Session updated successfully",
       );
-      navigate(-1);
+      navigate("/admin/live/sessions");
     } catch (e) {
       console.error(e);
     } finally {
@@ -582,649 +472,54 @@ const EditSessions = () => {
     }
   };
 
-  if (sessionLoading || groupLoading || teachersLoading) return <Loader />;
   if (sessionError || groupError || teachersError) return <Errorpage />;
 
+  const head = (
+    <PageHead title="Edit session" sub={formData.name ? `Changing “${formData.name}”. Students see the changes on their schedule.` : "Change the type, time, students and lessons of this session."}>
+      <button type="button" onClick={() => navigate(-1)} className="a-btn">
+        <ArrowLeft size={16} /> Back
+      </button>
+    </PageHead>
+  );
+  if (sessionLoading || groupLoading || teachersLoading) return <div>{head}<FormSkeleton /></div>;
+
   return (
-    <div className="p-4 bg-[#f8fafc] min-h-screen text-left" dir="ltr">
-      {/* Header Banner */}
-      <div className="mx-auto mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
-          Edit Session Config
-        </h1>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center w-fit gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-        >
-          <ArrowLeft size={18} />
-          <span>Back</span>
-        </button>
-      </div>
+    <div>
+      {head}
 
-      <form onSubmit={onSave} className="space-y-4">
-        {/* Navigation Tabs bar */}
-        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm mb-4">
-          <div className="grid w-full grid-cols-4 bg-slate-100 p-1 rounded-lg">
-            {["info", "schedule", "content", "links"].map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`font-bold text-sm py-2 rounded-md transition-all capitalize ${activeTab === tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
-              >
-                {tab === "info" && "📝 General Info"}
-                {tab === "schedule" && "📅 Schedule"}
-                {tab === "content" && "📚 Content & Users"}
-                {tab === "links" && "🔗 Links & Lesson PDFs"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab 1: General Info */}
-        <div
-          className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-6 ${activeTab !== "info" ? "hidden" : ""}`}
-        >
-          <h2 className="text-lg font-bold text-slate-700 border-b border-slate-100 pb-2">
-            Session Identity
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">
-                Session Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className={`p-3 rounded-xl border bg-slate-50/30 outline-none transition-all ${errors.name ? "border-red-400 focus:ring-red-100" : "border-slate-200 focus:border-one"}`}
-              />
-              {errors.name && (
-                <p className="text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle size={14} />
-                  {errors.name}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">
-                Schedule Type <span className="text-red-500">*</span>
-              </label>
-              <Select
-                options={scheduleTypeOptions}
-                value={scheduleTypeOptions.find(
-                  (o) => o.value === formData.scheduleType,
-                )}
-                onChange={(s) => handleSelectChange("scheduleType", s.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">
-                Session Type <span className="text-red-500">*</span>
-              </label>
-              <Select
-                options={sessionRelationalTypeOptions}
-                value={sessionRelationalTypeOptions.find(
-                  (o) => o.value === formData.sessionRelationalType,
-                )}
-                onChange={(s) =>
-                  handleSessionTypeChange(s.value)
-                }
-              />
-            </div>
-            {formData.sessionRelationalType === "Exam" && (
-              <SessionExamSelect
-                value={formData.examId}
-                onChange={(examId) => handleSelectChange("examId", examId)}
-                error={errors.examId}
-              />
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">
-                Teacher <span className="text-red-500">*</span>
-              </label>
-              <Select
-                options={teacherOptions}
-                value={
-                  teacherOptions.find((o) => o.value === formData.teacherId) ||
-                  null
-                }
-                onChange={(s) =>
-                  handleSelectChange("teacherId", s ? s.value : "")
-                }
-              />
-              {errors.teacherId && (
-                <p className="text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle size={14} />
-                  {errors.teacherId}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Tab 2: Schedule */}
-        <div
-          className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-6 ${activeTab !== "schedule" ? "hidden" : ""}`}
-        >
-          <h2 className="text-lg font-bold text-slate-700 border-b border-slate-100 pb-2">
-            Timing Configuration
-          </h2>
-          {formData.scheduleType === "once" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-bold text-slate-700">
-                  Session Date <span className="text-red-500">*</span>
-                </label>
-                <DatePicker
-                  selected={
-                    parseLocalDate(formData.sessionDate)
-                  }
-                  onChange={(d) =>
-                    handleSelectChange(
-                      "sessionDate",
-                      toLocalDateString(d),
-                    )
-                  }
-                  dateFormat="yyyy-MM-dd"
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                />
-                {errors.sessionDate && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <AlertCircle size={14} />
-                    {errors.sessionDate}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-bold text-slate-700">
-                  From Time <span className="text-red-500">*</span>
-                </label>
-                <DatePicker
-                  selected={parseHMSToDate(formData.timeFrom)}
-                  onChange={(d) =>
-                    handleSelectChange("timeFrom", formatTimeToHMS(d))
-                  }
-                  showTimeSelect
-                  showTimeSelectOnly
-                  timeIntervals={15}
-                  timeFormat="hh:mm a"
-                  dateFormat="hh:mm a"
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                />
-                {errors.timeFrom && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <AlertCircle size={14} />
-                    {errors.timeFrom}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-bold text-slate-700">
-                  To Time <span className="text-red-500">*</span>
-                </label>
-                <DatePicker
-                  selected={parseHMSToDate(formData.timeTo)}
-                  onChange={(d) =>
-                    handleSelectChange("timeTo", formatTimeToHMS(d))
-                  }
-                  showTimeSelect
-                  showTimeSelectOnly
-                  timeIntervals={15}
-                  timeFormat="hh:mm a"
-                  dateFormat="hh:mm a"
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                />
-                {errors.timeTo && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <AlertCircle size={14} />
-                    {errors.timeTo}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-bold text-slate-700">
-                    Start Date <span className="text-red-500">*</span>
-                  </label>
-                  <DatePicker
-                    selected={
-                      parseLocalDate(formData.startDate)
-                    }
-                    onChange={(d) =>
-                      handleSelectChange(
-                        "startDate",
-                        toLocalDateString(d),
-                      )
-                    }
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-bold text-slate-700">
-                    End Date <span className="text-red-500">*</span>
-                  </label>
-                  <DatePicker
-                    selected={
-                      parseLocalDate(formData.endDate)
-                    }
-                    onChange={(d) =>
-                      handleSelectChange(
-                        "endDate",
-                        toLocalDateString(d),
-                      )
-                    }
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <label className="text-sm font-bold text-slate-700">
-                  Recurring Days Setup
-                </label>
-                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  {formData.recurringDays.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
-                    >
-                      <div>
-                        <label className="text-xs font-bold text-slate-600 block mb-1">
-                          Day of Week
-                        </label>
-                        <select
-                          value={item.dayOfWeek}
-                          onChange={(e) => {
-                            const next = [...formData.recurringDays];
-                            next[idx].dayOfWeek = e.target.value;
-                            handleSelectChange("recurringDays", next);
-                          }}
-                          className="w-full p-2.5 rounded-lg border border-slate-200 bg-white text-sm outline-none"
-                        >
-                          <option value="">Select Day...</option>
-                          {dayOfWeekOptions.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-600 block mb-1">
-                          Time From
-                        </label>
-                        <DatePicker
-                          selected={parseHMSToDate(item.timeFrom)}
-                          onChange={(d) => {
-                            const next = [...formData.recurringDays];
-                            next[idx].timeFrom = formatTimeToHMS(d);
-                            handleSelectChange("recurringDays", next);
-                          }}
-                          showTimeSelect
-                          showTimeSelectOnly
-                          timeIntervals={15}
-                          timeFormat="hh:mm a"
-                          dateFormat="hh:mm a"
-                          className="w-full p-2 rounded-lg border border-slate-200 text-sm outline-none"
-                        />
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-slate-600 block mb-1">
-                            Time To
-                          </label>
-                          <DatePicker
-                            selected={parseHMSToDate(item.timeTo)}
-                            onChange={(d) => {
-                              const next = [...formData.recurringDays];
-                              next[idx].timeTo = formatTimeToHMS(d);
-                              handleSelectChange("recurringDays", next);
-                            }}
-                            showTimeSelect
-                            showTimeSelectOnly
-                            timeIntervals={15}
-                            timeFormat="hh:mm a"
-                            dateFormat="hh:mm a"
-                            className="w-full p-2 rounded-lg border border-slate-200 text-sm outline-none"
-                          />
-                        </div>
-                        {formData.recurringDays.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = formData.recurringDays.filter(
-                                (_, i) => i !== idx,
-                              );
-                              handleSelectChange("recurringDays", next);
-                            }}
-                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg mt-5"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSelectChange("recurringDays", [
-                        ...formData.recurringDays,
-                        { dayOfWeek: "", timeFrom: "", timeTo: "" },
-                      ])
-                    }
-                    className="text-xs font-bold text-one hover:underline mt-1"
-                  >
-                    + Add Another Day
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Tab 3: Content and Audience */}
-        <div
-          className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-6 ${activeTab !== "content" ? "hidden" : ""}`}
-        >
-          <h2 className="text-lg font-bold text-slate-700 border-b border-slate-100 pb-2">
-            Target & Study Scope
-          </h2>
-          <div className="flex flex-col gap-1.5 max-w-md">
-            <label className="text-sm font-bold text-slate-700">
-              Assign Session To <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-6 pt-1">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.assignToGroup}
-                  onChange={(e) =>
-                    handleSelectChange("assignToGroup", e.target.checked)
-                  }
-                  className="w-4 h-4 rounded border-slate-300 text-one focus:ring-one"
-                />
-                Group
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.assignToStudents}
-                  onChange={(e) =>
-                    handleSelectChange("assignToStudents", e.target.checked)
-                  }
-                  className="w-4 h-4 rounded border-slate-300 text-one focus:ring-one"
-                />
-                Specific Students
-              </label>
-            </div>
-            {errors.assignmentTarget && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <AlertCircle size={14} />
-                {errors.assignmentTarget}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 pt-2">
-            {formData.assignToGroup && (
-              <div className="flex flex-col gap-1.5 max-w-md">
-                <label className="text-sm font-bold text-slate-700">
-                  Select Group <span className="text-red-500">*</span>
-                </label>
-                <Select
-                  options={groupOptions}
-                  value={
-                    groupOptions.find((o) => o.value === formData.groupId) ||
-                    null
-                  }
-                  onChange={(s) =>
-                    handleSelectChange("groupId", s ? s.value : "")
-                  }
-                />
-                {errors.groupId && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <AlertCircle size={14} />
-                    {errors.groupId}
-                  </p>
-                )}
-
-                {formData.groupId && (
-                  <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <p className="text-xs font-bold text-slate-500 mb-2">
-                      Students in this group
-                    </p>
-                    {groupMembersLoading ? (
-                      <p className="text-xs text-slate-400">
-                        Loading group students...
-                      </p>
-                    ) : groupMembersError ? (
-                      <p className="text-xs text-red-500">
-                        Could not load group students
-                      </p>
-                    ) : groupMembers.length === 0 ? (
-                      <p className="text-xs text-slate-400">
-                        No students found in this group
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {groupMembers.map((s) => (
-                          <span
-                            key={s.id || s.studentId}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600"
-                          >
-                            {s.name || s.studentName || s.fullName}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Student search table is always visible so it can be combined with a group */}
-            <div className="flex flex-col gap-1.5 w-full">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <label className="text-sm font-bold text-slate-700">
-                  Search & Select Students{" "}
-                  {formData.assignToStudents && (
-                    <span className="text-red-500">*</span>
-                  )}
-                </label>
-                {!isExamSession && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOpenManualAttendance(true)}
-                      className="text-xs font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <UserCheck size={14} />
-                      Manual Attendance
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerateAttendance}
-                      disabled={attendanceLoading || !formData.userIds?.length}
-                      className="text-xs font-bold px-3 py-1.5 bg-one/10 text-one rounded-lg hover:bg-one/20 disabled:opacity-50 transition-all cursor-pointer"
-                    >
-                      {attendanceLoading
-                        ? "Generating..."
-                        : "Generate Attendance"}
-                    </button>
-                  </div>
-                )}
-              </div>
-              <SearchStudents
-                value={formData.userIds}
-                onChange={handleStudentsChange}
-                error={errors.userIds}
-              />
-
-              {!isExamSession && (
-                <CommonLessonsReportView
-                  commonLessonsData={commonLessonsData}
-                  attendanceStudents={attendanceStudents}
-                  sessionName={formData.name}
-                  userIds={formData.userIds}
-                  attendanceNameMap={attendanceNameMap}
-                />
-              )}
-            </div>
-
-            {isExamSession ? (
-              <>
-                <p className="border-t border-slate-100 pt-4 text-sm text-slate-500">
-                  Exam sessions use the selected exam and do not require lesson
-                  assignments.
-                </p>
-                <ExamSessionCourseFields
-                  categoryId={formData.examCategoryId}
-                  subCategoryId={formData.examSubCategoryId}
-                  courseId={formData.examCourseId}
-                  onChange={handleExamCourseChange}
-                />
-              </>
-            ) : (
-              <div className="flex flex-col gap-1.5 w-full border-t border-slate-100 pt-4">
-                <label className="text-sm font-bold text-slate-700 mb-2">
-                  Lesson Hierarchy Selection{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <HierarchicalLessonSelector
-                  initialLessons={
-                    clearInitialLessons
-                      ? []
-                      : sessionRes?.data?.session?.lessons || []
-                  }
-                  value={formData.lessonIds}
-                  onChange={handleHierarchyChange}
-                />
-                {errors.lessonIds && (
-                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                    <AlertCircle size={14} />
-                    {errors.lessonIds}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tab 4: External Links */}
-        <div
-          className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-6 ${activeTab !== "links" ? "hidden" : ""}`}
-        >
-          <h2 className="text-lg font-bold text-slate-700 border-b border-slate-100 pb-2">
-            Virtual Integration & Materials
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {["session_link", "material_link", "teacher_material_link"].map(
-              (field) => (
-                <div key={field} className="flex flex-col gap-1.5">
-                  <label className="text-sm font-bold text-slate-700 capitalize">
-                    {field.replace(/_/g, " ")}
-                  </label>
-                  <input
-                    type="text"
-                    name={field}
-                    value={formData[field]}
-                    onChange={handleInputChange}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/30 outline-none focus:border-one"
-                  />
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-
-        {/* Tab 4 (cont.): Session PDFs */}
-        <div
-          className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-6 ${activeTab !== "links" ? "hidden" : ""}`}
-        >
-          <div className="border-b border-slate-100 pb-2">
-            <h2 className="text-lg font-bold text-slate-700">
-              PDFs from assigned lessons
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Session PDFs are provided by the lessons assigned to this
-              session. Mistakes PDFs are generated automatically.
-            </p>
-          </div>
-
-          <p className="text-sm text-slate-500">
-            Assign lessons in the content step to provide their session and
-            answer PDFs.
-          </p>
-        </div>
-
-        {/* Actions Footer */}
-        <div className="flex items-center justify-end gap-4 pt-4 pb-12">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            disabled={isSubmitting}
-            className="px-8 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl"
-          >
-            Cancel
-          </button>
-          {activeTab !== TABS[0] && (
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={isSubmitting}
-              className="px-8 py-3 text-slate-600 font-bold border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
-            >
-              Previous
-            </button>
-          )}
-
-          {activeTab !== TABS[TABS.length - 1] ? (
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={isSubmitting}
-              className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 flex items-center gap-3"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-12 py-3 bg-one text-white rounded-xl font-bold shadow-xl shadow-one/20 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 flex items-center gap-3"
-            >
-              {isSubmitting ? (
-                <>
-                  {" "}
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
-                  <span>Updating Configuration...</span>{" "}
-                </>
-              ) : (
-                <span>Update Changes</span>
-              )}
-            </button>
-          )}
-        </div>
-      </form>
+      <SessionForm
+        mode="edit"
+        formData={formData}
+        errors={errors}
+        teacherOptions={teacherOptions}
+        groupOptions={groupOptions}
+        onInput={handleInputChange}
+        onSelect={handleSelectChange}
+        onSessionType={handleSessionTypeChange}
+        onExamCourse={handleExamCourseChange}
+        onHierarchy={handleHierarchyChange}
+        onStudents={handleStudentsChange}
+        isExamSession={isExamSession}
+        groupMembers={groupMembers}
+        groupMembersLoading={groupMembersLoading}
+        groupMembersError={groupMembersError}
+        groupMembersSelectable={false}
+        onGenerateAttendance={handleGenerateAttendance}
+        attendanceLoading={attendanceLoading}
+        commonLessonsData={commonLessonsData}
+        attendanceStudents={attendanceStudents}
+        attendanceNameMap={attendanceNameMap}
+        onManualAttendance={() => setOpenManualAttendance(true)}
+        initialLessons={clearInitialLessons ? NO_LESSONS : sessionRes?.data?.session?.lessons || NO_LESSONS}
+        isSubmitting={isSubmitting}
+        onSubmit={onSave}
+        onCancel={() => navigate(-1)}
+      />
 
       <ManualAttendanceModal
         open={openManualAttendance}
         onClose={() => setOpenManualAttendance(false)}
-        initialSession={{ id, name: formData.name }}
+        initialSession={manualSession}
       />
     </div>
   );

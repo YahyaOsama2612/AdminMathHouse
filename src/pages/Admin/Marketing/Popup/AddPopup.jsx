@@ -1,126 +1,50 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AddPage from "@/components/AddPage";
 import usePost from "@/hooks/usePost";
+import PopupForm from "./PopupForm";
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const AddPopup = () => {
   const navigate = useNavigate();
-  const {
-    postData,
-    loading: saving,
-    error: postError,
-  } = usePost("/api/admin/popup");
+  const { postData } = usePost("/api/admin/popup");
 
- 
-  const fields = useMemo(
-    () => [
-      {
-        name: "name",
-        label: "Popup Name",
-        type: "text",
-        required: true,
-        placeholder: "Enter popup name",
-      section: "General Information",
-      },
-      {
-        name: "destination",
-        label: "Destination",
-        type: "select",
-        options: [
-          { value: "student", label: "Student" },
-          { value: "parent", label: "Parent" },
-          { value: "teacher", label: "Teacher" },
-        ],
-        required: true,
-      section: "General Information",
-      },
-      {
-        name:"isActive",
-        label:"Active",
-        type:"switch",
-        section:"General Information"
-      },
-        {
-        name: "startDate",
-        label: "Start Date",
-        type: "datemin",
-        required: true,
-      section: "General Information",
-      },
-      {
-        name: "endDate",
-        label: "End Date",
-        type: "datemin",
-        required: true,
-      section: "General Information",
-      }, 
-      {
-        name: "image",
-        label: "Popup Image",
-        type: "file",
-        required: true,
-      section: "General Information",
-        helperText: "Upload an image (PNG/JPG)",
-      }
-    ],
-    [],
-  );
-
-  // 👇 البيانات الأولية للفورم
-  const initialFormValues = useMemo(
-    () => ({
-      name: "",
-      image: "",
-      isActive: false,
-      destination: "",
-      startDate: "",
-      endDate: "",
-    }),
-    [],
-  );
- const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   const onSave = async (formData) => {
-   if(formData.startDate > formData.endDate) {
-    toast.error("Start date must be before end date");
-    return;
-   }
- let imageBase64 = null;
+    if (formData.startDate > formData.endDate) {
+      toast.error("Start date must be before end date");
+      return;
+    }
+    let imageBase64 = null;
     if (formData.image instanceof File) {
       imageBase64 = await fileToBase64(formData.image);
     }
 
     const payload = {
       name: formData.name,
-      image: imageBase64, // تأكد إن FileUpload يحولها إلى Base64
+      image: imageBase64,
       destination: formData.destination,
       startDate: formData.startDate,
       endDate: formData.endDate,
+      isActive: !!formData.isActive,
     };
 
-    try {
-      await postData(payload, "/api/admin/popup", "Popup added successfully");
-      navigate("/admin/marketing/popup");
-    } catch (error) {
-      throw error; // الخطأ سيتم التعامل معه بواسطة usePost
-    }
+    await postData(payload, "/api/admin/popup", "Popup added successfully");
+    navigate("/admin/marketing/popup");
   };
 
-
   return (
-    <AddPage
-      title="Add Popup"
-      fields={fields}
+    <PopupForm
+      isNew
+      imageRequired
+      initial={{ name: "", image: "", destination: "", startDate: "", endDate: "", isActive: true }}
       onSave={onSave}
-      onCancel={() => navigate("/admin/marketing/popup")}
-      initialData={initialFormValues}
-      loading={saving}
     />
   );
 };

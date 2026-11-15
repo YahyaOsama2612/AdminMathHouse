@@ -82,54 +82,38 @@ const CommonLessonsReportView = ({
   const studentsCount = studentNamesList.length;
 
   return (
-    <div className="mt-4 border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden text-left">
-      <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <BookOpen size={18} />
-          </div>
-          <div>
+    <div className="mt-4 rounded-xl border border-gray-100 bg-white overflow-hidden text-left">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-9 h-9 rounded-xl bg-red-50 text-one flex items-center justify-center shrink-0">
+            <BookOpen size={17} />
+          </span>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm font-bold text-slate-800">Common Lessons</h4>
-              <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-indigo-50 text-indigo-600">
-                {totalLessons} {totalLessons === 1 ? "Lesson" : "Lessons"}
-              </span>
-              <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-200 text-slate-700">
-                {totalChapters} {totalChapters === 1 ? "Chapter" : "Chapters"}
-              </span>
+              <h4 className="text-sm font-bold text-gray-800">Common lessons</h4>
+              <span className="a-pill bg-red-50 text-one">{totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}</span>
+              <span className="a-pill bg-gray-100 text-gray-600">{totalChapters} {totalChapters === 1 ? "chapter" : "chapters"}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Identified across {studentsCount} selected student
-              {studentsCount === 1 ? "" : "s"}
+            <p className="text-xs text-gray-400">
+              Across {studentsCount} selected student{studentsCount === 1 ? "" : "s"}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={downloading || totalLessons === 0}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 active:scale-95 shadow-sm disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
-        >
+        <button type="button" onClick={handleDownload} disabled={downloading || totalLessons === 0} className="a-btn !py-2 !px-3 !text-xs">
           <Download size={14} />
-          {downloading ? "Downloading..." : "Download Report"}
+          {downloading ? "Downloading…" : "Download report"}
         </button>
       </div>
 
-      {/* Selected Students Strip */}
       {studentNamesList.length > 0 && (
-        <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-200 flex items-start sm:items-center gap-2.5 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 shrink-0">
-            <Users size={14} className="text-indigo-600" />
-            <span>Students ({studentNamesList.length}):</span>
-          </div>
+        <div className="px-4 py-2.5 bg-gray-50/60 border-b border-gray-100 flex items-start sm:items-center gap-2.5 flex-wrap">
+          <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-gray-400 shrink-0">
+            <Users size={13} /> Students · {studentNamesList.length}
+          </span>
           <div className="flex items-center gap-1.5 flex-wrap max-h-24 overflow-y-auto">
             {studentNamesList.map((name, i) => (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span key={i} className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-700">
                 {name}
               </span>
             ))}
@@ -138,40 +122,31 @@ const CommonLessonsReportView = ({
       )}
 
       {totalLessons === 0 ? (
-        <div className="p-8 text-center text-sm text-slate-400 italic">
-          No common lessons found for the selected students in this course.
-        </div>
+        <p className="py-8 text-center text-sm text-gray-400">No common lessons found for the selected students in this course.</p>
       ) : (
-        <div className="overflow-x-auto max-h-80">
-          <table className="min-w-full text-xs text-left border-collapse">
-            <thead className="bg-slate-100/70 sticky top-0 z-10 text-slate-600 font-bold border-b border-slate-200">
-              <tr>
-                <th className="p-3 w-12 text-center">#</th>
-                <th className="p-3">Chapter</th>
-                <th className="p-3">Common Lesson Name</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {flattenedLessons.map((item, idx) => (
-                <tr
-                  key={item.id || idx}
-                  className="hover:bg-slate-50/80 transition-colors"
-                >
-                  <td className="p-3 text-center font-medium text-slate-400">
-                    {idx + 1}
-                  </td>
-                  <td className="p-3 font-semibold text-slate-700">
-                    <span className="inline-block px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-medium text-xs">
-                      {item.chapterName}
-                    </span>
-                  </td>
-                  <td className="p-3 font-medium text-slate-800">
-                    {item.lessonName}
-                  </td>
+        <div className="max-h-80 overflow-y-auto">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="a-th w-12">#</th>
+                  <th className="a-th">Chapter</th>
+                  <th className="a-th">Common lesson</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {flattenedLessons.map((item, idx) => (
+                  <tr key={item.id || idx} className="a-tr">
+                    <td className="a-td text-xs font-semibold text-gray-400">{idx + 1}</td>
+                    <td className="a-td">
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-xs font-semibold">{item.chapterName}</span>
+                    </td>
+                    <td className="a-td font-semibold text-gray-800">{item.lessonName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
