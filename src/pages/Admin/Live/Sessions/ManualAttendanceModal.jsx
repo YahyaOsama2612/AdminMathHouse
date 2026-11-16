@@ -248,10 +248,18 @@ const ManualAttendanceModal = ({
         payload,
       );
 
-      toast.success(
-        res?.data?.message ||
-        `Manual attendance recorded for ${selectedStudentIds.length} student(s)!`,
-      );
+      toast.success(`Manual attendance recorded for ${selectedStudentIds.length} student(s)!`);
+
+      // Students with 0 live balance are still marked attended, but flagged as not paid
+      const unpaid = (res?.data?.data?.results || []).filter((r) => r.unpaidSessions > 0);
+      if (unpaid.length) {
+        toast(
+          `Not paid (no live sessions left): ${unpaid
+            .map((r) => `${r.studentName}${r.unpaidSessions > 1 ? ` ×${r.unpaidSessions}` : ""}`)
+            .join(", ")}`,
+          { icon: "⚠️", duration: 8000 },
+        );
+      }
 
       if (onSuccess) onSuccess(res.data);
       onClose();
