@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, Layers, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ClipboardCheck, FileText, Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
@@ -89,6 +89,14 @@ const Semester = () => {
         actions={
           <>
             <button type="button" onClick={addSemester} className="a-btn primary"><Plus size={16} /> Add semester</button>
+            {course.id && (
+              <>
+                {/* exams of this course — the course goes in the link too, so a page refresh keeps it */}
+                <button type="button" onClick={() => navigate(`/admin/courses/exam/add?courseId=${course.id}`, { state: { courseId: course.id } })} className="a-btn"><FileText size={16} /> Add exam</button>
+                <button type="button" onClick={() => navigate(`/admin/courses/diagnosticexam/add?courseId=${course.id}`, { state: { courseId: course.id } })} className="a-btn"><ClipboardCheck size={16} /> Add diagnostic exam</button>
+                <button type="button" onClick={() => navigate(`/admin/courses/exam/${course.id}`)} className="a-btn">View exams</button>
+              </>
+            )}
             {course.id && (
               <button type="button" onClick={() => navigate(`/admin/courses/courses/edit/${course.id}`)} className="a-btn">Edit course</button>
             )}

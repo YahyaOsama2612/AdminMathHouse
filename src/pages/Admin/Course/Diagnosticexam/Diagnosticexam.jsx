@@ -37,7 +37,7 @@ const Diagnosticexam = () => {
   };
 
   const handleEdit = (row) => navigate(`/admin/courses/diagnosticexam/edit/${row.id}`, { state: { courseId } });
-  const goAdd = () => navigate("/admin/courses/diagnosticexam/add", { state: { courseId } });
+  const goAdd = () => navigate(`/admin/courses/diagnosticexam/add?courseId=${courseId}`, { state: { courseId } });
 
   const tableData = useMemo(() => {
     return (

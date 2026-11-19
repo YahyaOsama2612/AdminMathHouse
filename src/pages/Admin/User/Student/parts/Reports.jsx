@@ -137,7 +137,7 @@ export const QuizReportsSection = ({ quizzes, studentId, studentName, grade, cou
                   expanded={isExpanded}
                   onToggle={() => list.toggleExpand(quiz.quizId)}
                   title={quiz.quizName}
-                  sub={`Lesson: ${quiz.lesson?.name || "N/A"}`}
+                  sub={`Lesson: ${quiz.lesson?.name || "N/A"}${quiz.attemptsCount > 1 ? ` · first try shown (${quiz.attemptsCount} tries, latest ${quiz.latestAttempt?.score ?? "—"}/${quiz.totalScore})` : ""}`}
                   pill={<Pill tone={quiz.status === "absent" ? "red" : "green"}>{cap(quiz.status)}</Pill>}
                   score={quiz.score !== null && quiz.score !== undefined ? `${quiz.score}/${quiz.totalScore}` : "N/A"}
                   extra={
@@ -215,7 +215,7 @@ export const ExamReportsSection = ({ exams, studentName, grade }) => {
                   expanded={isExpanded}
                   onToggle={() => list.toggleExpand(exam.examId)}
                   title={exam.examName}
-                  sub={`${exam.date ? fmtDate(exam.date) : "N/A"} · ${exam.mistakesCount || 0} mistakes`}
+                  sub={`${exam.date ? fmtDate(exam.date) : "N/A"} · ${exam.mistakesCount || 0} mistakes${exam.attemptsCount > 1 ? ` · first try shown (${exam.attemptsCount} tries, latest ${exam.latestAttempt?.score ?? "—"}/${exam.totalScore})` : ""}`}
                   pill={
                     <Pill tone={exam.status === "absent" ? "red" : passed ? "green" : "amber"}>{cap(exam.status)}</Pill>
                   }

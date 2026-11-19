@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ArrowDown, ArrowUp, ChevronRight, DollarSign, GripVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ClipboardCheck, DollarSign, FileText, GripVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
 import usePatch from "@/hooks/usePatch";
@@ -202,6 +202,14 @@ const Chapters = () => {
         actions={
           <>
             <button type="button" onClick={addChapter} className="a-btn primary"><Plus size={16} /> Add chapter</button>
+            {courseIdForLinks && (
+              <>
+                {/* exams of this course — the course goes in the link too, so a page refresh keeps it */}
+                <button type="button" onClick={() => navigate(`/admin/courses/exam/add?courseId=${courseIdForLinks}`, { state: { courseId: courseIdForLinks } })} className="a-btn"><FileText size={16} /> Add exam</button>
+                <button type="button" onClick={() => navigate(`/admin/courses/diagnosticexam/add?courseId=${courseIdForLinks}`, { state: { courseId: courseIdForLinks } })} className="a-btn"><ClipboardCheck size={16} /> Add diagnostic exam</button>
+                <button type="button" onClick={() => navigate(`/admin/courses/exam/${courseIdForLinks}`)} className="a-btn">View exams</button>
+              </>
+            )}
             {courseIdForLinks && (
               <button type="button" onClick={() => navigate(`/admin/courses/courses/edit/${courseIdForLinks}`)} className="a-btn">Edit course</button>
             )}

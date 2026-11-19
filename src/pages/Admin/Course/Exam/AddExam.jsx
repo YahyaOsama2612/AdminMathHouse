@@ -18,7 +18,7 @@ const MONTHS = [
 const AddExam = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const courseId = location.state?.courseId;
+  const courseId = location.state?.courseId || new URLSearchParams(location.search).get("courseId");
   const { postData, loading: saving } = usePost("/api/admin/exams");
 
   const { data: optionsRes, loading } = useGet(

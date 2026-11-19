@@ -42,7 +42,7 @@ const Exam = () => {
   };
 
   const handleEdit = (row) => navigate(`/admin/courses/exam/edit/${row.id}`);
-  const goAdd = () => navigate("/admin/courses/exam/add", { state: { courseId } });
+  const goAdd = () => navigate(`/admin/courses/exam/add?courseId=${courseId}`, { state: { courseId } });
 
   const groups = data?.data?.data?.exams || {};
   const counts = { all: (groups.static || []).length + (groups.adaptive || []).length, static: (groups.static || []).length, adaptive: (groups.adaptive || []).length };

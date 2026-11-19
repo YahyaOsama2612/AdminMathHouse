@@ -12,7 +12,7 @@ const AddExam = () => {
   const navigate = useNavigate();
   const { postData, loading: saving } = usePost();
   const location = useLocation();
-  const courseId = location.state?.courseId;
+  const courseId = location.state?.courseId || new URLSearchParams(location.search).get("courseId");
   const {
     data: rawScoresRes,
     loading: loadingRawScores,

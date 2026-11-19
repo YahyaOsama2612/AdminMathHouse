@@ -114,17 +114,17 @@ const GEN_GAPS = [0, 15, 30, 60];
 const SlotRow = ({ row, error, disabled, onChange, onDuplicate, onRemove }) => (
   <div className={`rounded-xl border bg-white p-3 ${error ? "border-red-300" : "border-gray-100"}`}>
     <div className="grid gap-3 grid-cols-2 sm:grid-cols-[1.2fr_1fr_1fr_auto]">
-      <label className="col-span-2 sm:col-span-1">
+      <label className="col-span-2 sm:col-span-1 min-w-0">
         <span className="a-lbl-f !text-xs">Day</span>
         <select value={row.dayOfWeek} disabled={disabled} onChange={(e) => onChange({ dayOfWeek: e.target.value })} className="a-inp">
           {WEEKDAYS.map((day) => <option key={day} value={day}>{day}</option>)}
         </select>
       </label>
-      <label>
+      <label className="min-w-0">
         <span className="a-lbl-f !text-xs">From</span>
         <input type="time" value={row.timeFrom} disabled={disabled} onChange={(e) => onChange({ timeFrom: e.target.value })} className="a-inp" />
       </label>
-      <label>
+      <label className="min-w-0">
         <span className="a-lbl-f !text-xs">To</span>
         <input type="time" value={row.timeTo} disabled={disabled} onChange={(e) => onChange({ timeTo: e.target.value })} className="a-inp" />
       </label>
@@ -174,6 +174,11 @@ const AvailabilitySlots = () => {
   const openDays = WEEKDAYS.filter((d) => (slotsByDay[d] || []).some((s) => s.isActive)).length;
   const earliest = active.length ? active.reduce((m, s) => (s.timeFrom < m ? s.timeFrom : m), "99:99") : null;
   const latest = active.length ? active.reduce((m, s) => (s.timeTo > m ? s.timeTo : m), "00:00") : null;
+
+  // Phones show one day at a time (picked from a strip); tablets and up show the whole week.
+  const [phoneDay, setPhoneDay] = useState(null);
+  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const shownPhoneDay = phoneDay || (WEEKDAYS.includes(todayName) ? todayName : WEEKDAYS[0]);
 
   // Add modal
   const [addOpen, setAddOpen] = useState(false);
@@ -356,11 +361,11 @@ const AvailabilitySlots = () => {
         title="Time Slots"
         sub={`The weekly times students can pick when they send their availability.${slots.length ? ` ${activeCount} of ${slots.length} active.` : ""}`}
       >
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => refetch()} disabled={loading} className="a-btn">
+        <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
+          <button type="button" onClick={() => refetch()} disabled={loading} className="a-btn justify-center">
             <RotateCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
-          <button type="button" onClick={() => openAdd()} className="a-btn primary"><Plus size={16} /> Add slots</button>
+          <button type="button" onClick={() => openAdd()} className="a-btn primary justify-center"><Plus size={16} /> Add slots</button>
         </div>
       </PageHead>
 
@@ -391,6 +396,7 @@ const AvailabilitySlots = () => {
 
           <Card
             className="mb-4"
+            bodyClass="p-4 sm:p-5"
             title="Generate slots"
             sub="Fill a time range with back-to-back slots, e.g. 10 AM to 10 PM in 90-minute sessions. You review them before saving."
           >
@@ -438,7 +444,7 @@ const AvailabilitySlots = () => {
                   })}
                 </div>
               </div>
-              <button type="button" onClick={openGenerated} disabled={!genCount || !gen.days.length} className="a-btn primary col-span-2 md:col-span-1 justify-center self-end">
+              <button type="button" onClick={openGenerated} disabled={!genCount || !gen.days.length} className="a-btn primary col-span-2 md:col-span-1 justify-center self-end w-full 2xl:w-auto">
                 Prepare {genCount} slot{genCount === 1 ? "" : "s"} / day
               </button>
             </div>
@@ -453,12 +459,27 @@ const AvailabilitySlots = () => {
           )}
 
           {slots.length > 0 && (
-            <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,230px),1fr))]">
+            <>
+            {/* Phones: pick a day here; the cards below show only that day */}
+            <div className="sm:hidden -mx-1 px-1 mb-3 flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Day">
+              {WEEKDAYS.map((day) => {
+                const n = (slotsByDay[day] || []).filter((x) => x.isActive).length;
+                const on = day === shownPhoneDay;
+                return (
+                  <button key={day} type="button" role="tab" aria-selected={on} onClick={() => setPhoneDay(day)}
+                    className={`shrink-0 min-w-[3.6rem] rounded-xl border px-2.5 py-2 text-center ${on ? "bg-one text-white border-one" : "bg-white text-gray-600 border-gray-200"}`}>
+                    <span className="block text-xs font-bold">{day.slice(0, 3)}</span>
+                    <span className={`block text-[10px] ${on ? "text-white/80" : n ? "text-green-700" : "text-gray-400"}`}>{n ? `${n} open` : "—"}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,265px),1fr))]">
               {WEEKDAYS.map((day) => {
                 const daySlots = slotsByDay[day] || [];
                 const dayActive = daySlots.filter((s) => s.isActive).length;
                 return (
-                  <section key={day} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col ${dayActive ? "" : "opacity-80"}`}>
+                  <section key={day} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-col ${day === shownPhoneDay ? "flex" : "hidden sm:flex"} ${dayActive ? "" : "opacity-80"}`}>
                     <div className="flex items-center justify-between mb-3">
                       <p className="font-bold text-gray-800">{day}</p>
                       {daySlots.length > 0 ? (
@@ -475,8 +496,9 @@ const AvailabilitySlots = () => {
                             className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${slot.isActive ? "border-red-100 bg-red-50/40" : "border-dashed border-gray-200 bg-gray-50"}`}
                           >
                             <span className="min-w-0">
-                              <span className={`block text-[12.5px] font-semibold whitespace-nowrap ${slot.isActive ? "text-gray-800" : "text-gray-400 line-through"}`}>
-                                {formatRange(slot.timeFrom, slot.timeTo)}
+                              <span className={`block text-[13px] sm:text-[12.5px] font-semibold ${slot.isActive ? "text-gray-800" : "text-gray-400 line-through"}`}>
+                                <span className="whitespace-nowrap">{formatTime(slot.timeFrom)}</span>{" – "}
+                                <span className="whitespace-nowrap">{formatTime(slot.timeTo)}</span>
                               </span>
                               <span className="block text-[10px] text-gray-400">{toMin(slot.timeTo) - toMin(slot.timeFrom)} min{slot.isActive ? "" : " · inactive"}</span>
                             </span>
@@ -493,10 +515,10 @@ const AvailabilitySlots = () => {
                               >
                                 <span />
                               </button>
-                              <button type="button" onClick={() => openEdit(slot)} title="Edit" aria-label="Edit slot" className="w-7 h-7 rounded-md inline-flex items-center justify-center text-gray-400 hover:text-one hover:bg-white">
+                              <button type="button" onClick={() => openEdit(slot)} title="Edit" aria-label="Edit slot" className="w-9 h-9 sm:w-7 sm:h-7 rounded-md inline-flex items-center justify-center text-gray-400 hover:text-one hover:bg-white">
                                 <Pencil size={14} />
                               </button>
-                              <button type="button" onClick={() => setDeleteSlot(slot)} title="Delete" aria-label="Delete slot" className="w-7 h-7 rounded-md inline-flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white">
+                              <button type="button" onClick={() => setDeleteSlot(slot)} title="Delete" aria-label="Delete slot" className="w-9 h-9 sm:w-7 sm:h-7 rounded-md inline-flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -505,12 +527,13 @@ const AvailabilitySlots = () => {
                       </ul>
                     )}
                     <div className="mt-3">
-                      <button type="button" onClick={() => openAdd(day)} className="text-xs font-bold text-one hover:underline">+ Add slot</button>
+                      <button type="button" onClick={() => openAdd(day)} className="text-xs font-bold text-one hover:underline py-1.5 sm:py-0">+ Add slot to {day}</button>
                     </div>
                   </section>
                 );
               })}
             </div>
+            </>
           )}
         </>
       )}
@@ -519,7 +542,7 @@ const AvailabilitySlots = () => {
       {addOpen && (
         <div className="a-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget && !creating) closeAdd(); }}>
           <section role="dialog" aria-modal="true" aria-labelledby="add-slots-title" className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+            <header className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 sm:px-5 py-3 sm:py-4">
               <div>
                 <h2 id="add-slots-title" className="text-lg font-bold text-gray-900">Add time slots</h2>
                 <p className="text-xs text-gray-400">
@@ -530,7 +553,7 @@ const AvailabilitySlots = () => {
               <button type="button" onClick={closeAdd} disabled={creating} aria-label="Close" className="a-act shrink-0"><X size={18} /></button>
             </header>
 
-            <div className="flex-1 space-y-2.5 overflow-y-auto p-5 bg-[#fcfafa]">
+            <div className="flex-1 space-y-2.5 overflow-y-auto p-3 sm:p-5 bg-[#fcfafa]">
               {addRows.map((row) => (
                 <SlotRow
                   key={row.key}
@@ -552,9 +575,9 @@ const AvailabilitySlots = () => {
               </button>
             </div>
 
-            <footer className="flex flex-col-reverse gap-2 border-t border-gray-100 px-5 py-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={closeAdd} disabled={creating} className="a-btn">Cancel</button>
-              <button type="button" onClick={saveAdd} disabled={creating || addRows.length === 0} className="a-btn primary">
+            <footer className="flex flex-col-reverse gap-2 border-t border-gray-100 px-4 sm:px-5 py-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeAdd} disabled={creating} className="a-btn justify-center">Cancel</button>
+              <button type="button" onClick={saveAdd} disabled={creating || addRows.length === 0} className="a-btn primary justify-center">
                 {creating ? "Saving…" : `Save ${addRows.length} slot${addRows.length === 1 ? "" : "s"}`}
               </button>
             </footer>
@@ -565,7 +588,7 @@ const AvailabilitySlots = () => {
       {/* ---------------- Edit modal ---------------- */}
       {editSlot && editRow && (
         <div className="a-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget && !updating) closeEdit(); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="edit-slot-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-slot-title" className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl bg-white p-4 sm:p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <h2 id="edit-slot-title" className="text-lg font-bold text-gray-900">Edit slot</h2>
               <button type="button" onClick={closeEdit} disabled={updating} aria-label="Close" className="a-act"><X size={16} /></button>
@@ -579,9 +602,9 @@ const AvailabilitySlots = () => {
                 setEditErrors({});
               }}
             />
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={closeEdit} disabled={updating} className="a-btn">Cancel</button>
-              <button type="button" onClick={saveEdit} disabled={updating || editUnchanged} className="a-btn primary">
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeEdit} disabled={updating} className="a-btn justify-center">Cancel</button>
+              <button type="button" onClick={saveEdit} disabled={updating || editUnchanged} className="a-btn primary justify-center">
                 {updating ? "Saving…" : "Save changes"}
               </button>
             </div>
