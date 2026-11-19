@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import useDelete from "@/hooks/useDelete";
 import Errorpage from "@/components/Errorpage";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import { Pill } from "@/components/admin/kit";
 import { CourseExamHead } from "../Questions/parts/qb";
+import AssignExamModal from "./AssignExamModal";
 
 /* Course → Exams (MathPortal question-bank design).
    GET /api/admin/exams/course/:courseId ({ exams: { static, adaptive } }), DELETE /api/admin/exams/:id. */
@@ -22,6 +23,7 @@ const Exam = () => {
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [filterType, setFilterType] = useState("all"); // all, static, adaptive
+  const [assigning, setAssigning] = useState(null); // exam row being assigned to students/groups
 
   const handleDelete = (row) => {
     setSelectedRow(row);
@@ -62,6 +64,8 @@ const Exam = () => {
       year: exam.year,
       Month: exam.Month,
       isActive: exam.isActive,
+      assignedStudents: exam.assignedStudents || 0,
+      assignedGroups: exam.assignedGroups || 0,
       raw: exam,
     }));
   }, [data, filterType]);
@@ -105,7 +109,7 @@ const Exam = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr>
-                  {["Title", "Type", "Exam code", "Date", "Duration", "Pass / total", "Status"].map((h) => <th key={h} className="a-th">{h}</th>)}
+                  {["Title", "Type", "Exam code", "Date", "Duration", "Pass / total", "Assigned to", "Status"].map((h) => <th key={h} className="a-th">{h}</th>)}
                   <th className="a-th text-right" data-keep>Actions</th>
                 </tr>
               </thead>
@@ -123,9 +127,19 @@ const Exam = () => {
                     <td className="a-td whitespace-nowrap">{[e.Month, e.year].filter(Boolean).join(" ") || "—"}</td>
                     <td className="a-td whitespace-nowrap">{e.duration ? `${e.duration} min` : "—"}</td>
                     <td className="a-td tabular-nums whitespace-nowrap">{e.passScore ?? "—"} / {e.totalScore ?? "—"}</td>
+                    <td className="a-td whitespace-nowrap">
+                      {e.assignedStudents || e.assignedGroups ? (
+                        <button type="button" onClick={() => setAssigning(e)} className="text-xs font-bold text-one hover:underline">
+                          {[e.assignedGroups && `${e.assignedGroups} group${e.assignedGroups === 1 ? "" : "s"}`, e.assignedStudents && `${e.assignedStudents} student${e.assignedStudents === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">Category only</span>
+                      )}
+                    </td>
                     <td className="a-td"><Pill tone={e.isActive ? "green" : "gray"}>{e.isActive ? "Active" : "Inactive"}</Pill></td>
                     <td className="a-td">
                       <div className="flex justify-end gap-1">
+                        <button onClick={() => setAssigning(e)} className="a-act" title="Assign to students or groups" aria-label={`Assign ${e.title}`}><UserPlus className="w-4 h-4" /></button>
                         <button onClick={() => handleEdit(e)} className="a-act" title="Edit" aria-label={`Edit ${e.title}`}><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(e)} className="a-act del" title="Delete" aria-label={`Delete ${e.title}`}><Trash2 className="w-4 h-4" /></button>
                       </div>
@@ -137,6 +151,8 @@ const Exam = () => {
           </div>
         </div>
       )}
+
+      {assigning && <AssignExamModal exam={assigning} onClose={() => setAssigning(null)} onSaved={refetch} />}
 
       <ConfirmDeleteModal
         open={openDeleteModal}

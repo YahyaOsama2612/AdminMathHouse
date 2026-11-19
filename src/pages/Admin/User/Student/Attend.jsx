@@ -7,6 +7,7 @@ import Errorpage from "@/components/Errorpage";
 import axios from "@/api/api";
 import { Empty, Pill, SkelRows, Stat } from "@/components/admin/kit";
 import { SearchBox } from "./parts/shared";
+import AttendanceSheet from "./parts/AttendanceSheet";
 
 /* Admin → Students → Content & attendance (MathPortal "attPage" design).
    GET  /api/admin/student/:id/content   → { student, content: [course → chapters → lessons] }
@@ -37,6 +38,8 @@ const Attend = () => {
   const [notice, setNotice] = useState("");
   const [courseId, setCourseId] = useState(null);
   const [q, setQ] = useState("");
+  // "sheet" = mark each owned lesson Attended / Absent; "enroll" = open or remove content
+  const [tab, setTab] = useState("sheet");
 
   const { data, error, refetch } = useGet(`/api/admin/student/${studentId}/content`);
 
@@ -194,6 +197,7 @@ const Attend = () => {
             Open profile →
           </button>
         </div>
+        {tab === "enroll" && (
         <div className="flex flex-wrap items-end gap-3 basis-full lg:basis-auto">
           <div>
             <label htmlFor="extraDays" className="a-lbl-f !text-xs">
@@ -217,10 +221,21 @@ const Attend = () => {
               : "Set a number, then use the + Days button on any enrolled row."}
           </p>
         </div>
+        )}
         {notice && <p className="basis-full text-xs font-semibold text-green-700">{notice}</p>}
       </div>
 
-      {content.length === 0 ? (
+      <div className="flex gap-1.5 mb-4" role="tablist">
+        {[["sheet", "Attendance sheet"], ["enroll", "Enrollment"]].map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`a-chip ${tab === k ? "on" : ""}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "sheet" ? (
+        <AttendanceSheet studentId={studentId} />
+      ) : content.length === 0 ? (
         <Empty title="No content for this student" text="No courses match the student's category and grade." />
       ) : (
         <>
