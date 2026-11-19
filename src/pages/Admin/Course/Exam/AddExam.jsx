@@ -195,11 +195,12 @@ const AddExam = () => {
             {...props}
             sectionOptions={options?.sections || []}
             lessonOptions={lessonOptions}
+            courseId={courseId}
           />
         ),
       },
     ],
-    [options, years, lessonOptions],
+    [options, years, lessonOptions, courseId],
   );
 
   const onSave = async (formData) => {

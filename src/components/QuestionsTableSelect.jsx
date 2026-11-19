@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Select from "react-select";
 import api from "../api/api";
+import QuestionPhoto from "./QuestionPhoto";
 
 const MONTH_OPTIONS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -22,6 +23,7 @@ const QuestionsTableSelect = ({
   maxQuestions,
   lessons = [],
   onLessonChange,
+  courseId, // with no lesson picked, every question of this course is listed ("All lessons")
 }) => {
   const [questions, setQuestions] = useState([]);
   const [page, setPage] = useState(1);
@@ -38,7 +40,7 @@ const QuestionsTableSelect = ({
   // إعادة ضبط الصفحة إلى 1 عند تغير الـ lessonId
   useEffect(() => {
     setPage(1);
-  }, [lessonId]);
+  }, [lessonId, courseId]);
 
   // تأخير البحث لتجنب كثرة الطلبات أثناء الكتابة
   useEffect(() => {
@@ -50,13 +52,13 @@ const QuestionsTableSelect = ({
 
   // استدعاء البيانات عند تغير الصفحة، البحث، أو الفلاتر
   useEffect(() => {
-    if (lessonId) {
+    if (lessonId || courseId) {
       fetchQuestions();
     } else {
       setQuestions([]);
       setTotalPages(1);
     }
-  }, [page, debouncedSearch, difficulty, year, month, lessonId]);
+  }, [page, debouncedSearch, difficulty, year, month, lessonId, courseId]);
 
   useEffect(() => {
     if (maxQuestions > 0 && value.length > maxQuestions) {
@@ -67,13 +69,15 @@ const QuestionsTableSelect = ({
   const isLesson = !name || name === "lesson";
 
   const fetchQuestions = async () => {
-    if (!lessonId) return;
+    if (!lessonId && !courseId) return;
     try {
       setLoading(true);
 
-      const endpoint = name
-        ? `/api/admin/questions/${name}/${lessonId}`
-        : `/api/admin/questions/lesson/${lessonId}`;
+      const endpoint = !lessonId
+        ? `/api/admin/questions/course/${courseId}`
+        : name
+          ? `/api/admin/questions/${name}/${lessonId}`
+          : `/api/admin/questions/lesson/${lessonId}`;
 
       const params = {
         page,
@@ -232,7 +236,7 @@ const QuestionsTableSelect = ({
               }}
               isClearable
               isSearchable
-              placeholder="Select Lesson..."
+              placeholder={courseId ? "All lessons (whole course)" : "Select Lesson..."}
               className="text-sm font-medium"
               classNamePrefix="select"
               styles={{
@@ -323,7 +327,7 @@ const QuestionsTableSelect = ({
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — click anywhere on a row to select / unselect it */}
       <div className="overflow-x-auto rounded-xl border border-gray-100">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-400 text-[11px] font-extrabold uppercase tracking-wider">
@@ -331,7 +335,7 @@ const QuestionsTableSelect = ({
               <th className="p-4 w-16 text-center">
                 <input
                   type="checkbox"
-                  disabled={loading || !lessonId || questions.length === 0}
+                  disabled={loading || (!lessonId && !courseId) || questions.length === 0}
                   checked={isAllCurrentPageSelected}
                   onChange={handleSelectAllToggle}
                   className="w-4 h-4 accent-[#7d0a0a] cursor-pointer disabled:opacity-40"
@@ -351,7 +355,7 @@ const QuestionsTableSelect = ({
                   Loading questions...
                 </td>
               </tr>
-            ) : !lessonId ? (
+            ) : !lessonId && !courseId ? (
               <tr>
                 <td colSpan="5" className="p-6 text-center text-amber-600 font-medium">
                   Please select a lesson to load and choose questions
@@ -364,42 +368,46 @@ const QuestionsTableSelect = ({
                 </td>
               </tr>
             ) : (
-              questions.map((q) => (
-                <tr
-                  key={q.id}
-                  className={`transition hover:bg-slate-50 ${
-                    isChecked(q.id) ? "bg-red-50/60" : ""
-                  }`}
-                >
-                  <td className="p-4 text-center">
-                    <input
-                      type="checkbox"
-                      checked={isChecked(q.id)}
-                      disabled={
-                        !isChecked(q.id) &&
-                        maxQuestions > 0 &&
-                        value.length >= maxQuestions
-                      }
-                      onChange={() => toggleSelect(q.id)}
-                      className="w-4 h-4 accent-[#7d0a0a] cursor-pointer"
-                    />
-                  </td>
+              questions.map((q) => {
+                const on = isChecked(q.id);
+                const full = !on && maxQuestions > 0 && value.length >= maxQuestions;
+                return (
+                  <tr
+                    key={q.id}
+                    onClick={() => !full && toggleSelect(q.id)}
+                    title={full ? `You already picked ${maxQuestions} questions` : on ? "Click to remove" : "Click to select"}
+                    className={`transition-colors ${full ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${on ? "bg-red-50/60 hover:bg-red-50" : "hover:bg-slate-50"}`}
+                  >
+                    <td className="p-4 text-center">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        disabled={full}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(q.id)}
+                        className="w-4 h-4 accent-[#7d0a0a] cursor-pointer"
+                      />
+                    </td>
 
-                  <td className="p-4 font-medium text-slate-700">
-                    {q.question}
-                  </td>
+                    <td className="p-4 font-medium text-slate-700 min-w-[220px]">
+                      <QuestionPhoto id={q.id} image={q.image} text={q.question} size="sm" inCard />
+                      {!lessonId && q.lesson?.name && (
+                        <p className="text-[11px] text-slate-400 mt-1">{q.lesson.name}</p>
+                      )}
+                    </td>
 
-                  <td className="p-4">
-                    <span className="px-2 py-1 text-xs bg-slate-100 rounded-md capitalize">
-                      {q.difficulty || "—"}
-                    </span>
-                  </td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 text-xs bg-slate-100 rounded-md capitalize">
+                        {q.difficulty || "—"}
+                      </span>
+                    </td>
 
-                  <td className="p-4 text-slate-500">{q.year || "—"}</td>
+                    <td className="p-4 text-slate-500">{q.year || "—"}</td>
 
-                  <td className="p-4 text-slate-500">{q.month || "—"}</td>
-                </tr>
-              ))
+                    <td className="p-4 text-slate-500">{q.month || "—"}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -433,9 +441,7 @@ const QuestionsTableSelect = ({
 
       {error && (
         <p className="text-sm text-red-500 font-medium">
-          {typeof error === "object"
-            ? error.message || JSON.stringify(error)
-            : String(error)}
+          {typeof error === "object" ? error.message || JSON.stringify(error) : String(error)}
         </p>
       )}
     </div>

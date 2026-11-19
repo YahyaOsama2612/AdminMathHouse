@@ -155,6 +155,7 @@ const AddExam = () => {
             error={error}
             maxQuestions={Number(formData?.numberOfQuestions) || 0}
             lessons={lessonOptions}
+            courseId={courseId}
             onLessonChange={(newLessonId) => {
               if (setFormData) {
                 setFormData((prev) => ({ ...prev, lessonId: newLessonId }));
@@ -164,7 +165,7 @@ const AddExam = () => {
         ),
       },
     ],
-    [rawScoreOptions, lessonOptions, loadingLessons],
+    [rawScoreOptions, lessonOptions, loadingLessons, courseId],
   );
 
   const initialFormValues = useMemo(

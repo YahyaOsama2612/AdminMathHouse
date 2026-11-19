@@ -46,6 +46,7 @@ const SectionsEditor = ({
     setFormData,
     sectionOptions = [],
     lessonOptions = [],
+    courseId,
 }) => {
     const sections = value || [];
     const totalDuration = sumDurations(sections);
@@ -247,7 +248,9 @@ const SectionsEditor = ({
                     <QuestionsTableSelect
                         value={section.questionIds}
                         name={lessonOptions && lessonOptions.length > 0 ? "lesson" : "section"}
-                        lessonId={section.lessonId || section.sectionId}
+                        // the section id is not a lesson id: with lessons available, no lesson = the whole course
+                        lessonId={lessonOptions && lessonOptions.length > 0 ? section.lessonId || "" : section.sectionId}
+                        courseId={lessonOptions && lessonOptions.length > 0 ? courseId : undefined}
                         lessons={lessonOptions}
                         onLessonChange={(newLessonId) =>
                             updateSection(index, { lessonId: newLessonId })

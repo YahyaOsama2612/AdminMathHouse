@@ -1,6 +1,7 @@
 // Small pieces shared by the student-profile sections (MathPortal admin design).
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import QuestionPhoto from "@/components/QuestionPhoto";
 
 export const MONEY = (n) =>
   `${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} EGP`;
@@ -105,7 +106,7 @@ export const ReportDetails = ({ item, pageSize = 5 }) => {
           <div className="space-y-2">
             {mistakes.slice(0, toShow).map((mistake) => (
               <div key={mistake.questionId} className="bg-white px-3.5 py-3 rounded-xl border border-gray-100 text-sm">
-                <p className="text-gray-800 font-medium break-words">{mistake.questionText}</p>
+                <QuestionPhoto id={mistake.questionId} image={mistake.questionImage} text={mistake.questionText} />
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs">
                   <span className="text-gray-400">Lesson: {mistake.lesson?.name || "N/A"}</span>
                   <span>

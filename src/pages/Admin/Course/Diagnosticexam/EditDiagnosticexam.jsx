@@ -196,6 +196,7 @@ const EditDiagnosticexam = () => {
               0
             }
             lessons={lessonOptions}
+            courseId={courseId}
             onLessonChange={(newLessonId) => {
               if (setFormData) {
                 setFormData((prev) => ({ ...prev, lessonId: newLessonId }));
@@ -205,7 +206,7 @@ const EditDiagnosticexam = () => {
         ),
       },
     ],
-    [rawScoreOptions, lessonOptions, loadingLessons, initialData],
+    [rawScoreOptions, lessonOptions, loadingLessons, initialData, courseId],
   );
 
   const onSave = async (formData) => {

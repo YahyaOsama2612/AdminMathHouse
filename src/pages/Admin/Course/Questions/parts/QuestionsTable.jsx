@@ -1,6 +1,7 @@
 // Question list table in the MathPortal question-bank design (used by the lesson page and the all-questions page).
 import { Copy, GitBranch, Pencil, Trash2 } from "lucide-react";
 import { DiffChip, PagerBar, excerpt } from "./qb";
+import QuestionPhoto from "@/components/QuestionPhoto";
 
 const TH = "a-th";
 
@@ -33,9 +34,10 @@ export default function QuestionsTable({ rows, loading, showLesson = false, onPr
                 return (
                   <tr key={q.id} className="a-tr align-top">
                     <td className="a-td font-bold text-gray-400 tabular-nums">{pager ? (pager.page - 1) * pager.limit + i + 1 : i + 1}</td>
-                    <td className="a-td min-w-[240px] max-w-[420px]">
-                      <button type="button" onClick={() => onPreview?.(q.id)} className="text-left group" title="Preview">
-                        <span className="text-sm text-gray-800 line-clamp-2 group-hover:text-one">{text || <i className="text-gray-400">Image only</i>}</span>
+                    <td className="a-td min-w-[220px] max-w-[380px]">
+                      <QuestionPhoto id={q.id} image={q.image} text={text} size="sm" />
+                      <button type="button" onClick={() => onPreview?.(q.id)} className="mt-1 text-[11px] font-bold text-one hover:underline" title="Open the full question">
+                        {text ? <span className="line-clamp-1 text-gray-600 font-medium">{text}</span> : "Preview"}
                       </button>
                     </td>
                     <td className="a-td whitespace-nowrap">
