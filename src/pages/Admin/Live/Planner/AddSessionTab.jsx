@@ -50,7 +50,7 @@ export default function AddSessionTab({ onCreated }) {
 
   // A teacher who turns out to be busy at the new time can't stay picked.
   useEffect(() => {
-    if (teacher && teacher.state === "busy") setTeacherId("");
+    if (teacher && (teacher.state === "busy" || teacher.state === "off")) setTeacherId("");
   }, [teacher]);
 
   const pickCourse = (id) => {
@@ -110,7 +110,7 @@ export default function AddSessionTab({ onCreated }) {
   /* ---------- teachers ---------- */
   const tq = teacherQ.trim().toLowerCase();
   const shownTeachers = tq ? teachers.filter((t) => String(t.name).toLowerCase().includes(tq)) : teachers;
-  const freeTeacherCount = teachers.filter((t) => t.state !== "busy").length;
+  const freeTeacherCount = teachers.filter((t) => t.state !== "busy" && t.state !== "off").length;
 
   /* ---------- create ---------- */
   const submit = async () => {
@@ -126,6 +126,7 @@ export default function AddSessionTab({ onCreated }) {
     if (!validTimes(timeFrom, timeTo)) return toast.error("The end time must be after the start time");
     if (!teacherId) return toast.error("Pick a teacher");
     if (teacher?.state === "busy") return toast.error(`${teacher.name} is busy then`);
+    if (teacher?.state === "off") return toast.error(`That is outside ${teacher.name}'s working hours`);
 
     const body = {
       courseId,
@@ -372,7 +373,7 @@ export default function AddSessionTab({ onCreated }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-0.5">
                 {shownTeachers.map((t) => {
                   const on = String(t.id) === String(teacherId);
-                  const busy = t.state === "busy";
+                  const busy = t.state === "busy" || t.state === "off";
                   return (
                     <button
                       key={t.id}
@@ -386,14 +387,14 @@ export default function AddSessionTab({ onCreated }) {
                         <StateBadge meta={TEACHER_STATE[t.state]} />
                       </span>
                       <span className={`block text-[11px] mt-0.5 truncate ${busy ? "text-red-600 font-semibold" : t.teachesCourse ? "text-green-700 font-semibold" : "text-gray-400"}`}>
-                        {busy ? `Busy — ${t.busyWith || "another session"}` : !courseId ? "Pick a course to see who teaches it" : t.teachesCourse ? "Teaches this course" : "Doesn't teach this course"}
+                        {t.state === "off" ? "Outside working hours" : busy ? `Busy — ${t.busyWith || "another session"}` : !courseId ? "Pick a course to see who teaches it" : t.teachesCourse ? "Teaches this course" : "Doesn't teach this course"}
                       </span>
                     </button>
                   );
                 })}
               </div>
               {!shownTeachers.length && <p className="py-6 text-center text-sm text-gray-400">{teachers.length ? "No teacher matches this search." : "No teachers found."}</p>}
-              {teachers.length > 0 && !freeTeacherCount && <p className="text-sm font-bold text-red-600 mt-3">Every teacher is busy then — try another time.</p>}
+              {teachers.length > 0 && !freeTeacherCount && <p className="text-sm font-bold text-red-600 mt-3">No teacher is free then (busy or outside their hours) — try another time.</p>}
             </>
           )}
         </StepCard>
@@ -429,9 +430,6 @@ export default function AddSessionTab({ onCreated }) {
             <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-900">
               <b>Busy then:</b> {leftOut.map((s) => s.name).join(", ")}. They are left out.
             </div>
-          )}
-          {teacher && teacher.state === "off" && (
-            <p className="mt-3 text-xs text-amber-700">{teacher.name} has not marked this time as free.</p>
           )}
 
           <button type="button" onClick={submit} disabled={saving} className="a-btn primary w-full mt-4 h-11">

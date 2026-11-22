@@ -69,18 +69,89 @@ function SessionsTab({ teachers, sessions, q }) {
   );
 }
 
+/** Teacher states for one date + time: free / busy / off (outside hours) / not_shared. */
+function useStatesAt(date, from, to, enabled = true) {
+  const [map, setMap] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!enabled || !date || !from || !to || mins(to) <= mins(from)) { setMap(null); return undefined; }
+    let live = true;
+    setLoading(true);
+    api.post("/api/admin/session/teacher-states", { scheduleType: "once", sessionDate: date, timeFrom: from, timeTo: to })
+      .then((res) => live && setMap(new Map((res.data?.data?.teachers || []).map((t) => [String(t.id), t]))))
+      .catch(() => live && setMap(null))
+      .finally(() => live && setLoading(false));
+    return () => { live = false; };
+  }, [date, from, to, enabled]);
+  return { map, loading };
+}
+const STATE_PILL = { free: ["Free", "green"], not_shared: ["No hours set", "gray"], busy: ["Busy", "red"], off: ["Outside hours", "amber"] };
+
+/* ---------- Working-hours editor (admin sets a teacher's week) ---------- */
+function HoursEditor({ teacher, slots, onClose, onSaved }) {
+  const [rows, setRows] = useState(() => (slots || []).map((x, i) => ({ k: i, day: x.dayOfWeek, from: String(x.timeFrom).slice(0, 5), to: String(x.timeTo).slice(0, 5) })));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const add = (day = 0) => setRows((r) => [...r, { k: Date.now() + Math.random(), day, from: "14:00", to: "22:00" }]);
+  const upd = (k, patch) => { setErr(""); setRows((r) => r.map((x) => (x.k === k ? { ...x, ...patch } : x))); };
+  const save = async () => {
+    const bad = rows.find((x) => !x.from || !x.to || mins(x.to) <= mins(x.from));
+    if (bad) { setErr(`${DAY_NAME[bad.day]}: the end time must be after the start time.`); return; }
+    for (const a of rows) for (const b of rows) {
+      if (a.k !== b.k && a.day === b.day && mins(a.from) < mins(b.to) && mins(b.from) < mins(a.to)) { setErr(`${DAY_NAME[a.day]}: two time ranges overlap.`); return; }
+    }
+    setSaving(true);
+    try {
+      await api.put(`/api/admin/teacher-requests/availability/${teacher.id}`, { slots: rows.map((x) => ({ dayOfWeek: Number(x.day), timeFrom: x.from, timeTo: x.to })) });
+      toast.success(`Working hours saved for ${teacher.name}`);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setErr(errText(e, "Could not save the hours"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const ordered = [...rows].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || mins(a.from) - mins(b.from));
+  return (
+    <Modal wide title={`Working hours — ${teacher.name}`} onClose={onClose}
+      actions={<>
+        <button type="button" onClick={onClose} className="a-btn">Cancel</button>
+        <button type="button" onClick={save} disabled={saving} className="a-btn primary">{saving ? "Saving…" : "Save hours"}</button>
+      </>}>
+      <p className="mb-3">Sessions can only be booked inside these hours, and never on top of another session of this teacher. The teacher sees the change in their profile.</p>
+      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+        {ordered.length === 0 && <p className="text-gray-400 py-3 text-center">No hours yet — add the days this teacher works.</p>}
+        {ordered.map((x) => (
+          <div key={x.k} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+            <select value={x.day} onChange={(e) => upd(x.k, { day: Number(e.target.value) })} className="a-inp">
+              {DAYS.map((d) => <option key={d} value={d}>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d]}</option>)}
+            </select>
+            <input type="time" value={x.from} onChange={(e) => upd(x.k, { from: e.target.value })} className="a-inp" aria-label="From" />
+            <input type="time" value={x.to} onChange={(e) => upd(x.k, { to: e.target.value })} className="a-inp" aria-label="To" />
+            <button type="button" onClick={() => setRows((r) => r.filter((y) => y.k !== x.k))} className="a-act del" aria-label="Remove">✕</button>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-3">
+        <span className="text-xs font-bold text-gray-500 mr-1 self-center">Add a day:</span>
+        {DAYS.map((d) => <button key={d} type="button" onClick={() => add(d)} className="px-2.5 py-1 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-one hover:text-one">+ {DAY_NAME[d]}</button>)}
+      </div>
+      {err && <p className="mt-3 text-sm font-semibold text-red-600">{err}</p>}
+    </Modal>
+  );
+}
+
 /* ---------- Availability tab ---------- */
-function AvailabilityTab({ teachers, avail, q }) {
+function AvailabilityTab({ teachers, avail, q, reload }) {
+  const [editing, setEditing] = useState(null);
   const [date, setDate] = useState("");
   const [from, setFrom] = useState("16:00");
   const [to, setTo] = useState("18:00");
   const list = teachers.filter((t) => !q || t.name.toLowerCase().includes(q));
-  const free = useMemo(() => {
-    if (!date || mins(to) <= mins(from)) return null;
-    const [y, m, d] = date.split("-").map(Number);
-    const dow = new Date(y, m - 1, d).getDay();
-    return teachers.filter((t) => (avail[t.id]?.slots || []).some((s) => s.dayOfWeek === dow && mins(s.timeFrom) <= mins(from) && mins(s.timeTo) >= mins(to)));
-  }, [date, from, to, teachers, avail]);
+  const { map: states, loading: statesLoading } = useStatesAt(date, from, to);
+  const free = states ? teachers.filter((t) => ["free", "not_shared"].includes(states.get(String(t.id))?.state)) : null;
+  const blocked = states ? teachers.filter((t) => ["busy", "off"].includes(states.get(String(t.id))?.state)) : [];
   const hours = (id) => (avail[id]?.slots || []).reduce((a, s) => a + (mins(s.timeTo) - mins(s.timeFrom)) / 60, 0);
   const sel = "block mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white";
 
@@ -91,10 +162,15 @@ function AvailabilityTab({ teachers, avail, q }) {
           <label className="text-[11px] font-bold text-gray-400 uppercase">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={sel} /></label>
           <label className="text-[11px] font-bold text-gray-400 uppercase">From<input type="time" value={from} onChange={(e) => setFrom(e.target.value)} className={sel} /></label>
           <label className="text-[11px] font-bold text-gray-400 uppercase">To<input type="time" value={to} onChange={(e) => setTo(e.target.value)} className={sel} /></label>
-          {free && (
+          {statesLoading && <span className="text-xs text-gray-400">Checking…</span>}
+          {free && !statesLoading && (
             <div className="flex flex-wrap gap-2">
-              {free.length ? free.map((t) => <span key={t.id} className="text-xs font-bold px-3 py-1.5 rounded-full bg-green-100 text-green-700">{t.name}</span>)
-                : <span className="text-xs font-bold text-red-600">Nobody shared this time as free</span>}
+              {free.length ? free.map((t) => (
+                <span key={t.id} title={states.get(String(t.id))?.reason || ""} className={`text-xs font-bold px-3 py-1.5 rounded-full ${states.get(String(t.id))?.state === "free" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                  {t.name}{states.get(String(t.id))?.state === "not_shared" ? " (no hours set)" : ""}
+                </span>
+              )) : <span className="text-xs font-bold text-red-600">Nobody is free then</span>}
+              {blocked.length > 0 && <span className="text-[11px] text-gray-400 self-center">Not available: {blocked.map((t) => `${t.name} (${STATE_PILL[states.get(String(t.id))?.state]?.[0]})`).join(", ")}</span>}
             </div>
           )}
         </div>
@@ -111,6 +187,7 @@ function AvailabilityTab({ teachers, avail, q }) {
                     <td className="a-td">
                       <p className="font-bold text-gray-800">{t.name}</p>
                       <p className={`text-[11px] mt-1 ${a?.sharedAt ? "text-green-700 font-bold" : "text-amber-600 font-bold"}`}>{a?.sharedAt ? `Shared ${fmtStamp(a.sharedAt)}` : "Not shared yet"}</p>
+                      <button type="button" onClick={() => setEditing(t)} className="mt-1 text-[11px] font-bold text-one hover:underline">Edit hours</button>
                     </td>
                     {DAYS.map((d) => {
                       const slots = (a?.slots || []).filter((s) => s.dayOfWeek === d);
@@ -129,6 +206,7 @@ function AvailabilityTab({ teachers, avail, q }) {
           </table>
         </div>
       </Card>
+      {editing && <HoursEditor teacher={editing} slots={avail[editing.id]?.slots || []} onClose={() => setEditing(null)} onSaved={reload} />}
     </>
   );
 }
@@ -142,10 +220,16 @@ function RequestsTab({ requests, teachers, sessions, q, reload }) {
   const [reply, setReply] = useState("");
   const [cover, setCover] = useState("");
   const [busy, setBusy] = useState(false);
+  const acceptReq = dialog && dialog.mode === "accept" ? dialog.r : null;
+  const slotOf = (r) => (r.type === "cover"
+    ? [String(r.requestDate || "").slice(0, 10), String(r.timeFrom || "").slice(0, 5), String(r.timeTo || "").slice(0, 5)]
+    : [String(r.sessionDate || "").slice(0, 10), String(r.sessionTimeFrom || "").slice(0, 5), String(r.sessionTimeTo || "").slice(0, 5)]);
+  const [cDate, cFrom, cTo] = acceptReq ? slotOf(acceptReq) : ["", "", ""];
+  const { map: coverStates, loading: coverLoading } = useStatesAt(cDate, cFrom, cTo, !!acceptReq);
 
-  /** Booked single-date sessions of the teacher inside a cover request's slot. */
+  /** Booked sessions of the teacher inside a cover request's slot (one-off and weekly-repeat dates). */
   const affected = (r) => (r.type !== "cover" ? [] : sessions.filter((s) => s.teacher?.id === r.teacherId && s.status !== "cancelled"
-    && s.scheduleType !== "repeat" && sessDate(s) === String(r.requestDate || "").slice(0, 10)
+    && sessDate(s) === String(r.requestDate || "").slice(0, 10)
     && mins(s.timeFrom) < mins(r.timeTo) && mins(s.timeTo) > mins(r.timeFrom)));
 
   const n = (st) => requests.filter((r) => r.status === st).length;
@@ -159,17 +243,18 @@ function RequestsTab({ requests, teachers, sessions, q, reload }) {
   const send = async () => {
     const { r, mode } = dialog;
     if (mode === "decline" && !reply.trim()) { toast.error("Write a short reply — the teacher sees it"); return; }
+    if (mode === "accept" && r.type === "cover" && affected(r).length && !cover) { toast.error("Pick a cover teacher — these sessions need one"); return; }
     setBusy(true);
     try {
       const res = await api.patch(`/api/admin/teacher-requests/${r.id}/respond`, {
         status: mode === "accept" ? "accepted" : "rejected",
         adminReply: reply.trim() || undefined,
-        coverTeacherId: mode === "accept" && r.type === "cover" && cover ? cover : undefined,
+        coverTeacherId: mode === "accept" && cover ? cover : undefined,
       });
       const moved = res.data?.data?.reassignedSessions || 0;
       toast.success(mode === "decline" ? "Declined — the teacher was told"
-        : r.type === "cancellation" ? "Session cancelled — the teacher was told"
-          : moved ? `Accepted — ${moved} session${moved === 1 ? "" : "s"} moved to the cover teacher` : "Accepted — the teacher was told");
+        : r.type === "cancellation" ? (moved ? "Session handed to the new teacher — everyone was told" : "Session cancelled — the teacher and students were told")
+          : moved ? `Accepted — ${moved} session${moved === 1 ? "" : "s"} moved to the cover teacher; the teachers and students were told` : "Accepted — the teacher was told");
       setDialog(null);
       refreshWaiting();
       await reload();
@@ -242,7 +327,7 @@ function RequestsTab({ requests, teachers, sessions, q, reload }) {
                   {r.status === "pending" && (
                     <div className="flex gap-2">
                       <button onClick={() => open(r, "decline")} className="px-3 py-2 rounded-lg text-xs font-bold text-red-600 border border-red-200 bg-white hover:bg-red-50">Decline</button>
-                      <button onClick={() => open(r, "accept")} className="px-3 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#15803d" }}>{r.type === "cancellation" ? "Approve & cancel" : "Accept & assign cover"}</button>
+                      <button onClick={() => open(r, "accept")} className="px-3 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "#15803d" }}>{r.type === "cancellation" ? "Reassign or cancel" : "Accept & assign cover"}</button>
                     </div>
                   )}
                 </div>
@@ -254,7 +339,7 @@ function RequestsTab({ requests, teachers, sessions, q, reload }) {
 
       {dialog && (
         <Modal
-          title={dialog.mode === "decline" ? "Decline request" : dialog.r.type === "cancellation" ? "Approve & cancel the session" : "Accept cover request"}
+          title={dialog.mode === "decline" ? "Decline request" : dialog.r.type === "cancellation" ? "Teacher can't attend this session" : "Accept cover request"}
           onClose={() => setDialog(null)}
           actions={<>
             <button onClick={() => setDialog(null)} className="a-btn">Cancel</button>
@@ -262,17 +347,39 @@ function RequestsTab({ requests, teachers, sessions, q, reload }) {
           </>}
         >
           <p className="mb-3"><b className="text-gray-900">{dialog.r.teacherName}</b> — “{dialog.r.reason}”</p>
-          {dialog.mode === "accept" && dialog.r.type === "cover" && (
-            <label className="block mb-3">
-              <span className="a-lbl-f">Cover teacher (optional)</span>
-              <select value={cover} onChange={(e) => setCover(e.target.value)} className="a-inp">
-                <option value="">— No cover teacher —</option>
-                {teachers.filter((t) => t.id !== dialog.r.teacherId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-              <span className="block text-[11px] text-gray-400 mt-1">{affected(dialog.r).length} booked session{affected(dialog.r).length === 1 ? "" : "s"} in this slot move to the cover teacher.</span>
-            </label>
-          )}
-          {dialog.mode === "accept" && dialog.r.type === "cancellation" && <p className="mb-3 text-amber-700">The session is cancelled for everyone and students won’t be charged for it.</p>}
+          {dialog.mode === "accept" && (() => {
+            const isCover = dialog.r.type === "cover";
+            const n = isCover ? affected(dialog.r).length : dialog.r.sessionId ? 1 : 0;
+            const required = isCover && n > 0;
+            return (
+              <>
+                {!isCover && dialog.r.sessionName && (
+                  <p className="mb-2 text-gray-700">Session: <b>{dialog.r.sessionName}</b> · {fmtDay(cDate)} {cFrom && fmtTime(cFrom)}</p>
+                )}
+                <label className="block mb-3">
+                  <span className="a-lbl-f">{isCover ? (required ? "Cover teacher *" : "Cover teacher") : "Hand it to another teacher (optional)"}</span>
+                  <select value={cover} onChange={(e) => setCover(e.target.value)} className="a-inp">
+                    <option value="">{coverLoading ? "Checking who is free…" : isCover ? "— Pick a teacher —" : "— No: cancel the session —"}</option>
+                    {teachers.filter((t) => t.id !== dialog.r.teacherId).map((t) => {
+                      const st = coverStates?.get(String(t.id));
+                      const blockedT = st && (st.state === "busy" || st.state === "off");
+                      return (
+                        <option key={t.id} value={t.id} disabled={!!blockedT}>
+                          {t.name}{st ? ` — ${STATE_PILL[st.state]?.[0] || st.state}` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <span className="block text-[11px] text-gray-400 mt-1">
+                    {isCover
+                      ? (n ? `${n} booked session${n === 1 ? "" : "s"} in this slot move to the cover teacher, with their lessons and materials. The teachers and students are told.` : "No booked session in this slot.")
+                      : cover ? "The session moves to this teacher with its lessons and materials — nothing is cancelled. The teachers and students are told."
+                        : "Without a new teacher the session is cancelled for everyone and students won’t be charged."}
+                  </span>
+                </label>
+              </>
+            );
+          })()}
           <label className="block">
             <span className="a-lbl-f">{dialog.mode === "decline" ? "Reply to the teacher *" : "Reply to the teacher (optional)"}</span>
             <textarea rows={3} value={reply} onChange={(e) => setReply(e.target.value)} className="a-inp" placeholder={dialog.mode === "decline" ? "e.g. Please keep it, the student confirmed." : "e.g. Ms. Nada takes this slot."}></textarea>
@@ -331,7 +438,7 @@ export default function TeacherHub() {
         {q && <button onClick={() => setQ("")} className="text-xs font-bold text-gray-400 hover:text-one px-2 py-1">Clear</button>}
       </div>
       {teachers === null ? <SkelRows n={5} /> : tab === "sessions" ? <SessionsTab teachers={teachers} sessions={sessions} q={ql} />
-        : tab === "availability" ? <AvailabilityTab teachers={teachers} avail={avail} q={ql} />
+        : tab === "availability" ? <AvailabilityTab teachers={teachers} avail={avail} q={ql} reload={load} />
           : <RequestsTab requests={requests} teachers={teachers} sessions={sessions} q={ql} reload={load} />}
     </div>
   );

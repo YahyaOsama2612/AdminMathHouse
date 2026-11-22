@@ -95,18 +95,19 @@ export function usePlannerOptions(studentId) {
 }
 
 /** GET /courses/:courseId/lessons → chapters[{ id, name, lessons[{ id, name }] }] */
-export function useCourseLessons(courseId) {
+/** studentId / planId (optional): each lesson gets status "attended" | "booked" | null for that student. */
+export function useCourseLessons(courseId, { studentId, planId } = {}) {
   const [state, setState] = useState({ chapters: [], loading: false, error: "" });
   useEffect(() => {
     if (!courseId) { setState({ chapters: [], loading: false, error: "" }); return undefined; }
     let alive = true;
     setState({ chapters: [], loading: true, error: "" });
     api
-      .get(`${PLANNER_API}/courses/${courseId}/lessons`)
+      .get(`${PLANNER_API}/courses/${courseId}/lessons`, { params: studentId ? { studentId, ...(planId ? { planId } : {}) } : {} })
       .then((r) => alive && setState({ chapters: r.data?.data?.chapters || [], loading: false, error: "" }))
       .catch((err) => alive && setState({ chapters: [], loading: false, error: errText(err, "Could not load lessons") }));
     return () => { alive = false; };
-  }, [courseId]);
+  }, [courseId, studentId, planId]);
   return state;
 }
 

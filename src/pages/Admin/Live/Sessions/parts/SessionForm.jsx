@@ -1,6 +1,8 @@
 // The Add / Edit session form body (MathPortal design: numbered section cards + a summary card).
 // All state and API calls stay in AddSessions.jsx / EditSessions.jsx — this file only renders.
 import Select from "react-select";
+import { useParams } from "react-router-dom";
+import useTeacherStates, { TEACHER_STATE_LABEL } from "./useTeacherStates";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Plus, UserCheck, X } from "lucide-react";
@@ -97,7 +99,19 @@ export default function SessionForm({
   onCancel,
 }) {
   const isOnce = formData.scheduleType === "once";
-  const teacher = teacherOptions.find((o) => o.value === formData.teacherId);
+  // teachers free at the chosen time (busy / outside working hours can't be picked)
+  const { id: editingId } = useParams();
+  const { states: teacherStates, loading: statesLoading, hasSchedule } = useTeacherStates(formData, mode === "edit" ? editingId : null);
+  const rankedTeachers = (() => {
+    const order = { free: 0, not_shared: 1, off: 2, busy: 3 };
+    const list = teacherOptions.map((o) => {
+      const st = teacherStates?.get(String(o.value));
+      return { ...o, tState: st?.state, tReason: st?.reason, isDisabled: !!st && (st.state === "busy" || st.state === "off") };
+    });
+    return teacherStates ? list.sort((a, b) => (order[a.tState] ?? 1) - (order[b.tState] ?? 1) || String(a.label).localeCompare(String(b.label))) : list;
+  })();
+  const teacher = rankedTeachers.find((o) => o.value === formData.teacherId) || teacherOptions.find((o) => o.value === formData.teacherId);
+  const pickedBlocked = teacher && (teacher.tState === "busy" || teacher.tState === "off");
   const group = groupOptions.find((o) => o.value === formData.groupId);
   const errorCount = Object.values(errors).filter(Boolean).length;
 
@@ -162,12 +176,27 @@ export default function SessionForm({
             <div>
               <label className="a-lbl-f">Teacher <Req /></label>
               <Select
-                options={teacherOptions}
+                options={rankedTeachers}
                 value={teacher || null}
                 onChange={(s) => onSelect("teacherId", s ? s.value : "")}
-                placeholder="Select teacher…"
+                placeholder={hasSchedule ? "Select teacher…" : "Select teacher… (pick the date & time to see who is free)"}
                 styles={SELECT_STYLES}
+                isOptionDisabled={(o) => !!o.isDisabled}
+                formatOptionLabel={(o, { context }) => (
+                  <span className="flex items-center justify-between gap-2 w-full" title={o.tReason || ""}>
+                    <span className="truncate">{o.label}</span>
+                    {o.tState && context === "menu" && (
+                      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${TEACHER_STATE_LABEL[o.tState]?.cls || ""}`}>
+                        {TEACHER_STATE_LABEL[o.tState]?.text}
+                      </span>
+                    )}
+                  </span>
+                )}
               />
+              {statesLoading && <p className="text-[11px] text-gray-400 mt-1">Checking who is free…</p>}
+              {!statesLoading && pickedBlocked && (
+                <p className="text-xs font-semibold text-red-600 mt-1">{teacher.label} can't take this time — {teacher.tReason}. Pick another teacher or time.</p>
+              )}
               <FieldError msg={errors.teacherId} />
             </div>
 
