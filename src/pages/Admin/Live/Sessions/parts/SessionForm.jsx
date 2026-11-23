@@ -12,6 +12,7 @@ import { fmtDay, fmtTime } from "@/components/admin/kit";
 import SessionExamSelect from "../SessionExamSelect";
 import ExamSessionCourseFields from "../ExamSessionCourseFields";
 import CommonLessonsReportView from "../CommonLessonsReportView";
+import CommonLessonsPicker from "./CommonLessonsPicker";
 import {
   ChoiceCard, FieldError, MiniLabel, Req, SELECT_STYLES, Section, TYPE_TONE,
   formatTimeToHMS, parseHMSToDate, parseLocalDate, toLocalDateString,
@@ -24,11 +25,7 @@ const SESSION_TYPES = [
   ["Exam", "Linked to an exam"],
 ];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const LINKS = [
-  ["session_link", "Live session link", "https://zoom.us/j/..."],
-  ["material_link", "Student material link", "https://drive.google.com/..."],
-  ["teacher_material_link", "Teacher material link", "https://drive.google.com/..."],
-];
+// (The live / material link fields were removed: the teacher adds the meeting link from the teacher site.)
 
 const inpCls = (err) => `a-inp ${err ? "!border-red-300" : ""}`;
 
@@ -93,6 +90,8 @@ export default function SessionForm({
   attendanceNameMap,
   onManualAttendance,
   initialLessons,
+  // lessons shared by the group / 2+ students: { on, setOn, available, data, loading, error } (add only)
+  commonLessons,
   // submit
   isSubmitting,
   onSubmit,
@@ -383,34 +382,36 @@ export default function SessionForm({
         </Section>
 
         {/* 4 — Lessons / exam course */}
-        <Section n={4} title={isExamSession ? "Exam course" : "Lessons"} sub={isExamSession ? "Exam sessions use the selected exam and need no lessons" : "The lessons this session covers"}>
+        <Section
+          n={4}
+          title={isExamSession ? "Exam course" : "Lessons"}
+          sub={isExamSession ? "Exam sessions use the selected exam and need no lessons" : commonLessons?.on ? "Picked from what all the students have" : "The lessons this session covers"}
+        >
           {isExamSession ? (
             <ExamSessionCourseFields categoryId={formData.examCategoryId} subCategoryId={formData.examSubCategoryId} courseId={formData.examCourseId} onChange={onExamCourse} />
+          ) : commonLessons?.on ? (
+            <div>
+              <CommonLessonsPicker data={commonLessons.data} loading={commonLessons.loading} error={commonLessons.error}
+                value={formData.lessonIds} onPick={onHierarchy} onManual={() => commonLessons.setOn(false)} />
+              <FieldError msg={errors.lessonIds} />
+            </div>
           ) : (
             <div>
-              <span className="a-lbl-f">Lesson hierarchy <Req /></span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="a-lbl-f">Lesson hierarchy <Req /></span>
+                {commonLessons?.available && (
+                  <button type="button" onClick={() => commonLessons.setOn(true)} className="text-xs font-bold text-one hover:underline mb-1.5">
+                    Show the lessons these students share
+                  </button>
+                )}
+              </div>
               <HierarchicalLessonSelector value={formData.lessonIds} onChange={onHierarchy} initialLessons={initialLessons} />
               <FieldError msg={errors.lessonIds} />
             </div>
           )}
-        </Section>
-
-        {/* 5 — Links & PDFs */}
-        <Section n={5} title="Links & PDFs" sub="Optional">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {LINKS.map(([field, label, ph]) => (
-              <div key={field}>
-                <label className="a-lbl-f" htmlFor={`f-${field}`}>{label}</label>
-                <input id={`f-${field}`} type="text" name={field} value={formData[field]} onChange={onInput} className="a-inp" placeholder={ph} />
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-            <p className="text-sm font-bold text-gray-700">PDFs from assigned lessons</p>
-            <p className="text-xs text-gray-500">
-              Session and answer PDFs come from the lessons assigned to this session. Mistakes PDFs are generated automatically.
-            </p>
-          </div>
+          {!isExamSession && (
+            <p className="mt-3 text-xs text-gray-400">Session and answer PDFs come from the chosen lessons. Mistakes PDFs are generated automatically.</p>
+          )}
         </Section>
       </div>
 

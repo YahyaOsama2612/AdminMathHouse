@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import api from "@/api/api";
 import { useNavigate } from "react-router-dom";
 import usePost from "@/hooks/usePost";
 import useGet from "@/hooks/useGet";
@@ -110,6 +111,42 @@ const AddSessions = () => {
   }, [groupMembers]);
 
   const isExamSession = formData.sessionRelationalType === "Exam";
+
+  // ── Lessons the students have in common (group or 2+ students) — no course / chapter to pick ──
+  const audienceIds = useMemo(() => {
+    const ids = new Set();
+    if (formData.assignToGroup && formData.groupId) groupMembers.forEach((s) => ids.add(s.id || s.studentId));
+    if (formData.assignToStudents) formData.userIds.forEach((id) => ids.add(id));
+    return [...ids].filter(Boolean);
+  }, [formData.assignToGroup, formData.groupId, formData.assignToStudents, formData.userIds, groupMembers]);
+  const audienceKey = [formData.assignToGroup ? formData.groupId : "", ...(formData.assignToStudents ? [...formData.userIds].sort() : [])].join("|");
+  const sharedAvailable = !isExamSession && audienceIds.length >= 2;
+  const [commonOn, setCommonOn] = useState(true);
+  const [common, setCommon] = useState({ data: null, loading: false, error: "" });
+  useEffect(() => {
+    if (!sharedAvailable) { setCommon({ data: null, loading: false, error: "" }); return undefined; }
+    let alive = true;
+    setCommon((c) => ({ ...c, loading: true, error: "" }));
+    const t = setTimeout(() => {
+      api.post("/api/admin/session/common-lessons", {
+        groupId: formData.assignToGroup && formData.groupId ? formData.groupId : undefined,
+        studentIds: formData.assignToStudents ? formData.userIds : [],
+      })
+        .then((r) => alive && setCommon({ data: r.data?.data || null, loading: false, error: "" }))
+        .catch((e) => alive && setCommon({ data: null, loading: false, error: e?.response?.data?.error?.message || e.message }));
+    }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [audienceKey, sharedAvailable]); // audienceKey stands for the group + picked students
+  // a new audience → back to its common lessons (lessons picked for the old one may not be shared)
+  useEffect(() => {
+    if (!sharedAvailable) return;
+    setCommonOn(true);
+    setFormData((prev) => (prev.lessonIds.length ? { ...prev, lessonIds: [], lessonsFullDetails: [] } : prev));
+  }, [audienceKey, sharedAvailable]);
+  const setCommonMode = (on) => {
+    setCommonOn(on);
+    setFormData((prev) => ({ ...prev, lessonIds: [], lessonsFullDetails: [] }));
+  };
 
   const handleStudentsChange = (ids) => {
     handleSelectChange("userIds", ids);
@@ -289,10 +326,6 @@ const AddSessions = () => {
       chapterIds: isExamSession ? [] : allChapterIds,
       lessonIds: isExamSession ? [] : formData.lessonIds,
 
-      session_link: formData.session_link || null,
-      material_link: formData.material_link || null,
-      teacher_material_link: formData.teacher_material_link || null,
-
       ...(formData.scheduleType === "once"
         ? {
           sessionDate: formData.sessionDate,
@@ -361,6 +394,7 @@ const AddSessions = () => {
         commonLessonsData={commonLessonsData}
         attendanceStudents={attendanceStudents}
         attendanceNameMap={attendanceNameMap}
+        commonLessons={{ on: sharedAvailable && commonOn, setOn: setCommonMode, available: sharedAvailable, ...common }}
         isSubmitting={isSubmitting}
         onSubmit={onSave}
         onCancel={() => navigate(-1)}
