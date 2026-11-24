@@ -1,28 +1,18 @@
 // Add session → lessons the chosen students have IN COMMON (POST /api/admin/session/common-lessons).
 // Shown when the session is for a group or 2+ students: no course / chapter picking — the admin ticks
 // lessons straight from what every student owns. One course per session (the backend needs one).
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Check, ChevronDown, Users } from "lucide-react";
 
-const tag = (attended, total) => {
-  if (!attended) return ["New for everyone", "bg-green-50 text-green-700 border-green-200"];
-  if (attended >= total) return ["Everyone attended", "bg-gray-100 text-gray-500 border-gray-200"];
-  return [`${attended}/${total} attended`, "bg-amber-50 text-amber-700 border-amber-200"];
-};
-
+// The backend lists only lessons NONE of the students attended yet (hiddenAttended = how many it left out).
 export default function CommonLessonsPicker({ data, loading, error, value = [], onPick, onManual }) {
   const courses = data?.courses || [];
   const total = Number(data?.students) || 0;
+  const hidden = Number(data?.hiddenAttended) || 0;
   const pickedCourse = courses.find((c) => c.chapters.some((ch) => ch.lessons.some((l) => value.includes(l.id))));
   const [courseId, setCourseId] = useState(null);
-  const [hideDone, setHideDone] = useState(true);
   const [closed, setClosed] = useState({});
   const course = courses.find((c) => c.id === (courseId || pickedCourse?.id)) || courses[0];
-
-  const counts = useMemo(() => {
-    const all = (course?.chapters || []).flatMap((ch) => ch.lessons);
-    return { all: all.length, done: all.filter((l) => total && l.attended >= total).length };
-  }, [course, total]);
 
   // value → the ids + the course / chapter details the save payload needs
   const emit = (ids) => {
@@ -31,7 +21,7 @@ export default function CommonLessonsPicker({ data, loading, error, value = [], 
   };
   const toggle = (id) => emit(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
   const toggleChapter = (ch, on) => {
-    const ids = ch.lessons.filter((l) => !hideDone || l.attended < total).map((l) => l.id);
+    const ids = ch.lessons.map((l) => l.id);
     emit(on ? [...new Set([...value, ...ids])] : value.filter((x) => !ids.includes(x)));
   };
   const switchCourse = (id) => {
@@ -48,7 +38,11 @@ export default function CommonLessonsPicker({ data, loading, error, value = [], 
   );
   if (!courses.length) return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-      <p className="font-bold">These {total} students have no lesson in common.</p>
+      <p className="font-bold">
+        {hidden
+          ? `No new lessons left: all ${hidden} lesson${hidden === 1 ? "" : "s"} these ${total} students share ${hidden === 1 ? "was" : "were"} already attended by at least one of them.`
+          : `These ${total} students have no lesson in common.`}
+      </p>
       {data?.ownsNothing?.length > 0 && <p className="text-xs mt-1">Nothing bought yet: {data.ownsNothing.join(", ")}.</p>}
       <button type="button" onClick={onManual} className="mt-2 text-xs font-bold text-one hover:underline">Pick from the full course list instead</button>
     </div>
@@ -57,20 +51,15 @@ export default function CommonLessonsPicker({ data, loading, error, value = [], 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <p className="text-sm text-gray-600 flex items-center gap-1.5">
-          <Users size={15} className="text-one" /> Lessons all <b>{total}</b> students have
+        <p className="text-sm text-gray-600 flex items-center gap-1.5 flex-wrap">
+          <Users size={15} className="text-one" /> Shared lessons none of the <b>{total}</b> students attended yet
           {value.length > 0 && <span className="ml-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-one">{value.length} picked</span>}
         </p>
-        <div className="flex items-center gap-3">
-          {counts.done > 0 && (
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} className="w-3.5 h-3.5 accent-[#7d0a0a]" />
-              Hide lessons everyone attended ({counts.done})
-            </label>
-          )}
-          <button type="button" onClick={onManual} className="text-xs font-bold text-gray-400 hover:text-one">Full course list</button>
-        </div>
+        <button type="button" onClick={onManual} className="text-xs font-bold text-gray-400 hover:text-one">Full course list</button>
       </div>
+      {hidden > 0 && (
+        <p className="text-[11px] text-gray-400 -mt-1 mb-3">{hidden} shared lesson{hidden === 1 ? " is" : "s are"} hidden because at least one student already attended {hidden === 1 ? "it" : "them"}.</p>
+      )}
 
       {courses.length > 1 && (
         <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Course">
@@ -90,7 +79,7 @@ export default function CommonLessonsPicker({ data, loading, error, value = [], 
 
       <div className="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
         {course.chapters.map((ch) => {
-          const shown = ch.lessons.filter((l) => !hideDone || l.attended < total);
+          const shown = ch.lessons;
           if (!shown.length) return null;
           const on = shown.every((l) => value.includes(l.id));
           const some = shown.some((l) => value.includes(l.id));
@@ -107,13 +96,11 @@ export default function CommonLessonsPicker({ data, loading, error, value = [], 
               </div>
               {!isClosed && shown.map((l) => {
                 const sel = value.includes(l.id);
-                const [label, cls] = tag(l.attended, total);
                 return (
                   <button key={l.id} type="button" onClick={() => toggle(l.id)} aria-pressed={sel}
                     className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 text-left transition-colors ${sel ? "bg-red-50/60" : "hover:bg-gray-50"}`}>
                     <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${sel ? "bg-one border-one text-white" : "border-gray-300 bg-white"}`}>{sel && <Check size={12} />}</span>
                     <span className={`flex-1 min-w-0 text-sm truncate ${sel ? "font-semibold text-gray-900" : "text-gray-700"}`}>{l.name}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${cls}`}>{label}</span>
                   </button>
                 );
               })}

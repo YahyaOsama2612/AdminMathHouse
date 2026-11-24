@@ -113,13 +113,19 @@ const AddSessions = () => {
   const isExamSession = formData.sessionRelationalType === "Exam";
 
   // ── Lessons the students have in common (group or 2+ students) — no course / chapter to pick ──
+  // the students the lessons are matched for: the group members you ticked (none ticked = the whole
+  // group) plus the students picked by name
   const audienceIds = useMemo(() => {
     const ids = new Set();
-    if (formData.assignToGroup && formData.groupId) groupMembers.forEach((s) => ids.add(s.id || s.studentId));
+    if (formData.assignToGroup && formData.groupId) {
+      const members = groupMembers.map((s) => s.id || s.studentId).filter(Boolean);
+      const ticked = members.filter((id) => formData.userIds.includes(id));
+      (ticked.length ? ticked : members).forEach((id) => ids.add(id));
+    }
     if (formData.assignToStudents) formData.userIds.forEach((id) => ids.add(id));
     return [...ids].filter(Boolean);
   }, [formData.assignToGroup, formData.groupId, formData.assignToStudents, formData.userIds, groupMembers]);
-  const audienceKey = [formData.assignToGroup ? formData.groupId : "", ...(formData.assignToStudents ? [...formData.userIds].sort() : [])].join("|");
+  const audienceKey = [...audienceIds].sort().join("|");
   const sharedAvailable = !isExamSession && audienceIds.length >= 2;
   const [commonOn, setCommonOn] = useState(true);
   const [common, setCommon] = useState({ data: null, loading: false, error: "" });
@@ -128,10 +134,7 @@ const AddSessions = () => {
     let alive = true;
     setCommon((c) => ({ ...c, loading: true, error: "" }));
     const t = setTimeout(() => {
-      api.post("/api/admin/session/common-lessons", {
-        groupId: formData.assignToGroup && formData.groupId ? formData.groupId : undefined,
-        studentIds: formData.assignToStudents ? formData.userIds : [],
-      })
+      api.post("/api/admin/session/common-lessons", { studentIds: audienceIds })
         .then((r) => alive && setCommon({ data: r.data?.data || null, loading: false, error: "" }))
         .catch((e) => alive && setCommon({ data: null, loading: false, error: e?.response?.data?.error?.message || e.message }));
     }, 300);
@@ -325,6 +328,7 @@ const AddSessions = () => {
         : primaryRow.courseId || null,
       chapterIds: isExamSession ? [] : allChapterIds,
       lessonIds: isExamSession ? [] : formData.lessonIds,
+      session_link: formData.session_link.trim() || null,
 
       ...(formData.scheduleType === "once"
         ? {

@@ -128,6 +128,26 @@ const SearchStudents = ({ value = [], onChange, error, limit = 10 }) => {
         </span>
       </div>
 
+      {/* who is selected — names with a remove button */}
+      {value.length > 0 && (() => {
+        const named = value.map((id) => ({ id, name: String(knownStudentsRef.current.get(id)?.label || "").replace(/\s+/g, " ").trim() }));
+        const unknown = named.filter((s) => !s.name).length;
+        return (
+          <div className="-mt-3 flex flex-wrap items-center gap-1.5" aria-label="Selected students">
+            {named.filter((s) => s.name).map((s) => (
+              <span key={s.id} className="inline-flex items-center gap-1 max-w-full rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold pl-2.5 pr-1 py-1">
+                <span className="truncate">{s.name}</span>
+                <button type="button" onClick={() => toggleSelect(s.id)} className="w-4 h-4 rounded-full hover:bg-indigo-100 flex items-center justify-center shrink-0" aria-label={`Remove ${s.name}`} title="Remove">×</button>
+              </span>
+            ))}
+            {unknown > 0 && <span className="text-xs text-slate-400">+{unknown} more</span>}
+            {value.length > 1 && (
+              <button type="button" onClick={() => emitChange([])} className="text-xs font-semibold text-slate-400 hover:text-red-600 ml-1">Clear all</button>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Search */}
       <div className="relative">
         <input

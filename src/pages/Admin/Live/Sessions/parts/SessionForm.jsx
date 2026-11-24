@@ -25,7 +25,7 @@ const SESSION_TYPES = [
   ["Exam", "Linked to an exam"],
 ];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-// (The live / material link fields were removed: the teacher adds the meeting link from the teacher site.)
+// Only the meeting link is asked for (optional); the student / teacher material link fields were removed.
 
 const inpCls = (err) => `a-inp ${err ? "!border-red-300" : ""}`;
 
@@ -412,6 +412,15 @@ export default function SessionForm({
           {!isExamSession && (
             <p className="mt-3 text-xs text-gray-400">Session and answer PDFs come from the chosen lessons. Mistakes PDFs are generated automatically.</p>
           )}
+        </Section>
+
+        {/* 5 — Meeting link (optional; the teacher can also add it from the teacher site) */}
+        <Section n={5} title="Meeting link" sub="Optional">
+          <div className="max-w-xl">
+            <label className="a-lbl-f" htmlFor="f-session_link">Live session link</label>
+            <input id="f-session_link" type="text" name="session_link" value={formData.session_link || ""} onChange={onInput} className="a-inp" placeholder="https://zoom.us/j/... or https://meet.google.com/..." />
+            <p className="text-[11px] text-gray-400 mt-1">Leave it empty if the teacher will add it later.</p>
+          </div>
         </Section>
       </div>
 
