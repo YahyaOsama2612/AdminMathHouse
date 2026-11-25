@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BookOpen, Coins, Layers, Users } from "lucide-react";
 import { PageHead } from "@/components/admin/kit";
-import { CsvButton, HBars, Kpi, RCard, ReportState, downloadCsv, money, stars, useReport } from "./parts";
+import { CsvButton, HBars, Kpi, RCard, RTable, ReportNav, ReportState, SearchBox, Th, downloadCsv, money, stars, useReport, useSort } from "./parts";
 
 /* Reports → Courses (design: rep-courses). GET /api/admin/reports/courses
    Revenue = completed payments tied to the course (content bought in it + its packages). */
@@ -13,6 +13,10 @@ export default function ReportsCourses() {
   const byRevenue = [...list].sort((a, b) => b.revenue - a.revenue);
   const top3 = new Set(byRevenue.filter((c) => c.revenue > 0).slice(0, 3).map((c) => c.id));
   const sum = (k) => list.reduce((a, c) => a + c[k], 0);
+  const [q, setQ] = useState("");
+  const ql = q.trim().toLowerCase();
+  const filtered = useMemo(() => byStudents.filter((c) => !ql || `${c.name} ${c.category || ""}`.toLowerCase().includes(ql)), [byStudents, ql]);
+  const srt = useSort(filtered);
 
   const exportCsv = () => downloadCsv("courses-report.csv", [
     ["Course", "Category", "Chapters", "Lessons", "Teachers", "Active students", "All-time students", "From price (EGP)", "Revenue (EGP)", "Paid orders", "Avg rating (/5)", "Ratings"],
@@ -21,6 +25,7 @@ export default function ReportsCourses() {
 
   return (
     <div>
+      <ReportNav />
       <PageHead title="Courses report" sub="Students, content and money per course.">
         {data && <CsvButton onClick={exportCsv} />}
       </PageHead>
@@ -42,12 +47,16 @@ export default function ReportsCourses() {
           </RCard>
         </div>
 
-        <RCard title="Course breakdown" sub="★ marks the top 3 sellers. From price = the cheapest course price.">
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-sm">
-              <thead><tr>{["Course", "Chapters", "Lessons", "Teachers", "Active students", "All-time", "From price", "Revenue", "Rating"].map((h) => <th key={h} className="a-th">{h}</th>)}</tr></thead>
+        <RCard title="Course breakdown" sub="★ marks the top 3 sellers. From price = the cheapest course price."
+          right={<SearchBox value={q} onChange={setQ} placeholder="Search course…" className="w-full sm:w-60" />}>
+          <RTable>
+              <thead><tr>
+                <Th k="name" s={srt} first="asc">Course</Th><Th k="chapters" s={srt}>Chapters</Th><Th k="lessons" s={srt}>Lessons</Th>
+                <Th k="teachers" s={srt}>Teachers</Th><Th k="activeStudents" s={srt}>Active students</Th><Th k="allStudents" s={srt}>All-time</Th>
+                <Th k="fromPrice" s={srt}>From price</Th><Th k="revenue" s={srt}>Revenue</Th><Th k="perStudent" get={(c) => (c.activeStudents ? c.revenue / c.activeStudents : null)} s={srt}>Per student</Th><Th k="avgRating" s={srt}>Rating</Th>
+              </tr></thead>
               <tbody>
-                {byStudents.map((c) => (
+                {srt.sorted.map((c) => (
                   <tr key={c.id} className="a-tr">
                     <td className="a-td"><p className="font-bold text-gray-800">{top3.has(c.id) && <span className="text-amber-500">★ </span>}{c.name}</p><p className="text-[11px] text-gray-400">{c.category || "—"}</p></td>
                     <td className="a-td text-gray-600">{c.chapters}</td>
@@ -57,13 +66,13 @@ export default function ReportsCourses() {
                     <td className="a-td text-gray-600">{c.allStudents}</td>
                     <td className="a-td text-gray-600 whitespace-nowrap">{c.fromPrice == null ? "—" : money(c.fromPrice)}</td>
                     <td className="a-td font-bold text-one whitespace-nowrap">{c.revenue ? money(c.revenue) : "—"}</td>
+                    <td className="a-td text-gray-600 whitespace-nowrap">{c.revenue && c.activeStudents ? money(c.revenue / c.activeStudents) : "—"}</td>
                     <td className="a-td text-gray-600 whitespace-nowrap">{stars(c.avgRating)}{c.ratings > 0 && <span className="text-[11px] text-gray-400"> ({c.ratings})</span>}</td>
                   </tr>
                 ))}
-                {!byStudents.length && <tr><td colSpan={9} className="py-10 text-center text-gray-400">No courses yet.</td></tr>}
+                {!srt.sorted.length && <tr><td colSpan={10} className="py-10 text-center text-gray-400">{list.length ? "No courses match." : "No courses yet."}</td></tr>}
               </tbody>
-            </table>
-          </div>
+          </RTable>
         </RCard>
       </ReportState>
     </div>

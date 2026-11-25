@@ -15,7 +15,7 @@ const [pricePopup, setPricePopup] = useState({
   open: false,
   row: null,
 });
-  const { data, loading, error } = useGet("/api/admin/lessons");
+  const { data, loading, error, refetch } = useGet("/api/admin/lessons");
   const { deleteData, loading: deleteLoading } = useDelete();
  const [selectedRow, setSelectedRow] = useState(null);
   const [openDeleteModal, setOpenDeleteModal] = useState(false);

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Clock, Coins, Wallet, XCircle } from "lucide-react";
 import { PageHead, Pill } from "@/components/admin/kit";
-import { CsvButton, Kpi, RCard, RangePicker, ReportState, dayStr, downloadCsv, money, presetRange, useReport } from "./parts";
+import { CsvButton, Delta, Kpi, RCard, RTable, RangePicker, ReportNav, ReportState, SearchBox, Th, dayStr, downloadCsv, money, presetRange, useReport, useSort } from "./parts";
 
 /* Reports → Payments (design: rep-payments) from the payments the system already records.
    GET /api/admin/reports/payments?from&to
@@ -24,8 +24,13 @@ export default function ReportsPayments() {
   const t = data?.totals || {};
   const byMethod = data?.byMethod || [];
   const months = (data?.months || []).map((m) => ({ ...m, label: `${MON[Number(m.month.slice(5)) - 1]} ${m.month.slice(2, 4)}` }));
-  const tx = (data?.transactions || []).filter((x) => !status || x.status === status);
-  const low = data?.lowBalance || [];
+  const [q, setQ] = useState("");
+  const ql = q.trim().toLowerCase();
+  const tx = useMemo(() => (data?.transactions || []).filter((x) => (!status || x.status === status)
+    && (!ql || `${x.studentName || ""} ${x.method} ${x.purpose} ${x.packageName || ""}`.toLowerCase().includes(ql))), [data, status, ql]);
+  const txs = useSort(tx);
+  const low = useMemo(() => data?.lowBalance || [], [data]);
+  const lows = useSort(low);
   const decided = t.collected + t.rejected;
 
   const exportCsv = () => downloadCsv(`payments-report-${range.from}-to-${range.to}.csv`, [
@@ -35,13 +40,15 @@ export default function ReportsPayments() {
 
   return (
     <div>
+      <ReportNav />
       <PageHead title="Payments report" sub="Money collected, what is still waiting for review, and students about to run out of live sessions.">
         {data && <CsvButton onClick={exportCsv} />}
       </PageHead>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4"><RangePicker value={range} onChange={setRange} /></div>
       <ReportState loading={loading && !data} error={error} onRetry={reload}>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-          <Kpi label="Collected" value={money(t.collected)} sub={`${t.collectedCount} paid orders in this period`} bg="#f0fdf4" fg="#15803d" icon={Coins} />
+          <Kpi label="Collected" value={money(t.collected)} sub={`${t.collectedCount} orders · avg ${t.avgOrder == null ? "—" : money(t.avgOrder)} · ${t.payers || 0} payers (${t.newPayers || 0} new)`} bg="#f0fdf4" fg="#15803d" icon={Coins}
+            delta={<Delta now={t.collected} before={data?.previous?.collected} />} />
           <Kpi label="Waiting for review" value={money(t.pendingNow)} sub={`${t.pendingNowCount} receipts right now`} bg="#fef3c7" fg="#b45309" icon={Clock} />
           <Kpi label="Rejected" value={money(t.rejected)} sub={`${t.rejectedCount} orders · ${decided ? Math.round((t.collected / decided) * 100) : 0}% of money accepted`} icon={XCircle} />
           <Kpi label="Wallet balances" value={money(t.walletBalances)} sub={`${t.walletsWithBalance || 0} students hold money`} bg="#eff6ff" fg="#1d4ed8" icon={Wallet} />
@@ -96,15 +103,20 @@ export default function ReportsPayments() {
         <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
           <RCard title={`Transactions (${tx.length})`} sub="Every order in this period, newest first"
             right={(
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="a-inp !w-auto !py-1.5 text-xs">
-                <option value="">All statuses</option>{Object.entries(STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}
-              </select>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <SearchBox value={q} onChange={setQ} placeholder="Student, method…" className="flex-1 sm:w-48" />
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className="a-inp !w-auto !py-1.5 text-xs">
+                  <option value="">All statuses</option>{Object.entries(STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </div>
             )}>
-            <div className="overflow-x-auto -mx-5 max-h-[520px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white"><tr>{["Date", "Student", "Type", "Method", "Amount", "Status"].map((h) => <th key={h} className="a-th">{h}</th>)}</tr></thead>
+            <RTable maxH={520}>
+                <thead><tr>
+                  <Th k="createdAt" s={txs}>Date</Th><Th k="studentName" s={txs} first="asc">Student</Th><Th k="purpose" s={txs} first="asc">Type</Th>
+                  <Th k="method" s={txs} first="asc">Method</Th><Th k="amount" s={txs}>Amount</Th><Th k="status" s={txs} first="asc">Status</Th>
+                </tr></thead>
                 <tbody>
-                  {tx.map((x) => (
+                  {txs.sorted.map((x) => (
                     <tr key={x.id} className={`a-tr ${x.studentId ? "cursor-pointer" : ""}`} onClick={() => x.studentId && navigate(`/admin/users/student-information/${x.studentId}`)}>
                       <td className="a-td text-gray-600 whitespace-nowrap">{dayStr(x.createdAt)}</td>
                       <td className="a-td font-semibold text-gray-700">{x.studentName || <span className="text-gray-400">No student</span>}</td>
@@ -114,17 +126,17 @@ export default function ReportsPayments() {
                       <td className="a-td"><Pill tone={STATUS[x.status]?.[1]}>{STATUS[x.status]?.[0] || x.status}</Pill></td>
                     </tr>
                   ))}
-                  {!tx.length && <tr><td colSpan={6} className="py-10 text-center text-gray-400">No orders in this period.</td></tr>}
+                  {!tx.length && <tr><td colSpan={6} className="py-10 text-center text-gray-400">{q || status ? "No orders match." : "No orders in this period."}</td></tr>}
                 </tbody>
-              </table>
-            </div>
+            </RTable>
           </RCard>
           <RCard title={`0-1-2-3 countdown (${low.length})`} sub="Students who use live sessions and have 3 or fewer left. Renew before zero.">
-            <div className="overflow-x-auto -mx-5 max-h-[520px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white"><tr>{["Student", "Courses", "Left", "Last attended"].map((h) => <th key={h} className="a-th">{h}</th>)}</tr></thead>
+            <RTable maxH={520}>
+                <thead><tr>
+                  <Th k="name" s={lows} first="asc">Student</Th><Th>Courses</Th><Th k="liveBalance" s={lows} first="asc">Left</Th><Th k="lastAttended" s={lows}>Last attended</Th>
+                </tr></thead>
                 <tbody>
-                  {low.map((s) => (
+                  {lows.sorted.map((s) => (
                     <tr key={s.id} className="a-tr cursor-pointer" onClick={() => navigate(`/admin/users/student-information/${s.id}`)}>
                       <td className="a-td"><p className="font-bold text-gray-800">{s.name}</p>{s.nickname && <p className="text-[11px] text-gray-400 truncate max-w-[200px]">{s.nickname}</p>}</td>
                       <td className="a-td text-gray-600 max-w-[200px]"><span className="line-clamp-2">{s.courses.join(", ") || "—"}</span></td>
@@ -134,8 +146,7 @@ export default function ReportsPayments() {
                   ))}
                   {!low.length && <tr><td colSpan={4} className="py-10 text-center text-gray-400">Nobody is running low.</td></tr>}
                 </tbody>
-              </table>
-            </div>
+            </RTable>
           </RCard>
         </div>
       </ReportState>

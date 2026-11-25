@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Check, CheckSquare, Clock3, Eye, RotateCw, Square, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/api/api";
@@ -142,14 +143,17 @@ const AvailabilityPlans = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  // ?plan=<id> opens that study plan straight away (links from the Planner alert and Build a plan);
+  // ?status=<status> starts the list filtered.
+  const [params, setParams] = useSearchParams();
+  const [status, setStatus] = useState(() => params.get("status") || "");
   const [studentId, setStudentId] = useState("");
   const debouncedSearch = useDebouncedValue(search.trim());
   const debouncedStudentId = useDebouncedValue(studentId.trim());
   const [countsVersion, setCountsVersion] = useState(0);
 
   // Detail / propose state
-  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState(() => params.get("plan") || "");
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [adminNotes, setAdminNotes] = useState("");
   const [sessionNotes, setSessionNotes] = useState({});
@@ -244,11 +248,12 @@ const AvailabilityPlans = () => {
   };
 
   const closePlan = useCallback(() => {
+    if (params.get("plan")) setParams((p) => { p.delete("plan"); return p; }, { replace: true });
     setSelectedPlanId("");
     setSelectedSessionIds([]);
     setAdminNotes("");
     setSessionNotes({});
-  }, []);
+  }, [params, setParams]);
 
   const toggleSession = (sessionId) => {
     setSelectedSessionIds((current) => (current.includes(sessionId) ? current.filter((id) => id !== sessionId) : [...current, sessionId]));

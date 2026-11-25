@@ -46,7 +46,7 @@ const slotKey = (s) => `${s.date}|${s.timeFrom}|${s.timeTo}`;
 const rowLessons = (r) => (r.group ? r.lessonIds : r.lessonId ? [r.lessonId] : []);
 const sortDraft = (list) => [...list].sort((a, b) => `${a.date} ${a.timeFrom}`.localeCompare(`${b.date} ${b.timeFrom}`));
 
-export default function BuildPlanTab() {
+export default function BuildPlanTab({ refreshKey = 0 }) {
   /* ---------- requests list (both statuses merged) ---------- */
   const [plans, setPlans] = useState([]);
   const [listLoading, setListLoading] = useState(true);
@@ -71,7 +71,7 @@ export default function BuildPlanTab() {
       setListLoading(false);
     }
   }, []);
-  useEffect(() => { loadPlans(); }, [loadPlans]);
+  useEffect(() => { loadPlans(); }, [loadPlans, refreshKey]); // refreshKey: a student was marked inactive from the alert
 
   /* ---------- selected plan ---------- */
   const [plan, setPlan] = useState(null);
@@ -93,6 +93,23 @@ export default function BuildPlanTab() {
   const current = plan && sameId(plan.id, selectedId) ? plan : null;
   const student = current?.student || null;
   const studentName = personName(student);
+  // Active / Inactive for planner alerts (comes with the request list)
+  const listed = plans.find((p) => sameId(p.id, selectedId));
+  const plannerActive = listed?.student?.plannerActive !== false && listed?.student?.plannerActive !== 0;
+  const [savingActive, setSavingActive] = useState(false);
+  const setActive = async (active) => {
+    if (!listed?.student?.id) return;
+    setSavingActive(true);
+    try {
+      await api.put(`/api/admin/planner/students/${listed.student.id}/active`, { active });
+      setPlans((list) => list.map((p) => (sameId(p.student?.id, listed.student.id) ? { ...p, student: { ...p.student, plannerActive: active } } : p)));
+      toast.success(active ? "Active — you'll get planner alerts for this student" : "Inactive — no planner alerts for this student");
+    } catch (err) {
+      toast.error(errText(err, "Could not change the status"));
+    } finally {
+      setSavingActive(false);
+    }
+  };
 
   /* ---------- builder state ---------- */
   const { data: options } = usePlannerOptions(student?.id);
@@ -368,7 +385,7 @@ export default function BuildPlanTab() {
                     <span className={`text-sm font-bold truncate ${on ? "text-one" : "text-gray-800"}`}>{personName(p.student)}</span>
                     <Pill tone={meta.tone}>{meta.label}</Pill>
                   </span>
-                  <span className="block text-xs text-gray-500 truncate">{p.title || "Untitled plan"}</span>
+                  <span className="block text-xs text-gray-500 truncate">{p.title || "Untitled plan"}{(p.student?.plannerActive === false || p.student?.plannerActive === 0) && <span className="ml-1.5 text-[10px] font-bold uppercase text-gray-400">· Inactive</span>}</span>
                   <span className="block text-[11px] text-gray-400">Sent {fmtStamp(p.createdAt) || "—"}</span>
                 </button>
               );
@@ -394,6 +411,18 @@ export default function BuildPlanTab() {
                       {[student?.grade?.name, student?.category?.name, student?.email || student?.phone].filter(Boolean).join(" · ") || "—"}
                     </p>
                   </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 -mt-1 mb-4">
+                  <div className="inline-flex rounded-lg bg-gray-100 p-0.5" role="group" aria-label="Planner alerts for this student">
+                    {[[true, "Active"], [false, "Inactive"]].map(([v, l]) => (
+                      <button key={l} type="button" disabled={savingActive || !listed} onClick={() => v !== plannerActive && setActive(v)}
+                        className={`px-3 py-1 rounded-md text-xs font-bold ${plannerActive === v ? (v ? "bg-white text-green-700 shadow-sm" : "bg-white text-gray-700 shadow-sm") : "text-gray-500 hover:text-gray-800"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <Link to={`/admin/live/availability-plans?plan=${current.id}`} className="text-xs font-bold text-one hover:underline">Open study plan →</Link>
+                  <p className="w-full text-[11px] text-gray-400">{plannerActive ? "You get an alert on the Planner when this student's free times wait for you." : "Inactive: no Planner alerts for this student."}</p>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">Plan: <b className="text-gray-800">{current.title || "Untitled plan"}</b></p>
 

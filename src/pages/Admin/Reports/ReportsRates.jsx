@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { BookOpen, MessageSquare, Star, Trophy } from "lucide-react";
 import { PageHead } from "@/components/admin/kit";
-import { CsvButton, HBars, Kpi, RCard, ReportState, dayStr, downloadCsv, stars, useReport } from "./parts";
+import { CsvButton, HBars, Kpi, RCard, ReportNav, ReportState, SearchBox, dayStr, downloadCsv, stars, useReport } from "./parts";
 
 /* Reports → Rates (design: rep-rates). GET /api/admin/reports/rates
    Session ratings are stored 1–10 and shown as stars out of 5. */
@@ -30,6 +30,7 @@ export default function ReportsRates() {
 
   return (
     <div>
+      <ReportNav />
       <PageHead title="Rates report" sub="Session ratings by course and by teacher, with the latest comments.">
         {data && <CsvButton onClick={exportCsv} />}
       </PageHead>
@@ -62,13 +63,21 @@ export default function ReportsRates() {
         </div>
 
         <RCard title="Latest comments" sub={`${comments.length} most recent`}
-          right={<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments…" className="a-inp !py-2 !w-56" />}>
-          {shown.length ? shown.map((c) => (
-            <div key={c.id} className="border border-gray-100 rounded-xl p-4 mb-2">
-              <p className="text-sm font-bold text-gray-800">{stars(c.rating)} <span className="font-normal text-gray-400">· {c.studentName || "Student"} · {c.sessionName}{c.teacherName ? ` with ${c.teacherName}` : ""} · {dayStr(c.createdAt)}</span></p>
-              <p className="text-sm text-gray-600 mt-1">{c.comment}</p>
+          right={<SearchBox value={q} onChange={setQ} placeholder="Search comments…" className="w-full sm:w-56" />}>
+          {shown.length ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {shown.map((c) => (
+                <div key={c.id} className="border border-gray-100 rounded-xl p-4 hover:border-gray-200 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`font-extrabold ${c.rating >= 8 ? "text-green-700" : c.rating >= 5 ? "text-amber-600" : "text-red-600"}`}>{stars(c.rating)}</span>
+                    <span className="text-[11px] text-gray-400">{dayStr(c.createdAt)}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">{c.studentName || "Student"} · {c.sessionName}{c.teacherName ? ` with ${c.teacherName}` : ""}</p>
+                  <p className="text-sm text-gray-700 mt-2">{c.comment}</p>
+                </div>
+              ))}
             </div>
-          )) : <p className="text-sm text-gray-400 py-6 text-center">{comments.length ? "No comments match." : "No comments yet."}</p>}
+          ) : <p className="text-sm text-gray-400 py-6 text-center">{comments.length ? "No comments match." : "No comments yet."}</p>}
         </RCard>
       </ReportState>
     </div>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Gift } from "lucide-react";
 import useGet from "@/hooks/useGet";
 import axios from "@/api/api";
 import { Card, Empty, Modal, PageHead, Pill, SkelRows, Stat, errText } from "@/components/admin/kit";
@@ -12,6 +12,74 @@ import { Card, Empty, Modal, PageHead, Pill, SkelRows, Stat, errText } from "@/c
    POST /api/admin/student/:id/packages { packageId, paymentMethodId } */
 
 const TYPE_TONE = { live: "blue", exam: "amber", question: "purple" };
+const REASONS = ["Compensation", "Free trial", "Sibling discount", "Teacher's mistake", "Gift"];
+const fmtDate = (v) => (v ? new Date(String(v).replace(" ", "T")).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
+
+/* Free live sessions with a reason: POST/GET /api/admin/student/:id/free-sessions.
+   They go into the live balance; the reports show sessions used from them as free — given by admin. */
+function FreeSessions({ studentId, studentName, onGiven }) {
+  const { data, refetch } = useGet(`/api/admin/student/${studentId}/free-sessions`);
+  // flat response { success, data: { grants, total } }; useGet keeps res.data
+  const grants = data?.data?.grants || [];
+  const total = data?.data?.total || 0;
+  const [open, setOpen] = useState(false);
+  const [n, setN] = useState(1);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const valid = Number.isInteger(Number(n)) && Number(n) >= 1 && Number(n) <= 50 && reason.trim().length >= 3;
+
+  const give = async () => {
+    if (!valid) return;
+    setSaving(true);
+    try {
+      const r = await axios.post(`/api/admin/student/${studentId}/free-sessions`, { sessions: Number(n), reason: reason.trim() });
+      toast.success(`${n} free session${Number(n) === 1 ? "" : "s"} added — live balance is now ${r.data?.data?.liveBalance ?? "updated"}`);
+      setOpen(false); setN(1); setReason("");
+      refetch(); onGiven?.();
+    } catch (err) {
+      toast.error(errText(err, "Could not add the free sessions"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="mb-4" title={<span className="inline-flex items-center gap-2"><Gift size={16} className="text-amber-600" /> Free live sessions</span>}
+        sub={total ? `${total} given free so far — they count as free (0 EGP) in the reports` : "Give sessions without a payment: compensation, a trial, a discount…"}
+        right={<button onClick={() => setOpen(true)} className="a-btn primary !py-1.5"><Gift size={15} /> Give free sessions</button>}>
+        {grants.length ? (
+          <ul className="divide-y divide-gray-50 -my-2">
+            {grants.map((g) => (
+              <li key={g.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+                <b className="text-amber-700 w-16 shrink-0">+{g.sessions}</b>
+                <span className="text-gray-800 flex-1 min-w-[140px]">{g.reason}</span>
+                <span className="text-xs text-gray-400">{fmtDate(g.createdAt)}{g.givenBy ? ` · by ${g.givenBy}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-gray-400">No free sessions given yet.</p>}
+      </Card>
+
+      {open && (
+        <Modal title="Give free live sessions" onClose={() => !saving && setOpen(false)}
+          actions={<>
+            <button onClick={() => setOpen(false)} disabled={saving} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+            <button onClick={give} disabled={saving || !valid} className="a-btn primary !py-2">{saving ? "Adding…" : `Add ${Number(n) || 0} free session${Number(n) === 1 ? "" : "s"}`}</button>
+          </>}>
+          <p className="mb-3">Adds sessions to <b>{studentName}</b>&apos;s live balance with no payment. Sessions they use from it earn 0 EGP in the reports.</p>
+          <label className="a-lbl-f" htmlFor="free-n">How many sessions</label>
+          <input id="free-n" type="number" min={1} max={50} value={n} onChange={(e) => setN(e.target.value)} className="a-inp !w-32 mb-3" />
+          <label className="a-lbl-f" htmlFor="free-reason">Reason <span className="text-red-500">*</span></label>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {REASONS.map((r) => <button key={r} type="button" onClick={() => setReason(r)} className={`a-chip ${reason === r ? "on" : ""}`}>{r}</button>)}
+          </div>
+          <input id="free-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} placeholder="Or write the reason…" className="a-inp" />
+        </Modal>
+      )}
+    </>
+  );
+}
 
 const UserPackage = () => {
   const navigate = useNavigate();
@@ -70,6 +138,8 @@ const UserPackage = () => {
               <Stat label="Packages bought" value={all.filter((p) => p.isPurchasedBefore).length} sub={`of ${all.length} available`} />
             </div>
           )}
+
+          {student && <FreeSessions studentId={studentId} studentName={student.name} onGiven={refetch} />}
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4 grid grid-cols-2 md:flex md:flex-wrap md:items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search packages…" className={`${sel} col-span-2 md:flex-1 md:min-w-[200px]`} />

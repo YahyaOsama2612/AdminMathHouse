@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Users, Wallet } from "lucide-react";
 import { PageHead, Pill } from "@/components/admin/kit";
-import { CsvButton, Kpi, RCard, ReportState, dayStr, downloadCsv, money, useReport } from "./parts";
+import { CsvButton, Kpi, RCard, RTable, ReportNav, ReportState, SearchBox, Th, dayStr, downloadCsv, money, useReport, useSort } from "./parts";
 
 /* Reports → Students (design: rep-students). GET /api/admin/reports/students */
 
@@ -30,8 +30,9 @@ export default function ReportsStudents() {
   const list = all.filter((s) => (!ql || `${s.name} ${s.nickname} ${s.email} ${s.phone}`.toLowerCase().includes(ql))
     && (!grade || s.grade === grade) && (!course || s.courses.includes(course))
     && (!status || s.status === status) && (!country || s.country === country));
+  const srt = useSort(list, { key: "name", dir: "asc" });
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
-  const shown = list.slice((Math.min(page, pages) - 1) * PAGE, Math.min(page, pages) * PAGE);
+  const shown = srt.sorted.slice((Math.min(page, pages) - 1) * PAGE, Math.min(page, pages) * PAGE);
   const set = (fn) => (e) => { fn(e.target.value); setPage(1); };
 
   const live = all.filter((s) => s.status !== "No live sessions");
@@ -46,6 +47,7 @@ export default function ReportsStudents() {
 
   return (
     <div>
+      <ReportNav />
       <PageHead title="Students report" sub="Every student with their courses, live sessions left, money and attendance. Click a row for the full profile.">
         {data && <CsvButton onClick={exportCsv} />}
       </PageHead>
@@ -59,16 +61,19 @@ export default function ReportsStudents() {
 
         <RCard title="All students" sub="Search, filter, click a row for the full profile and reports">
           <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 mb-3">
-            <input value={q} onChange={set(setQ)} placeholder="Search name, email or phone…" className="a-inp !py-2 col-span-2 md:!w-64" />
+            <SearchBox value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search name, email or phone…" className="col-span-2 md:w-64" />
             <select value={grade} onChange={set(setGrade)} className={sel}><option value="">All grades</option>{opts.grades.map((g) => <option key={g}>{g}</option>)}</select>
             <select value={course} onChange={set(setCourse)} className={sel}><option value="">All courses</option>{opts.courses.map((c) => <option key={c}>{c}</option>)}</select>
             <select value={country} onChange={set(setCountry)} className={sel}><option value="">All countries</option>{opts.countries.map((c) => <option key={c}>{c}</option>)}</select>
             <select value={status} onChange={set(setStatus)} className={sel}><option value="">All statuses</option>{Object.keys(STATUS_TONE).map((s) => <option key={s}>{s}</option>)}</select>
             <span className="text-xs text-gray-400 self-center md:ml-auto col-span-2">{list.length} of {all.length}</span>
           </div>
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-sm">
-              <thead><tr>{["Student", "Grade", "Courses", "Country", "Live left", "Wallet", "Paid", "Attended", "Status"].map((h) => <th key={h} className="a-th">{h}</th>)}</tr></thead>
+          <RTable>
+              <thead><tr>
+                <Th k="name" s={srt} first="asc">Student</Th><Th k="grade" s={srt} first="asc">Grade</Th><Th>Courses</Th>
+                <Th k="country" s={srt} first="asc">Country</Th><Th k="liveBalance" s={srt}>Live left</Th><Th k="wallet" s={srt}>Wallet</Th>
+                <Th k="paid" s={srt}>Paid</Th><Th k="present" s={srt}>Attended</Th><Th k="status" s={srt} first="asc">Status</Th>
+              </tr></thead>
               <tbody>
                 {shown.map((s) => (
                   <tr key={s.id} className="a-tr cursor-pointer" onClick={() => navigate(`/admin/users/student-information/${s.id}`)} title="Open profile">
@@ -85,8 +90,7 @@ export default function ReportsStudents() {
                 ))}
                 {!shown.length && <tr><td colSpan={9} className="py-10 text-center text-gray-400">No students match.</td></tr>}
               </tbody>
-            </table>
-          </div>
+          </RTable>
           {pages > 1 && (
             <div className="flex items-center justify-end gap-2 pt-3 text-xs text-gray-500">
               <button className="a-btn !py-1.5 !px-3" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</button>
