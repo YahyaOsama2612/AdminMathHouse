@@ -21,6 +21,21 @@ const SearchStudents = ({ value = [], onChange, error, limit = 10 }) => {
   const knownStudentsRef = useRef(new Map());
   // عشان لو request قديم رجع متأخر مايغطيش على نتيجة أحدث
   const requestIdRef = useRef(0);
+  // students already selected (e.g. when editing a session) may not be on the loaded page —
+  // fetch their names once so the chips show who they are instead of "+N more"
+  const askedRef = useRef(new Set());
+  const [, setNamesVersion] = useState(0);
+  useEffect(() => {
+    const missing = value.filter((id) => id && !knownStudentsRef.current.has(id) && !askedRef.current.has(id));
+    if (!missing.length) return;
+    missing.forEach((id) => askedRef.current.add(id));
+    api.get("/api/admin/groups/search-students", { params: { ids: missing.join(",") } })
+      .then((res) => {
+        (res?.data?.data?.data || []).forEach((st) => knownStudentsRef.current.set(st.value, st));
+        setNamesVersion((v) => v + 1);
+      })
+      .catch(() => missing.forEach((id) => askedRef.current.delete(id)));
+  }, [value]);
 
   // 🔹 Debounce للبحث: مابنبعتش request مع كل حرف
   useEffect(() => {
